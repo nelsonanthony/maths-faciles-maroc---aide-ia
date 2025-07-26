@@ -55,7 +55,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) {
         console.error('Error creating chat room:', error);
-        return res.status(500).json({ error: 'Failed to create chat room' });
+        if (error.code === '42P01') { // undefined_table
+            return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_rooms' est manquante." });
+        }
+        return res.status(500).json({ error: 'Échec de la création du salon de discussion.' });
     }
 
     return res.status(201).json(data);

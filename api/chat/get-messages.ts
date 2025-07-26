@@ -70,7 +70,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) {
         console.error('Error fetching messages:', error);
-        return res.status(500).json({ error: 'Failed to fetch messages' });
+        if (error.code === '42P01') { // undefined_table
+            return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_messages' est manquante. Veuillez exécuter le SQL de configuration fourni dans les commentaires du fichier API." });
+        }
+        return res.status(500).json({ error: 'Échec de la récupération des messages.' });
     }
 
     return res.status(200).json(data);

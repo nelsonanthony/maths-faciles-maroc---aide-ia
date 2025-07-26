@@ -97,7 +97,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (error) {
         console.error('Error sending message:', error);
-        return res.status(500).json({ error: 'Failed to send message' });
+        if (error.code === '42P01') { // undefined_table
+            return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_messages' est manquante." });
+        }
+        return res.status(500).json({ error: 'Échec de l\'envoi du message.' });
     }
 
     return res.status(201).json(data);

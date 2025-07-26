@@ -1,4 +1,4 @@
 
 {
-  "devCommand": false
+  "devCommand": "npm run dev"
 }

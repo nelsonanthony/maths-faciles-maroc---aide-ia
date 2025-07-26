@@ -2,10 +2,7 @@
   "devCommand": "npm run dev",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": [
-        "src/types.ts",
-        "api/ai-usage-limiter.ts"
-      ]
+      "includeFiles": "src/types.ts"
     }
   }
 }

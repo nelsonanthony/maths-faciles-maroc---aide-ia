@@ -1,0 +1,158 @@
+
+{
+    "levels": [
+        {
+            "id": "1-bac-sm",
+            "levelName": "1ère Année Bac - Sciences Maths",
+            "description": "Programme de la première année du baccalauréat marocain, filière sciences mathématiques.",
+            "chapters": [
+                {
+                    "id": "1-logique",
+                    "title": "Notions de logique",
+                    "summary": "Ce chapitre introduit les fondements du raisonnement mathématique. Nous aborderons les concepts de propositions, les connecteurs logiques (ET, OU, NON, implication, équivalence) et les quantificateurs (universel ∀ et existentiel ∃). La maîtrise des tables de vérité et des différents types de raisonnement (par l'absurde, par contraposée, par récurrence) est essentielle pour la suite du programme.",
+                    "videoLinks": [
+                        {
+                            "id": "_RkL24x4k6c",
+                            "title": "Notions de Logique - Vidéo Principale"
+                        }
+                    ],
+                    "quizzes": [
+                        {
+                            "id": "logique-q1",
+                            "title": "Quiz - Fondamentaux",
+                            "questions": [
+                                {
+                                    "id": "q1-1",
+                                    "question": "Quelle est la négation de la proposition \"∀x ∈ ℝ, x² ≥ 0\" ?",
+                                    "options": [
+                                        "∃x ∈ ℝ, x² > 0",
+                                        "∀x ∈ ℝ, x² < 0",
+                                        "∃x ∈ ℝ, x² < 0",
+                                        "∀x ∈ ℝ, x² ≤ 0"
+                                    ],
+                                    "correctAnswerIndex": 2
+                                },
+                                {
+                                    "id": "q1-2",
+                                    "question": "Si la proposition (P ⇒ Q) est fausse, que peut-on conclure ?",
+                                    "options": [
+                                        "P est vraie et Q est vraie",
+                                        "P est vraie et Q est fausse",
+                                        "P est fausse et Q est vraie",
+                                        "P est fausse et Q est fausse"
+                                    ],
+                                    "correctAnswerIndex": 1
+                                }
+                            ]
+                        }
+                    ],
+                    "series": [
+                        {
+                            "id": "logique-s1",
+                            "title": "Série 1 - Tables de vérité et implications",
+                            "exercises": [
+                                {
+                                    "id": "log-s1-e1",
+                                    "statement": "Soient P, Q et R trois propositions. Démontrer par l'absurde que si (P ⇒ Q) et (Q ⇒ R) sont vraies, alors (P ⇒ R) est vraie.",
+                                    "correctionSnippet": "On suppose que (P ⇒ Q) et (Q ⇒ R) sont vraies, et que (P ⇒ R) est fausse. Si (P ⇒ R) est fausse, cela signifie que P est vraie et R est fausse. Comme P est vraie et (P ⇒ Q) est vraie, alors Q doit être vraie. Mais si Q est vraie et R est fausse, alors (Q ⇒ R) est fausse, ce qui contredit notre hypothèse."
+                                },
+                                {
+                                    "id": "log-s1-e2",
+                                    "statement": "Dresser la table de vérité de la proposition (P ∧ Q) ⇒ (P ∨ R).",
+                                    "correctionSnippet": "La table de vérité doit comporter 8 lignes (2³ cas). La proposition est fausse uniquement si (P ∧ Q) est vraie et (P ∨ R) est fausse. Cela se produit quand P=Vrai, Q=Vrai, et R=Faux."
+                                }
+                            ]
+                        },
+                        {
+                            "id": "logique-s2",
+                            "title": "Série 2 - Raisonnement par récurrence",
+                            "exercises": [
+                                {
+                                    "id": "log-s2-e1",
+                                    "statement": "Démontrer par récurrence que pour tout entier naturel n ≥ 1, on a : $$\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$$",
+                                    "correctionSnippet": "La démonstration se fait en 3 temps : initialisation, hérédité et conclusion.",
+                                    "fullCorrection": "Étape 1 : Initialisation\nOn vérifie que la propriété est vraie pour le premier rang, n=1.\nPour n=1, la somme est  $\\sum_{k=1}^{1} k = 1$.\nLa formule donne $\\frac{1(1+1)}{2} = \\frac{2}{2} = 1$.\nComme 1 = 1, la propriété est vraie au rang 1.\n\nÉtape 2 : Hérédité\nOn suppose que la propriété est vraie pour un certain entier n ≥ 1. C'est notre hypothèse de récurrence (HR).\nHR: $$\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$$\nOn doit montrer que la propriété est vraie au rang n+1, c'est-à-dire : $$\\sum_{k=1}^{n+1} k = \\frac{(n+1)(n+2)}{2}$$\n\nÉtape 3 : Démonstration de l'hérédité\nOn part du membre de gauche de ce que l'on veut démontrer :\n$\\sum_{k=1}^{n+1} k = (\\sum_{k=1}^{n} k) + (n+1)$\nOn utilise l'hypothèse de récurrence pour remplacer la somme jusqu'à n :\n$= \\frac{n(n+1)}{2} + (n+1)$\nOn met (n+1) en facteur commun :\n$= (n+1) (\\frac{n}{2} + 1)$\nOn met au même dénominateur dans la seconde parenthèse :\n$= (n+1) (\\frac{n+2}{2})$\nCe qui donne bien :\n$= \\frac{(n+1)(n+2)}{2}$\n\nÉtape 4 : Conclusion\nLa propriété est vraie au rang 1, et elle est héréditaire. Donc, par le principe de récurrence, elle est vraie pour tout entier naturel n ≥ 1."
+                                }
+                            ]
+                        }
+                    ]
+                },
+                { "id": "1-ensembles", "title": "Ensembles et applications", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-fonctions-generalites", "title": "Généralités sur les fonctions", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-suites", "title": "Les suites numériques", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                {
+                    "id": "1-barycentre",
+                    "title": "Le barycentre dans le plan",
+                    "summary": "Résumé non disponible.",
+                    "videoLinks": [],
+                    "quizzes": [],
+                    "series": [
+                        {
+                            "id": "bary-s1",
+                            "title": "Série 1 - Associativité et construction",
+                            "exercises": [
+                                {
+                                    "id": "bary-s1-e1",
+                                    "statement": "Soient A, B, C trois points non alignés du plan. Construire le point G, barycentre du système pondéré {(A, 2), (B, 1), (C, 1)}.",
+                                    "correctionSnippet": "Par associativité, on construit I, milieu de [BC]. G est alors le barycentre de {(A, 2), (I, 2)}, ce qui signifie que G est le milieu du segment [AI].",
+                                    "imageUrl": "https://storage.googleapis.com/genai-assets/images/graphs/barycenter_graph.png"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                { "id": "1-produit-scalaire-plan", "title": "Étude analytique du produit scalaire", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-trigo", "title": "Trigonométrie", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-rotation", "title": "La rotation dans le plan", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-limites", "title": "Limite d'une fonction numérique", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-derivabilite", "title": "Dérivabilité d'une fonction numérique", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                {
+                    "id": "1-etude-fonctions",
+                    "title": "Étude des fonctions numériques",
+                    "summary": "Résumé non disponible.",
+                    "videoLinks": [],
+                    "quizzes": [],
+                    "series": [
+                        {
+                            "id": "fonctions-s1",
+                            "title": "Série 1 - Fonctions polynômes",
+                            "exercises": [
+                                {
+                                    "id": "fonc-s1-e1",
+                                    "statement": "Soit f(x) = x³ - 3x + 2. Dresser le tableau de variation complet de la fonction f sur R.",
+                                    "correctionSnippet": "La dérivée f'(x) = 3(x-1)(x+1) s'annule en -1 et 1. f est croissante sur ]-∞, -1] et [1, +∞[, et décroissante sur [-1, 1].",
+                                    "imageUrl": "https://storage.googleapis.com/genai-assets/images/graphs/function_study_graph.png",
+                                    "latexFormula": "y = x^3 - 3x + 2"
+                                }
+                            ]
+                        },
+                        {
+                            "id": "fonctions-s2",
+                            "title": "Série 2 - Fonctions rationnelles",
+                            "exercises": [
+                                {
+                                    "id": "fonc-s2-e1",
+                                    "statement": "Soit f(x) = \\frac{x^2 - 1}{x + 2}. Étudier la fonction et tracer son graphe. Identifier les asymptotes.",
+                                    "correctionSnippet": "La fonction a une asymptote verticale en x = -2. Elle a aussi une asymptote oblique car le degré du numérateur est supérieur de 1 à celui du dénominateur. La division euclidienne donne y = x - 2 comme asymptote oblique.",
+                                    "latexFormula": "y = \\frac{x^2 - 1}{x + 2}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                { "id": "1-denombrement", "title": "Dénombrement", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-arithmetique", "title": "Arithmétique dans Z", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-vecteurs-espace", "title": "Vecteurs de l'espace", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-analytique-espace", "title": "Étude analytique de l'espace", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-produit-scalaire-espace", "title": "Produit scalaire dans l'espace", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] },
+                { "id": "1-produit-vectoriel", "title": "Produit vectoriel dans l'espace", "summary": "Résumé non disponible.", "videoLinks": [], "quizzes": [], "series": [] }
+            ]
+        },
+        {
+            "id": "2-bac-sm",
+            "levelName": "2ème Année Bac - Sciences Maths",
+            "description": "Programme de la deuxième année du baccalauréat marocain, filière sciences mathématiques.",
+            "chapters": []
+        }
+    ]
+}

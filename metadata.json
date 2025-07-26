@@ -1,0 +1,8 @@
+{
+  "name": "Maths Faciles Maroc - Aide IA",
+  "description": "Un assistant IA pour aider les élèves à comprendre les exercices de mathématiques. Construit avec React et une simulation de backend FastAPI pour une expérience interactive.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "prompt": ""
+}

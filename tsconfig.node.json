@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
+  "include": [
+    "vite.config.ts", 
+    "tailwind.config.js", 
+    "postcss.config.js",
+    "api/**/*.ts",
+    "scripts/**/*.ts",
+    "src/types.ts"
+  ]
+}

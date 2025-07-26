@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .ai-response-content h3 { 
+    @apply text-xl font-semibold text-brand-blue-300 mt-5 mb-2;
+  }
+  .ai-response-content h4 { 
+    @apply text-lg font-semibold text-brand-blue-400 mt-4 mb-1;
+  }
+  .ai-response-content p { 
+    @apply mb-3 leading-relaxed;
+  }
+  .ai-response-content code { 
+    @apply bg-gray-700/50 text-amber-400 rounded-md px-1.5 py-0.5 font-mono text-sm;
+  }
+  .ai-response-content pre { 
+    @apply bg-gray-900/70 p-4 rounded-lg my-4 overflow-x-auto border border-gray-700/50;
+  }
+  .ai-response-content pre code { 
+    @apply bg-transparent p-0 text-base;
+  }
+  .ai-response-content ul, .ai-response-content ol { 
+    @apply list-inside pl-5 mb-4;
+  }
+  .ai-response-content li { 
+    @apply mb-1;
+  }
+  .ai-response-content table {
+    @apply w-full my-4 border-collapse border border-gray-600;
+  }
+  .ai-response-content th, .ai-response-content td {
+    @apply border border-gray-600 px-3 py-2 text-left;
+  }
+  .ai-response-content th {
+    @apply bg-gray-700/50;
+  }
+  mjx-container[jax="SVG"] {
+    display: inline-block;
+    margin: 0.2em 0;
+  }
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient-animation 6s ease infinite;
+  }
+
+  /* Custom MathQuill input field styling */
+  .mq-editable-field {
+    @apply w-full p-4 text-lg text-gray-200;
+  }
+  .mq-editable-field .mq-cursor {
+    @apply border-l-2 border-brand-blue-400;
+  }
+  .mq-selection .mq-root-block {
+    background-color: theme('colors.brand-blue.900/50') !important;
+  }
+
+  /* Custom MathKeyboard button styling */
+  .math-keyboard-button {
+    @apply p-3 rounded-lg text-lg font-semibold text-gray-200 transition-colors duration-150 flex items-center justify-center;
+  }
+  .math-keyboard-button .mjx-container {
+    font-size: 0.9em; /* Adjust font size inside buttons if needed */
+  }
+}
+
+@keyframes gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}

@@ -43,38 +43,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return;
     }
 
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
-
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return res.status(500).json({ error: 'Database configuration is missing' });
-    }
-
-    const { exercise_id } = req.query;
-
-    if (!exercise_id || typeof exercise_id !== 'string') {
-        return res.status(400).json({ error: 'exercise_id is required' });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { data, error } = await (supabase
-        .from('chat_rooms') as any)
-        .select('*')
-        .eq('exercise_id', exercise_id)
-        .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching rooms:', error);
-        if (error.code === '42P01') { // undefined_table
-            return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_rooms' est manquante. Veuillez exécuter le SQL de configuration fourni dans les commentaires du fichier API." });
+    try {
+        if (req.method !== 'GET') {
+            return res.status(405).json({ error: 'Method Not Allowed' });
         }
-        return res.status(500).json({ error: 'Échec de la récupération des salons de discussion.' });
-    }
 
-    return res.status(200).json(data);
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+            console.error('Server configuration error: SUPABASE_URL or SUPABASE_ANON_KEY is not set in Vercel environment variables.');
+            return res.status(500).json({ error: 'La configuration de la base de données sur le serveur est incomplète. L\'administrateur doit définir les variables d\'environnement.' });
+        }
+
+        const { exercise_id } = req.query;
+
+        if (!exercise_id || typeof exercise_id !== 'string') {
+            return res.status(400).json({ error: 'exercise_id is required' });
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+        const { data, error } = await (supabase
+            .from('chat_rooms') as any)
+            .select('*')
+            .eq('exercise_id', exercise_id)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Supabase error fetching rooms:', error);
+            if (error.code === '42P01') { // undefined_table
+                return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_rooms' est manquante. Veuillez exécuter le SQL de configuration." });
+            }
+            return res.status(500).json({ error: `Erreur base de données : ${error.message}` });
+        }
+
+        return res.status(200).json(data);
+    } catch (e: any) {
+        console.error('Catastrophic error in get-rooms handler:', e);
+        return res.status(500).json({ error: `Erreur interne du serveur : ${e.message}` });
+    }
 }

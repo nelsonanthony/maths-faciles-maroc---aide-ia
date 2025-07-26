@@ -2,8 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Level, Exercise } from '../src/types';
 import { checkUsageLimit, logAiCall } from './ai-usage-limiter';
+import { getExerciseById } from "./data-access";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -57,34 +57,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: "Les champs 'studentAnswer' et 'exerciseId' sont requis." });
         }
         
-        // --- Fetch LIVE curriculum from Supabase ---
-        const { data: curriculumDB, error: curriculumError } = await supabase
-            .from('curriculum')
-            .select('data')
-            .eq('id', 1)
-            .single();
-
-        if (curriculumError || !curriculumDB?.data) {
-            console.error('Erreur lors de la récupération du programme depuis Supabase:', curriculumError);
-            return res.status(500).json({ error: "Impossible de charger le contenu pédagogique depuis le serveur." });
-        }
-
-        const allExercisesMap = new Map<string, Exercise>();
-        const levels: Level[] = Array.isArray(curriculumDB.data) ? curriculumDB.data as Level[] : [];
-        
-        for (const level of levels) {
-            for (const chapter of level?.chapters ?? []) {
-                for (const series of chapter?.series ?? []) {
-                    for (const exercise of series?.exercises ?? []) {
-                        if (exercise?.id) {
-                            allExercisesMap.set(exercise.id, exercise);
-                        }
-                    }
-                }
-            }
-        }
-
-        const exercise = allExercisesMap.get(exerciseId);
+        // --- Fetch Exercise using the new cached method ---
+        const exercise = await getExerciseById(supabase, exerciseId);
         if (!exercise) {
             return res.status(404).json({ error: "Exercice non trouvé." });
         }

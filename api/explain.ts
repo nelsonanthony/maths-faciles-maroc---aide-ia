@@ -70,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             model: 'gemini-2.5-flash',
             contents: prompt,
         });
-        const explanationText = explanationResponse.text;
+        const explanationText = explanationResponse.text ?? '';
         
         // --- 2. Find Relevant Video Chunk ---
         let relevantVideoChunk: VideoChunk | undefined = undefined;

@@ -96,6 +96,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         
         const jsonText = response.text;
+        if (jsonText === undefined) {
+            throw new Error("La réponse de l'IA est vide ou invalide.");
+        }
         const parsedJson = JSON.parse(jsonText);
         return res.status(200).json(parsedJson);
 

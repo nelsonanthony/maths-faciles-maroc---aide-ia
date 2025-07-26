@@ -1,4 +1,8 @@
-
 {
-  "devCommand": "npm run dev"
+  "devCommand": "npm run dev",
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": "src/types.ts"
+    }
+  }
 }

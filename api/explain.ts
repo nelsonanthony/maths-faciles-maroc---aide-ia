@@ -2,8 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { AIResponse, VideoChunk } from "../src/types";
-import { checkUsageLimit, logAiCall } from "./ai-usage-limiter";
+import { AIResponse, VideoChunk } from "../src/types.js";
+import { checkUsageLimit, logAiCall } from "./ai-usage-limiter.js";
 
 // Cette fonction s'exécute sur les serveurs de Vercel (environnement Node.js)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -82,17 +82,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 model: 'text-embedding-004',
                 contents: userQuestion
             });
-            const queryEmbedding = embeddingResult.embeddings[0].values;
+            
+            if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
+                const queryEmbedding = embeddingResult.embeddings[0].values;
 
-            const { data: chunkData, error: rpcError } = await (supabase.rpc as any)('match_video_chunk', {
-                query_embedding: queryEmbedding,
-                target_chapter_id: chapterId,
-            });
+                const { data: chunkData, error: rpcError } = await (supabase.rpc as any)('match_video_chunk', {
+                    query_embedding: queryEmbedding,
+                    target_chapter_id: chapterId,
+                });
 
-            if (rpcError) {
-                console.error("Error calling Supabase RPC 'match_video_chunk':", rpcError.message);
-            } else if (chunkData && Array.isArray(chunkData) && chunkData.length > 0) {
-                relevantVideoChunk = chunkData[0] as VideoChunk;
+                if (rpcError) {
+                    console.error("Error calling Supabase RPC 'match_video_chunk':", rpcError.message);
+                } else if (chunkData && Array.isArray(chunkData) && chunkData.length > 0) {
+                    relevantVideoChunk = chunkData[0] as VideoChunk;
+                }
             }
         }
 

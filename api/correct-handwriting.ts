@@ -2,9 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { HandwrittenCorrectionResponse } from '../src/types';
-import { checkUsageLimit, logAiCall } from './ai-usage-limiter';
-import { getExerciseById } from "./data-access";
+import { HandwrittenCorrectionResponse } from "../src/types.js";
+import { checkUsageLimit, logAiCall } from './ai-usage-limiter.js';
+import { getExerciseById } from "./data-access.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -94,7 +94,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (error: any) {
         console.error("Error in correct-handwriting:", error);
-        const message = error.message?.includes("JSON") ? "The AI returned an invalid response format." : "An error occurred while communicating with the AI service.";
+        let message = "An error occurred while communicating with the AI service.";
+        if (error.message?.includes("JSON")) {
+            message = "The AI returned an invalid response format.";
+        } else if (error.message) {
+            message = `Erreur du service IA: ${error.message}`;
+        }
         return res.status(500).json({ error: message });
     }
 }

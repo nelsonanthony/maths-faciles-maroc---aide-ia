@@ -2,8 +2,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Exercise } from "../src/types";
-import { getAllExercisesMap } from "./data-access";
+import { Exercise } from "../src/types.js";
+import { getAllExercisesMap } from "./data-access.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Standard CORS headers

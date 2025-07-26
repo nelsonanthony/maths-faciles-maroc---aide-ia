@@ -1,5 +1,6 @@
+
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Level, Exercise } from '../src/types';
+import { Level, Exercise } from '../src/types.js';
 
 // Simple in-memory cache for the serverless function instance
 let cachedCurriculum: Level[] | null = null;

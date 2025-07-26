@@ -2,6 +2,33 @@
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// --- SQL to run in Supabase Editor to create chat_rooms table ---
+/*
+-- 1. Create the table
+CREATE TABLE public.chat_rooms (
+  id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  exercise_id text NOT NULL,
+  name text NOT NULL,
+  created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- 2. Enable Row Level Security (RLS)
+ALTER TABLE public.chat_rooms ENABLE ROW LEVEL SECURITY;
+
+-- 3. Create Policies for RLS
+-- Allow anyone to view chat rooms
+CREATE POLICY "Allow public read access to chat rooms"
+  ON public.chat_rooms FOR SELECT
+  USING (true);
+
+-- Allow authenticated users to create chat rooms
+CREATE POLICY "Allow authenticated users to create chat rooms"
+  ON public.chat_rooms FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = created_by);
+*/
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');

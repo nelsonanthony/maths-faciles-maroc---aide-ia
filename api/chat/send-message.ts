@@ -23,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-    const apiKey = process.env.GEMINI_API_KEY; // Correction ici
+    const apiKey = process.env.GEMINI_API_KEY; 
 
     if (!supabaseUrl || !supabaseServiceKey || !apiKey) {
         return res.status(500).json({ error: 'Server configuration is missing' });
@@ -66,10 +66,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             config: { responseMimeType: "application/json" }
         });
 
-        const moderationResult = JSON.parse(moderationResponse.text);
+        const moderationText = moderationResponse.text;
+        if (moderationText) {
+            const moderationResult = JSON.parse(moderationText);
 
-        if (!moderationResult.is_safe) {
-            return res.status(403).json({ error: `Message rejected: ${moderationResult.reason}` });
+            if (!moderationResult.is_safe) {
+                return res.status(403).json({ error: `Message rejected: ${moderationResult.reason}` });
+            }
+        } else {
+             // If moderation response is empty, log it but let the message pass as a fail-safe.
+             console.warn("AI moderation returned an empty response. Allowing message to pass.");
         }
 
     } catch (e) {

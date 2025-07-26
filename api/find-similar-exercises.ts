@@ -1,3 +1,5 @@
+
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Level, Exercise } from "../src/types";
@@ -85,7 +87,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const allExercisesMap = new Map<string, Exercise>();
-        const levels: Level[] = Array.isArray(curriculumDB.data) ? curriculumDB.data : [];
+        const rawData: any = curriculumDB.data;
+        const levels: Level[] = Array.isArray(rawData) ? rawData : [];
 
         for (const level of levels) {
             for (const chapter of level?.chapters ?? []) {

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -70,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         const allExercisesMap = new Map<string, Exercise>();
-        const levels: Level[] = Array.isArray(curriculumDB.data) ? curriculumDB.data : [];
+        const levels: Level[] = Array.isArray(curriculumDB.data) ? curriculumDB.data as Level[] : [];
         
         for (const level of levels) {
             for (const chapter of level?.chapters ?? []) {

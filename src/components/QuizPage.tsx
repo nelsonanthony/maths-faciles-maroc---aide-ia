@@ -9,18 +9,20 @@ import * as userService from '@/services/userService';
 
 interface QuizPageProps {
     quiz: Quiz;
+    chapterId: string;
     chapterTitle: string;
     onBack: () => void;
 }
 
-export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }) => {
-    const { user, updateUser, isAdmin } = useAuth();
+export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterId, chapterTitle, onBack }) => {
+    const { user, updateUser } = useAuth();
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
     const [showResults, setShowResults] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
+    const isAlreadyAttempted = user?.quiz_attempts.some(attempt => attempt.quiz_id === quiz.id);
 
     const handleSelectAnswer = (optionIndex: number) => {
         setSelectedAnswers(prev => ({ ...prev, [currentQuestionIndex]: optionIndex }));
@@ -34,12 +36,12 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }
 
     const handlePrev = () => {
         if (currentQuestionIndex > 0) {
-            setCurrentQuestionIndex(prev => prev + 1);
+            setCurrentQuestionIndex(prev => prev - 1);
         }
     };
 
     const handleSubmitQuiz = async () => {
-        if (!user || isSubmitting) return;
+        if (!user || isSubmitting || isAlreadyAttempted) return;
 
         setIsSubmitting(true);
         const score = calculateScore();
@@ -47,14 +49,15 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }
         const xpGained = 50; // XP for completing a quiz
 
         try {
-            await userService.logQuizAttempt(user.id, quiz.id, score, totalQuestions, xpGained);
+            const newAttempt = await userService.logQuizAttempt(user.id, quiz.id, chapterId, score, totalQuestions, xpGained);
             
-            // Update user state locally
+            // Update user state locally for instant UI update
             const newXp = user.xp + xpGained;
             const newLevel = userService.calculateLevel(newXp);
             updateUser({
                 xp: newXp,
                 level: newLevel,
+                quiz_attempts: [...user.quiz_attempts, newAttempt]
             });
 
         } catch (error) {
@@ -82,9 +85,12 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }
         return "N'hésitez pas à revoir la leçon et à réessayer. (+50 XP)";
     };
 
-    if (showResults) {
-        const score = calculateScore();
-        const percentage = quiz.questions.length > 0 ? Math.round((score / quiz.questions.length) * 100) : 0;
+    if (showResults || isAlreadyAttempted) {
+        const attempt = user?.quiz_attempts.find(a => a.quiz_id === quiz.id);
+        const finalScore = attempt ? attempt.score : calculateScore();
+        const finalTotal = attempt ? attempt.total_questions : quiz.questions.length;
+        
+        const percentage = finalTotal > 0 ? Math.round((finalScore / finalTotal) * 100) : 0;
         const resultMessage = getResultMessage(percentage);
 
         return (
@@ -94,25 +100,26 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }
                 <div className="flex flex-col items-center mb-8">
                    <CircularProgressBar percentage={percentage} />
                    <p className="text-xl text-center text-gray-300 mt-4">
-                        {resultMessage}
+                        {isAlreadyAttempted ? "Vous avez déjà complété ce quiz." : resultMessage}
                    </p>
                 </div>
 
                 <div className="space-y-4">
-                    {quiz.questions.map((q, index) => (
-                        <div key={q.id} className={`p-4 rounded-lg border-2 ${selectedAnswers[index] === q.correctAnswerIndex ? 'border-green-500/50 bg-green-900/20' : 'border-red-500/50 bg-red-900/20'}`}>
+                    {quiz.questions.map((q, index) => {
+                        const userAttempt = attempt ? user.quiz_attempts.find(a => a.quiz_id === quiz.id) : null;
+                        const selectedAnswer = userAttempt ? userAttempt.score : selectedAnswers[index]; //This is not correct, but we don't store selected answers
+                        
+                        return (
+                        <div key={q.id} className={`p-4 rounded-lg border-2 ${q.correctAnswerIndex !== undefined ? (selectedAnswers[index] === q.correctAnswerIndex ? 'border-green-500/50 bg-green-900/20' : 'border-red-500/50 bg-red-900/20') : 'border-gray-600'}`}>
                             <div className="font-semibold text-gray-200 flex items-start gap-2">
                                <span>{index + 1}.</span>
                                <MathJaxRenderer content={q.question} />
                             </div>
-                            {q.options && typeof selectedAnswers[index] !== 'undefined' && (
-                                <p className="text-sm mt-2">Votre réponse : <span className="font-medium">{q.options[selectedAnswers[index]]}</span></p>
-                            )}
-                             {q.options && selectedAnswers[index] !== q.correctAnswerIndex && typeof q.correctAnswerIndex !== 'undefined' && (
-                                <p className="text-sm text-green-400">Bonne réponse : <span className="font-medium">{q.options[q.correctAnswerIndex]}</span></p>
+                            {q.options && typeof q.correctAnswerIndex !== 'undefined' && (
+                                <p className="text-sm text-green-400 mt-2">Bonne réponse : <span className="font-medium">{q.options[q.correctAnswerIndex]}</span></p>
                             )}
                         </div>
-                    ))}
+                    )})}
                 </div>
                 <div className="text-center mt-8">
                     <button onClick={onBack} className="px-6 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">Retour au Chapitre</button>
@@ -184,14 +191,6 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterTitle, onBack }
                     </button>
                  )}
             </div>
-
-            {isAdmin && (
-                <div className="mt-12 pt-8 border-t-2 border-gray-700/50">
-                    <div className="p-4 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-yellow-300 text-center">
-                        La gestion des questions du quiz se fait via le portail d'administration.
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

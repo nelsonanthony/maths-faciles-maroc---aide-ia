@@ -37,13 +37,13 @@
     @apply bg-gray-700/50;
   }
   .ai-plan-step-button {
-    @apply w-full text-left p-4 rounded-lg border-2 transition-all duration-200 flex items-start gap-3;
+    @apply w-full text-left p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-4 cursor-pointer;
   }
   .ai-plan-step-button.active {
-    @apply bg-brand-blue-600/30 border-brand-blue-500;
+    @apply bg-brand-blue-600/30 border-brand-blue-500 shadow-lg;
   }
   .ai-plan-step-button.inactive {
-    @apply bg-gray-700/50 border-gray-600 hover:bg-gray-700;
+    @apply bg-gray-700/50 border-gray-600 hover:bg-gray-700 hover:border-gray-500;
   }
   mjx-container[jax="SVG"] {
     display: inline-block;
@@ -73,6 +73,16 @@
     font-size: 0.9em; /* Adjust font size inside buttons if needed */
   }
 }
+
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.5s ease-out forwards;
+}
+
 
 @keyframes gradient-animation {
   0% { background-position: 0% 50%; }

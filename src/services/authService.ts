@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient, Session, User as SupabaseUser } from '@supabase/supabase-js';
-import { User } from '@/types';
+import { User, UserQuizAttempt } from '@/types';
 import { calculateLevel } from '@/services/userService';
 
 let supabase: SupabaseClient | null = null;
@@ -132,14 +132,23 @@ export const getUserFromSession = async (session: Session | null): Promise<User 
     try {
         const profile = await getOrCreateProfile(supabaseUser);
 
-        const { data: completedExercisesData, error: exercisesError } = await (supabase
-            .from('user_exercise_progress') as any)
-            .select('exercise_id')
-            .eq('user_id', supabaseUser.id);
+        // Fetch all user progress data at once for performance
+        const [
+            { data: completedExercisesData, error: exercisesError },
+            { data: quizAttemptsData, error: quizAttemptsError }
+        ] = await Promise.all([
+            (supabase.from('user_exercise_progress') as any).select('exercise_id').eq('user_id', supabaseUser.id),
+            (supabase.from('user_quiz_attempts') as any).select('*').eq('user_id', supabaseUser.id)
+        ]);
         
         if (exercisesError) {
             console.error("Error fetching completed exercises:", exercisesError);
             throw exercisesError;
+        }
+        
+        if (quizAttemptsError) {
+            console.error("Error fetching quiz attempts:", quizAttemptsError);
+            throw quizAttemptsError;
         }
 
         const is_admin = !!adminEmail && 
@@ -152,6 +161,7 @@ export const getUserFromSession = async (session: Session | null): Promise<User 
             xp: profile.xp || 0,
             level: calculateLevel(profile.xp || 0),
             completed_exercises: completedExercisesData.map((ex: any) => ex.exercise_id) || [],
+            quiz_attempts: (quizAttemptsData || []) as UserQuizAttempt[],
         };
     } catch(error) {
         console.error("Error building user from session:", error);

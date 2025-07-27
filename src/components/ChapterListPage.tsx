@@ -1,9 +1,8 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
-import { Level, Chapter } from '@/types';
+import React, { useMemo } from 'react';
+import { Level, Chapter, Exercise } from '@/types';
 import { ArrowLeftIcon, PlusCircleIcon, PencilIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import * as userService from '@/services/userService';
 import { CircularProgressBar } from '@/components/CircularProgressBar';
 
 interface ChapterListPageProps {
@@ -22,63 +21,55 @@ const ChapterListItem: React.FC<{
     onDeleteChapter: (id: string, title: string) => void;
 }> = ({ chapter, onSelectChapter, onEditChapter, onDeleteChapter }) => {
     const { user, isAdmin } = useAuth();
-    const [mastery, setMastery] = useState<number | null>(null);
-    const [tooltipText, setTooltipText] = useState('');
-    const [isLoadingMastery, setIsLoadingMastery] = useState(true);
 
-    const totalExercises = useMemo(() => {
-         return chapter.series.flatMap(s => s.exercises.map(e => e.id)).length;
-    }, [chapter.series]);
-
-    useEffect(() => {
-        if (!user || isAdmin || (totalExercises === 0 && chapter.quizzes.length === 0)) {
-            setIsLoadingMastery(false);
-            return;
+    const { mastery, tooltipText, isLoading } = useMemo(() => {
+        if (!user || isAdmin) {
+            return { mastery: null, tooltipText: '', isLoading: false };
         }
 
-        const calculateMastery = async () => {
-            setIsLoadingMastery(true);
+        const allExerciseIdsInChapter = chapter.series.flatMap(s => s.exercises.map(e => e.id));
+        const totalExercises = allExerciseIdsInChapter.length;
 
-            // 1. Calculate exercise progress
-            const completedExercises = chapter.series.flatMap(s => s.exercises.map(e => e.id))
-                .filter(id => user.completed_exercises.includes(id)).length;
-            const exerciseScore = totalExercises > 0 ? (completedExercises / totalExercises) : 1; // 1 if no exercises
+        // 1. Calculate exercise progress
+        const completedExercises = allExerciseIdsInChapter
+            .filter(id => user.completed_exercises.includes(id)).length;
+        const exerciseScore = totalExercises > 0 ? (completedExercises / totalExercises) : 1; // 1 if no exercises
 
-            // 2. Calculate quiz progress
-            const quizIds = chapter.quizzes.map(q => q.id);
-            let avgQuizScore = 1; // 1 if no quizzes
-            let quizAttemptsCount = 0;
-
-            if (quizIds.length > 0) {
-                const attempts = await userService.getQuizAttemptsForQuizzes(user.id, quizIds);
-                if (attempts.length > 0) {
-                    const totalScore = attempts.reduce((acc, attempt) => acc + (attempt.score / attempt.total_questions), 0);
-                    avgQuizScore = totalScore / attempts.length;
-                    quizAttemptsCount = attempts.length;
-                } else {
-                    avgQuizScore = 0; // 0 if quizzes exist but no attempts
-                }
+        // 2. Calculate quiz progress
+        const quizIds = chapter.quizzes.map(q => q.id);
+        const chapterQuizAttempts = user.quiz_attempts.filter(attempt => attempt.chapter_id === chapter.id);
+        
+        let avgQuizScore = 1; // 1 if no quizzes
+        
+        if (quizIds.length > 0) {
+            if (chapterQuizAttempts.length > 0) {
+                const totalScore = chapterQuizAttempts.reduce((acc, attempt) => acc + (attempt.score / attempt.total_questions), 0);
+                avgQuizScore = totalScore / chapterQuizAttempts.length;
+            } else {
+                 avgQuizScore = 0; // 0 if quizzes exist but no attempts
             }
+        }
+        
+        // 3. Combine scores with weighting
+        const exerciseWeight = totalExercises > 0 ? 0.7 : 0;
+        const quizWeight = quizIds.length > 0 ? 0.3 : 0;
+        const totalWeight = exerciseWeight + quizWeight;
 
-            // 3. Combine scores with weighting
-            const exerciseWeight = 0.7;
-            const quizWeight = 0.3;
-            const finalMastery = (exerciseScore * exerciseWeight) + (avgQuizScore * quizWeight);
-            setMastery(Math.round(finalMastery * 100));
+        if (totalWeight === 0) {
+            return { mastery: 100, tooltipText: 'Aucun exercice ou quiz à suivre dans ce chapitre.', isLoading: false };
+        }
 
-            // 4. Create tooltip text
-            let tooltip = `Maîtrise estimée à ${Math.round(finalMastery * 100)}%.\n`;
-            tooltip += `Exercices: ${completedExercises}/${totalExercises}.\n`;
-            if (quizIds.length > 0) {
-                tooltip += `Score quiz moyen: ${Math.round(avgQuizScore * 100)}% (${quizAttemptsCount} tentative(s)).`;
-            }
-            setTooltipText(tooltip);
+        const finalMastery = ((exerciseScore * exerciseWeight) + (avgQuizScore * quizWeight)) / totalWeight;
+        const masteryPercentage = Math.round(finalMastery * 100);
 
-            setIsLoadingMastery(false);
-        };
+        // 4. Create tooltip text
+        let tooltip = `Maîtrise estimée à ${masteryPercentage}%\n`;
+        if (totalExercises > 0) tooltip += `Exercices: ${completedExercises}/${totalExercises}\n`;
+        if (quizIds.length > 0) tooltip += `Score quiz moyen: ${Math.round(avgQuizScore * 100)}% (${chapterQuizAttempts.length} tentative(s))`;
+        
+        return { mastery: masteryPercentage, tooltipText: tooltip.trim(), isLoading: false };
 
-        calculateMastery();
-    }, [chapter, user?.id, user?.completed_exercises, totalExercises, isAdmin]);
+    }, [chapter, user, isAdmin]);
 
     return (
         <div
@@ -114,10 +105,10 @@ const ChapterListItem: React.FC<{
                             </button>
                         </div>
                     )}
-                    {!isAdmin && !isLoadingMastery && mastery !== null && (
+                    {!isAdmin && !isLoading && mastery !== null && (
                          <CircularProgressBar percentage={mastery} size={60} strokeWidth={6} />
                     )}
-                    {!isAdmin && isLoadingMastery && (
+                    {!isAdmin && isLoading && (
                         <div className="w-[60px] h-[60px] flex items-center justify-center">
                             <SpinnerIcon className="w-6 h-6 animate-spin text-gray-500" />
                         </div>

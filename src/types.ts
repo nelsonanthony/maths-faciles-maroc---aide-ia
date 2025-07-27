@@ -73,9 +73,10 @@ export interface User {
     xp: number;
     level: number;
     completed_exercises: string[]; // List of completed exercise IDs
+    quiz_attempts: UserQuizAttempt[]; // List of quiz attempts
 }
 
-export interface Profile extends Omit<User, 'is_admin' | 'completed_exercises'> {}
+export interface Profile extends Omit<User, 'is_admin' | 'completed_exercises' | 'quiz_attempts'> {}
 
 export interface AuthContextType {
     user: User | null;
@@ -180,4 +181,5 @@ export interface UserQuizAttempt {
     score: number;
     total_questions: number;
     taken_at: string;
+    chapter_id: string; // This field is now mandatory for aggregation
 }

@@ -104,33 +104,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 contents: userQuestion
             });
             
-            if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
-                const queryEmbedding = embeddingResult.embeddings[0].values;
-                const { data: chunkData, error: rpcError } = await (supabase.rpc as any)('match_video_chunk', {
-                    query_embedding: queryEmbedding,
-                    target_chapter_id: chapterId,
+            const embedding = embeddingResult.embedding.values;
+            
+            if (embedding) {
+                 const { data: chunkData, error: chunkError } = await supabase.rpc('match_video_chunk', {
+                    query_embedding: embedding,
+                    target_chapter_id: chapterId
                 });
 
-                if (rpcError) {
-                    console.error("Error calling Supabase RPC 'match_video_chunk':", rpcError.message);
-                } else if (chunkData && Array.isArray(chunkData) && chunkData.length > 0) {
-                    relevantVideoChunk = chunkData[0] as VideoChunk;
+                if (chunkError) {
+                    console.error("Error fetching video chunk:", chunkError);
+                } else if (chunkData) {
+                    relevantVideoChunk = chunkData as unknown as VideoChunk;
                 }
             }
         }
-        finalResponse.videoChunk = relevantVideoChunk;
 
-        // --- Log successful AI call ---
+        if (relevantVideoChunk) {
+            finalResponse.videoChunk = relevantVideoChunk;
+        }
+
+        // Log successful AI call
         await logAiCall(supabase, user.id, 'EXPLANATION');
-        
+
         return res.status(200).json(finalResponse);
 
-    } catch (error) {
-        console.error("Error in 'explain' serverless function:", error);
-        const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue est survenue.";
-        if (errorMessage.includes("JSON")) {
-             return res.status(500).json({ error: `Erreur du service IA: L'IA a renvoyé une réponse mal formatée.` });
-        }
-        return res.status(500).json({ error: `Erreur du service IA: ${errorMessage}` });
+    } catch (e: any) {
+        console.error("Critical error in 'explain' function:", e);
+        return res.status(500).json({ error: "An internal server error occurred." });
     }
 }

@@ -76,7 +76,7 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
         case 'quiz':
             if (quiz && chapter) {
                 if (user) {
-                    return <QuizPage quiz={quiz} chapterTitle={chapter.title} onBack={handleBackToChapterHome} />;
+                    return <QuizPage quiz={quiz} chapterId={chapter.id} chapterTitle={chapter.title} onBack={handleBackToChapterHome} />;
                 }
                 // For non-logged-in users, show a prompt
                 return (

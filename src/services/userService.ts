@@ -29,7 +29,8 @@ CREATE TABLE public.user_quiz_attempts (
     quiz_id text not null,
     score integer not null,
     total_questions integer not null,
-    taken_at timestamp with time zone default now() not null
+    taken_at timestamp with time zone default now() not null,
+    chapter_id text -- Added for easier querying
 );
 -- 5. Enable RLS
 ALTER TABLE public.user_quiz_attempts ENABLE ROW LEVEL SECURITY;
@@ -112,16 +113,29 @@ $$;
  * Records a user's quiz attempt and updates their XP.
  * @param userId The ID of the user.
  * @param quizId The ID of the quiz.
+ * @param chapterId The ID of the chapter the quiz belongs to.
  * @param score The score achieved.
  * @param totalQuestions The total number of questions in the quiz.
  * @param xpGained The amount of XP to award.
+ * @returns The newly created quiz attempt object.
  */
-export const logQuizAttempt = async (userId: string, quizId: string, score: number, totalQuestions: number, xpGained: number): Promise<void> => {
+export const logQuizAttempt = async (userId: string, quizId: string, chapterId: string, score: number, totalQuestions: number, xpGained: number): Promise<UserQuizAttempt> => {
     const supabase = getSupabase();
 
-    const { error: attemptError } = await (supabase
+    // Use upsert to handle re-taking quizzes if that becomes a feature.
+    // The UNIQUE constraint on (user_id, quiz_id) will make it update the existing row.
+    const { data: attemptData, error: attemptError } = await (supabase
         .from('user_quiz_attempts') as any)
-        .insert({ user_id: userId, quiz_id: quizId, score, total_questions: totalQuestions });
+        .upsert({ 
+            user_id: userId, 
+            quiz_id: quizId, 
+            chapter_id: chapterId, 
+            score, 
+            total_questions: totalQuestions 
+        }, { onConflict: 'user_id,quiz_id' })
+        .select()
+        .single();
+
 
     if (attemptError) {
         console.error("Error logging quiz attempt:", attemptError);
@@ -134,6 +148,8 @@ export const logQuizAttempt = async (userId: string, quizId: string, score: numb
         console.error("Error updating user XP after quiz:", xpError);
         throw xpError;
     }
+    
+    return attemptData;
 };
 
 /**

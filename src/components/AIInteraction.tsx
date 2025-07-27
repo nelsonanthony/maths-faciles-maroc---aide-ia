@@ -7,7 +7,6 @@ import { SpinnerIcon, ThumbsUpIcon, ThumbsDownIcon, PlayCircleIcon, StarIcon, Ch
 import { useAuth } from '@/contexts/AuthContext';
 import { MathKeyboard } from './MathKeyboard';
 import { ExplanationPlan } from '@/types';
-import { MathJaxRenderer } from './MathJaxRenderer';
 
 interface AIInteractionProps {
     exerciseStatement: string;
@@ -39,6 +38,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
         if (initialQuestion) {
             handleAskForPlan();
         }
+         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); 
 
     useEffect(() => {
@@ -56,7 +56,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
             setDetailedExplanation(aiResponse.explanation);
             if(viewMode !== 'detail') setViewMode('detail');
         }
-    }, [aiResponse]);
+    }, [aiResponse, viewMode]);
 
     const buildBasePrompt = (studentQuestion: string) => {
         const systemPromptHeader = "Tu es un tuteur de mathématiques expert et bienveillant. Ton public est constitué de lycéens marocains. Tes explications doivent être claires, concises, pédagogiques et en français. Utilise la syntaxe Markdown pour formater tes réponses, y compris les formules LaTeX (en utilisant les délimiteurs $$...$$ ou \\(...\\)).";
@@ -128,6 +128,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
     const handleFeedback = (feedbackType: 'up' | 'down') => {
         setFeedback(feedbackType);
         // In a real application, you might want to send this feedback to a logging service.
+        console.log(`Feedback submitted: ${feedbackType}`);
     };
 
     const isReadyForUser = !!user && isAIFeatureEnabled;
@@ -149,13 +150,19 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
                     ) : (
                         <textarea value={question} onChange={(e) => setQuestion(e.target.value)} onKeyDown={handleTextareaKeyDown} placeholder="Posez votre question ici..." className="w-full h-24 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition" disabled={!isReadyForUser || isLoading || viewMode !== 'question'} />
                     )}
-                    <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={handleAskForPlan} disabled={isLoading || !question.trim() || !isReadyForUser} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70">
-                            {isLoading && viewMode !== 'detail' ? 'En cours...' : "Obtenir un plan d'aide"}
-                        </button>
-                         <button type="button" onClick={handleAskForDirectAnswer} disabled={isLoading || !question.trim() || !isReadyForUser} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-gray-200 bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-70">
-                            Voir la réponse directe
-                        </button>
+                     <div className="flex items-center justify-between">
+                        <div className="flex flex-wrap gap-2">
+                            <button type="button" onClick={handleAskForPlan} disabled={isLoading || !question.trim() || !isReadyForUser} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                                {isLoading && viewMode !== 'detail' ? 'En cours...' : "Obtenir un plan d'aide"}
+                            </button>
+                            <button type="button" onClick={handleAskForDirectAnswer} disabled={isLoading || !question.trim() || !isReadyForUser} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-gray-200 bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                                Voir la réponse directe
+                            </button>
+                        </div>
+                        <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+                            <input type="checkbox" checked={useMathKeyboard} onChange={() => setUseMathKeyboard(!useMathKeyboard)} className="h-4 w-4 rounded bg-gray-700 border-gray-600 text-brand-blue-600 focus:ring-brand-blue-500" />
+                            Clavier Mathématique
+                        </label>
                     </div>
                 </div>
             </div>
@@ -171,12 +178,12 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
                     {error && (<div className="flex items-center justify-center h-full text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {error}</p></div>)}
                     
                     {viewMode === 'plan' && plan && (
-                        <div className="space-y-4">
-                            <h4 className="font-semibold text-gray-300">Voici un plan pour vous aider à résoudre le problème. Cliquez sur une étape pour obtenir les détails.</h4>
+                        <div className="space-y-4 animate-fade-in">
+                            <h4 className="font-semibold text-gray-300">Voici un plan pour vous aider. Cliquez sur une étape pour obtenir les détails.</h4>
                             <div className="space-y-3">
                                 {plan.steps.map((step, index) => (
                                     <button key={index} onClick={() => handleAskForStepDetail(index)} className="ai-plan-step-button inactive">
-                                        <div className="text-lg font-bold text-brand-blue-400">{index + 1}</div>
+                                        <div className="flex items-center justify-center shrink-0 w-8 h-8 text-lg font-bold text-brand-blue-400 bg-gray-800 rounded-full border-2 border-gray-600">{index + 1}</div>
                                         <p className="text-gray-200">{step}</p>
                                     </button>
                                 ))}
@@ -185,15 +192,15 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
                                 <div className="pt-4 mt-4 border-t border-gray-700">
                                     <h5 className="text-sm font-semibold text-gray-400 flex items-center gap-2 mb-2"><StarIcon className="w-4 h-4"/>Concepts clés à réviser</h5>
                                     <div className="flex flex-wrap gap-2">
-                                        {plan.key_concepts.map(concept => <span key={concept} className="px-2 py-1 text-xs bg-yellow-900/50 text-yellow-300 rounded-full">{concept}</span>)}
+                                        {plan.key_concepts.map(concept => <span key={concept} className="px-3 py-1 text-xs bg-yellow-900/50 text-yellow-300 rounded-full">{concept}</span>)}
                                     </div>
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {viewMode === 'detail' && selectedStepIndex !== null && plan && (
-                        <div className="space-y-3">
+                    {viewMode === 'detail' && plan && (
+                        <div className="space-y-3 mb-4">
                             {plan.steps.map((step, index) => (
                                 <button key={index} onClick={() => handleAskForStepDetail(index)} className={`ai-plan-step-button ${selectedStepIndex === index ? 'active' : 'inactive'}`}>
                                     <div className={`flex items-center justify-center rounded-full w-6 h-6 text-sm font-bold shrink-0 ${selectedStepIndex === index ? 'bg-brand-blue-500 text-white' : 'bg-gray-600 text-gray-300'}`}>

@@ -16,11 +16,11 @@ export const useAIExplain = () => {
         error: null,
     });
 
-    const explain = useCallback(async (prompt: string, chapterId: string) => {
+    const explain = useCallback(async (prompt: string, chapterId: string, requestType: 'plan' | 'detail') => {
         setState({ data: null, isLoading: true, error: null });
         
         try {
-            const responseData = await getAIExplanation(prompt, chapterId);
+            const responseData = await getAIExplanation(prompt, chapterId, requestType);
             setState({ data: responseData, isLoading: false, error: null });
 
         } catch (e: any) {

@@ -1,6 +1,6 @@
 
 import { getSupabase } from '@/services/authService';
-import { Profile } from '@/types';
+import { Profile, UserQuizAttempt } from '@/types';
 
 // --- SQL to execute in Supabase SQL Editor ---
 /*
@@ -134,6 +134,31 @@ export const logQuizAttempt = async (userId: string, quizId: string, score: numb
         console.error("Error updating user XP after quiz:", xpError);
         throw xpError;
     }
+};
+
+/**
+ * Fetches all quiz attempts for a user for a given list of quiz IDs.
+ * @param userId The user's ID.
+ * @param quizIds An array of quiz IDs.
+ * @returns A promise that resolves to an array of quiz attempts.
+ */
+export const getQuizAttemptsForQuizzes = async (userId: string, quizIds: string[]): Promise<UserQuizAttempt[]> => {
+    if (quizIds.length === 0) {
+        return [];
+    }
+    const supabase = getSupabase();
+    const { data, error } = await (supabase
+        .from('user_quiz_attempts') as any)
+        .select('*')
+        .eq('user_id', userId)
+        .in('quiz_id', quizIds);
+    
+    if (error) {
+        console.error("Error fetching quiz attempts:", error);
+        throw error;
+    }
+
+    return data || [];
 };
 
 /**

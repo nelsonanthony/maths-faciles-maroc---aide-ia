@@ -101,8 +101,14 @@ export interface VideoChunk {
     similarity: number;
 }
 
+export interface ExplanationPlan {
+    steps: string[];
+    key_concepts: string[];
+}
+
 export interface AIResponse {
-    explanation: string;
+    explanation?: string;
+    plan?: ExplanationPlan;
     videoChunk?: VideoChunk;
 }
 
@@ -165,3 +171,13 @@ export type ModalState =
   | { type: 'delete'; payload: DeletionInfo };
 
 export type View = 'home' | 'courses' | 'chapters' | 'chapterHome' | 'seriesList' | 'exerciseList' | 'exercise' | 'quiz' | 'login' | 'register' | 'dashboard' | 'forgotPassword' | 'resetPassword' | 'chat';
+
+// Type for User Progress
+export interface UserQuizAttempt {
+    id: number;
+    user_id: string;
+    quiz_id: string;
+    score: number;
+    total_questions: number;
+    taken_at: string;
+}

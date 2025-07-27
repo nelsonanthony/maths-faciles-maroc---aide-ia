@@ -36,6 +36,15 @@
   .ai-response-content th {
     @apply bg-gray-700/50;
   }
+  .ai-plan-step-button {
+    @apply w-full text-left p-4 rounded-lg border-2 transition-all duration-200 flex items-start gap-3;
+  }
+  .ai-plan-step-button.active {
+    @apply bg-brand-blue-600/30 border-brand-blue-500;
+  }
+  .ai-plan-step-button.inactive {
+    @apply bg-gray-700/50 border-gray-600 hover:bg-gray-700;
+  }
   mjx-container[jax="SVG"] {
     display: inline-block;
     margin: 0.2em 0;

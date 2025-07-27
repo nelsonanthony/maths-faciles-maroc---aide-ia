@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const apiKey = process.env.GEMINI_API_KEY; 
     const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY; // Use Service Key for auth checks
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
     if (!apiKey || !supabaseUrl || !supabaseServiceKey) {
         return res.status(500).json({ error: "La configuration du serveur est incomplète. Veuillez vérifier les variables d'environnement." });
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // --- Main Logic ---
-        const { prompt, chapterId } = req.body as { prompt?: string, chapterId?: string };
+        const { prompt, chapterId, requestType } = req.body as { prompt?: string, chapterId?: string, requestType?: 'plan' | 'detail' };
 
         if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
             return res.status(400).json({ error: "Le 'prompt' est manquant, vide ou invalide." });
@@ -62,19 +62,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!chapterId || typeof chapterId !== 'string') {
             return res.status(400).json({ error: "Le 'chapterId' est manquant ou invalide." });
         }
+        if (!requestType) {
+            return res.status(400).json({ error: "Le 'requestType' est manquant ('plan' ou 'detail')." });
+        }
 
         const ai = new GoogleGenAI({ apiKey: apiKey });
+        const finalResponse: AIResponse = {};
 
-        // --- 1. Get Text Explanation from Gemini ---
-        const explanationResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        });
-        const explanationText = explanationResponse.text ?? '';
+        if (requestType === 'plan') {
+            const planSchema = {
+                type: Type.OBJECT,
+                properties: {
+                    steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Une liste de 2 à 4 étapes concises pour résoudre le problème." },
+                    key_concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Une liste de 2 à 3 concepts mathématiques essentiels liés à la question." }
+                }
+            };
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { responseMimeType: "application/json", responseSchema: planSchema }
+            });
+            const responseText = response.text?.trim() ?? '{}';
+            finalResponse.plan = JSON.parse(responseText);
+
+        } else { // 'detail'
+            const explanationResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+            });
+            finalResponse.explanation = explanationResponse.text ?? '';
+        }
         
-        // --- 2. Find Relevant Video Chunk ---
+        // --- Find Relevant Video Chunk (for both types of requests) ---
         let relevantVideoChunk: VideoChunk | undefined = undefined;
-        const questionMatch = prompt.match(/QUESTION DE L'ÉLÈVE :\s*([\s\S]*)/);
+        const questionMatch = prompt.match(/QUESTION ÉLÈVE---\s*([\s\S]*)/);
         const userQuestion = questionMatch ? questionMatch[1].trim() : prompt;
         
         if (userQuestion) {
@@ -85,7 +106,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
                 const queryEmbedding = embeddingResult.embeddings[0].values;
-
                 const { data: chunkData, error: rpcError } = await (supabase.rpc as any)('match_video_chunk', {
                     query_embedding: queryEmbedding,
                     target_chapter_id: chapterId,
@@ -98,20 +118,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             }
         }
+        finalResponse.videoChunk = relevantVideoChunk;
 
         // --- Log successful AI call ---
         await logAiCall(supabase, user.id, 'EXPLANATION');
-        
-        const finalResponse: AIResponse = {
-            explanation: explanationText,
-            videoChunk: relevantVideoChunk,
-        };
         
         return res.status(200).json(finalResponse);
 
     } catch (error) {
         console.error("Error in 'explain' serverless function:", error);
         const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue est survenue.";
+        if (errorMessage.includes("JSON")) {
+             return res.status(500).json({ error: `Erreur du service IA: L'IA a renvoyé une réponse mal formatée.` });
+        }
         return res.status(500).json({ error: `Erreur du service IA: ${errorMessage}` });
     }
 }

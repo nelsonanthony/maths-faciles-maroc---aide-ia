@@ -102,14 +102,25 @@ export interface VideoChunk {
     similarity: number;
 }
 
-export interface ExplanationPlan {
-    steps: string[];
-    key_concepts: string[];
+export interface DialogueMessage {
+    role: 'ai' | 'user' | 'system';
+    content: string;
 }
+
+export interface SocraticStep {
+    ia_question: string;
+    student_response_prompt: string;
+    expected_answer_keywords: string[];
+    positive_feedback: string;
+    hint_for_wrong_answer: string;
+}
+
+export type SocraticPath = SocraticStep[];
+
 
 export interface AIResponse {
     explanation?: string;
-    plan?: ExplanationPlan;
+    socraticPath?: SocraticPath;
     videoChunk?: VideoChunk;
 }
 

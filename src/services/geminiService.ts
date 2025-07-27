@@ -8,10 +8,10 @@ import { getSupabase } from '@/services/authService';
  * This now sends the auth token for rate limiting and chapterId for semantic video search.
  * @param prompt The full prompt to send to the serverless function.
  * @param chapterId The ID of the chapter to search for relevant video chunks.
- * @param requestType The type of response desired from the AI ('plan' or 'detail').
- * @returns An object containing the explanation, plan, and/or an optional video chunk.
+ * @param requestType The type of response desired from the AI ('socratic', 'direct').
+ * @returns An object containing the explanation, socratic path, and/or an optional video chunk.
  */
-const getAIExplanation = async (prompt: string, chapterId: string, requestType: 'plan' | 'detail'): Promise<AIResponse> => {
+const getAIExplanation = async (prompt: string, chapterId: string, requestType: 'socratic' | 'direct'): Promise<AIResponse> => {
     try {
         const supabase = getSupabase();
         const { data: { session } } = await supabase.auth.getSession();

@@ -36,15 +36,21 @@
   .ai-response-content th {
     @apply bg-gray-700/50;
   }
-  .ai-plan-step-button {
-    @apply w-full text-left p-4 rounded-lg border-2 transition-all duration-200 flex items-center gap-4 cursor-pointer;
+  
+  .chat-bubble {
+    @apply max-w-lg p-3 rounded-lg;
   }
-  .ai-plan-step-button.active {
-    @apply bg-brand-blue-600/30 border-brand-blue-500 shadow-lg;
+  .ai-bubble {
+    @apply bg-gray-700 text-gray-200 self-start;
   }
-  .ai-plan-step-button.inactive {
-    @apply bg-gray-700/50 border-gray-600 hover:bg-gray-700 hover:border-gray-500;
+  .user-bubble {
+    @apply bg-brand-blue-600 text-white self-end;
   }
+  .system-bubble {
+    @apply text-center text-xs text-gray-500 py-2;
+  }
+
+
   mjx-container[jax="SVG"] {
     display: inline-block;
     margin: 0.2em 0;

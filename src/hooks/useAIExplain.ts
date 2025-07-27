@@ -16,7 +16,7 @@ export const useAIExplain = () => {
         error: null,
     });
 
-    const explain = useCallback(async (prompt: string, chapterId: string, requestType: 'plan' | 'detail') => {
+    const explain = useCallback(async (prompt: string, chapterId: string, requestType: 'socratic' | 'direct') => {
         setState({ data: null, isLoading: true, error: null });
         
         try {

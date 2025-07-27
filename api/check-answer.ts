@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './ai-usage-limiter.js';
@@ -84,12 +84,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ---
             MAINTENANT, FOURNIS L'ÉVALUATION EN JSON:
         `;
+        
+        const answerSchema = {
+            type: Type.OBJECT,
+            properties: {
+                is_correct: {
+                    type: Type.BOOLEAN,
+                    description: "True if the student's answer is correct, false otherwise."
+                },
+                feedback: {
+                    type: Type.STRING,
+                    description: "A short, encouraging feedback message for the student, explaining why their answer is correct or what is wrong."
+                }
+            },
+            required: ["is_correct", "feedback"],
+        };
 
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: answerSchema
+            }
         });
         
         // Log successful AI call

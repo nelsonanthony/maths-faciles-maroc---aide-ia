@@ -30,6 +30,12 @@ CREATE POLICY "Allow authenticated users to send messages"
   WITH CHECK (auth.uid() = user_id);
 */
 
+// --- CONFIGURATION SERVER (BACKEND) ---
+// Cette fonction s'exécute sur les serveurs de Vercel.
+// Elle utilise les variables d'environnement `SUPABASE_URL` et `SUPABASE_ANON_KEY`
+// que vous devez configurer dans les paramètres de votre projet Vercel.
+// N'UTILISEZ PAS les préfixes `VITE_` ici.
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -43,38 +49,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         res.status(200).end();
         return;
     }
-
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
-
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-    if (!supabaseUrl || !supabaseAnonKey) {
-        return res.status(500).json({ error: 'Database configuration is missing' });
-    }
-
-    const { room_id } = req.query;
-
-    if (!room_id || typeof room_id !== 'string') {
-        return res.status(400).json({ error: 'room_id is required' });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-    const { data, error } = await (supabase.from('chat_messages') as any)
-        .select('*')
-        .eq('room_id', room_id)
-        .order('created_at', { ascending: true });
-
-    if (error) {
-        console.error('Error fetching messages:', error);
-        if (error.code === '42P01') { // undefined_table
-            return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_messages' est manquante. Veuillez exécuter le SQL de configuration fourni dans les commentaires du fichier API." });
+    
+    try {
+        if (req.method !== 'GET') {
+            return res.status(405).json({ error: 'Method Not Allowed' });
         }
-        return res.status(500).json({ error: 'Échec de la récupération des messages.' });
-    }
 
-    return res.status(200).json(data);
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+        if (!supabaseUrl || !supabaseAnonKey) {
+            console.error('Server configuration error: SUPABASE_URL or SUPABASE_ANON_KEY is not set in Vercel environment variables.');
+            return res.status(500).json({ error: 'La configuration de la base de données sur le serveur est incomplète. L\'administrateur doit définir les variables d\'environnement.' });
+        }
+
+        const { room_id } = req.query;
+
+        if (!room_id || typeof room_id !== 'string') {
+            return res.status(400).json({ error: 'room_id is required' });
+        }
+
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+        const { data, error } = await (supabase.from('chat_messages') as any)
+            .select('*')
+            .eq('room_id', room_id)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Supabase error fetching messages:', error);
+            if (error.code === '42P01') { // undefined_table
+                return res.status(500).json({ error: "Configuration de la base de données incomplète : la table 'chat_messages' est manquante. Veuillez exécuter le SQL de configuration." });
+            }
+            return res.status(500).json({ error: `Erreur base de données : ${error.message}` });
+        }
+
+        return res.status(200).json(data);
+    } catch (e: any) {
+        console.error('Catastrophic error in get-messages handler:', e);
+        return res.status(500).json({ error: `Erreur interne du serveur : ${e.message}` });
+    }
 }

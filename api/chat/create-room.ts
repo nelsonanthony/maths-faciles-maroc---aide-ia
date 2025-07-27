@@ -2,6 +2,13 @@
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+// --- CONFIGURATION SERVER (BACKEND) ---
+// Cette fonction s'exécute sur les serveurs de Vercel.
+// Elle utilise les variables d'environnement `SUPABASE_URL` et `SUPABASE_SERVICE_KEY`
+// que vous devez configurer dans les paramètres de votre projet Vercel.
+// La `SUPABASE_SERVICE_KEY` est une clé secrète qui a tous les droits.
+// N'UTILISEZ PAS les préfixes `VITE_` ici.
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');

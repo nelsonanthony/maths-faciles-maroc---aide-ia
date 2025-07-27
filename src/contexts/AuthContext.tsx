@@ -17,8 +17,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const initialize = async () => {
             try {
-                const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL;
-                const supabaseAnonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY;
+                // --- CLIENT-SIDE (BROWSER) CONFIGURATION ---
+                // These keys are loaded from the environment (e.g., a .env.local file or Vercel's env variables for the frontend).
+                // They are safe to be exposed in the browser.
+                const supabaseUrl = import.meta.env?.VITE_SUPABASE_URL; // This is your project's URL from Supabase settings.
+                const supabaseAnonKey = import.meta.env?.VITE_SUPABASE_ANON_KEY; // This is the "Publishable key" from Supabase settings.
                 const adminEmailFromEnv = import.meta.env?.VITE_ADMIN_EMAIL;
 
                 if (!supabaseUrl || !supabaseAnonKey) {

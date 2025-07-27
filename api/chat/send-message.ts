@@ -3,6 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from "@google/genai";
 
+// --- CONFIGURATION SERVER (BACKEND) ---
+// Cette fonction s'exécute sur les serveurs de Vercel.
+// Elle utilise les variables d'environnement `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` et `GEMINI_API_KEY`
+// que vous devez configurer dans les paramètres de votre projet Vercel.
+// La `SUPABASE_SERVICE_KEY` est une clé secrète qui a tous les droits.
+// N'UTILISEZ PAS les préfixes `VITE_` ici.
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');

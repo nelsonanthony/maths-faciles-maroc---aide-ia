@@ -29,6 +29,12 @@ CREATE POLICY "Allow authenticated users to create chat rooms"
   WITH CHECK (auth.uid() = created_by);
 */
 
+// --- CONFIGURATION SERVER (BACKEND) ---
+// Cette fonction s'exécute sur les serveurs de Vercel.
+// Elle utilise les variables d'environnement `SUPABASE_URL` et `SUPABASE_ANON_KEY`
+// que vous devez configurer dans les paramètres de votre projet Vercel.
+// N'UTILISEZ PAS les préfixes `VITE_` ici.
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');

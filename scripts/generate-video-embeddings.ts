@@ -1,4 +1,3 @@
-
 // To run this script:
 // 1. Make sure you have a .env file with API_KEY, SUPABASE_URL, and SUPABASE_SERVICE_KEY
 // 2. Run `npm install`
@@ -108,15 +107,21 @@ async function generateAndStoreEmbeddings() {
                         model: embeddingModelName,
                         contents: chunk.text
                     });
-                    const embedding = result.embeddings[0].values;
+                    
+                    if (result.embeddings && result.embeddings.length > 0) {
+                        const embedding = result.embeddings[0].values;
 
-                    rowsToInsert.push({
-                        chapter_id: chapter.id,
-                        video_id: videoLink.id, // Include the specific video ID
-                        chunk_text: chunk.text,
-                        start_time_seconds: chunk.startTime,
-                        embedding: embedding,
-                    });
+                        rowsToInsert.push({
+                            chapter_id: chapter.id,
+                            video_id: videoLink.id, // Include the specific video ID
+                            chunk_text: chunk.text,
+                            start_time_seconds: chunk.startTime,
+                            embedding: embedding,
+                        });
+                    } else {
+                        console.warn(`      ⚠️ No embedding generated for chunk at ${chunk.startTime}s. Skipping.`);
+                    }
+
                     
                     // Rate limiting
                     await new Promise(resolve => setTimeout(resolve, 250));

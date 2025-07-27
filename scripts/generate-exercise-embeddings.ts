@@ -1,4 +1,3 @@
-
 // To run this script:
 // 1. Make sure you have a .env file with API_KEY, SUPABASE_URL, and SUPABASE_SERVICE_KEY
 // 2. Run `npm install`
@@ -53,23 +52,29 @@ async function generateAndStoreEmbeddings() {
                 model: embeddingModelName,
                 contents: exercise.content
             });
-            const embedding = result.embeddings[0].values;
+            
+            if (result.embeddings && result.embeddings.length > 0) {
+                const embedding = result.embeddings[0].values;
 
-            // 2. Upsert into Supabase
-            // Use 'upsert' to avoid duplicates. It will update if the exercise_id already exists.
-            const { error } = await supabase
-                .from('exercise_embeddings')
-                .upsert({
-                    exercise_id: exercise.id,
-                    content: exercise.content,
-                    embedding: embedding,
-                } as any);
+                // 2. Upsert into Supabase
+                // Use 'upsert' to avoid duplicates. It will update if the exercise_id already exists.
+                const { error } = await supabase
+                    .from('exercise_embeddings')
+                    .upsert({
+                        exercise_id: exercise.id,
+                        content: exercise.content,
+                        embedding: embedding,
+                    } as any);
 
-            if (error) {
-                console.error(`❌ Error saving embedding for ID ${exercise.id}:`, error.message);
+                if (error) {
+                    console.error(`❌ Error saving embedding for ID ${exercise.id}:`, error.message);
+                } else {
+                    console.log(`   ✅ Successfully saved embedding for ID ${exercise.id}`);
+                }
             } else {
-                console.log(`   ✅ Successfully saved embedding for ID ${exercise.id}`);
+                console.warn(`   ⚠️ No embedding generated for exercise ID: ${exercise.id}. Skipping.`);
             }
+
 
             // Simple rate limiting to avoid overwhelming the API
             await new Promise(resolve => setTimeout(resolve, 250));

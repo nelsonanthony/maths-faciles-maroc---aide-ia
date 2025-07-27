@@ -103,18 +103,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 contents: userQuestion
             });
             
-            const embedding = embeddingResult.embeddings[0].values;
+            if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
+                const embedding = embeddingResult.embeddings[0].values;
             
-            if (embedding) {
-                 const { data: chunkData, error: chunkError } = await supabase.rpc('match_video_chunk', {
-                    query_embedding: embedding,
-                    target_chapter_id: chapterId
-                });
+                if (embedding) {
+                     const { data: chunkData, error: chunkError } = await supabase.rpc('match_video_chunk', {
+                        query_embedding: embedding,
+                        target_chapter_id: chapterId
+                    });
 
-                if (chunkError) {
-                    console.error("Error fetching video chunk:", chunkError);
-                } else if (chunkData) {
-                    relevantVideoChunk = chunkData as unknown as VideoChunk;
+                    if (chunkError) {
+                        console.error("Error fetching video chunk:", chunkError);
+                    } else if (chunkData) {
+                        relevantVideoChunk = chunkData as unknown as VideoChunk;
+                    }
                 }
             }
         }

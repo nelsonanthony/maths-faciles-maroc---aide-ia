@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -104,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 contents: userQuestion
             });
             
-            const embedding = embeddingResult.embedding.values;
+            const embedding = embeddingResult.embeddings[0].values;
             
             if (embedding) {
                  const { data: chunkData, error: chunkError } = await supabase.rpc('match_video_chunk', {

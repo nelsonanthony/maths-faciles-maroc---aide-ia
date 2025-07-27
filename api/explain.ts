@@ -1,17 +1,19 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
 import { checkUsageLimit, logAiCall } from "./ai-usage-limiter.js";
+import { getExerciseById } from "./data-access.js";
 
-// Cette fonction s'exécute sur les serveurs de Vercel (environnement Node.js)
+// This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
     res.setHeader(
-        'Access-Control-Allow-Headers',
-        'Authorization, X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+        'Access-control-allow-headers',
+        'authorization, x-csrf-token, x-requested-with, accept, accept-version, content-length, content-md5, content-type, date, x-api-version'
     );
 
     if (req.method === 'OPTIONS') {
@@ -33,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        // --- User Authentication ---
+        // --- User Authentication & Rate Limiting ---
         const authHeader = req.headers.authorization;
         if (!authHeader) {
             return res.status(401).json({ error: 'L\'authentification est requise.' });
@@ -46,83 +48,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });
         }
 
-        // --- Rate Limiting ---
         const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'EXPLANATION');
         if (limitExceeded) {
             return res.status(429).json({ error: `Vous avez atteint votre limite de ${limit} demandes d'explication par jour.` });
         }
         
-        // --- Main Logic ---
+        // --- Body Validation ---
         const { prompt, chapterId, requestType } = req.body as { prompt?: string, chapterId?: string, requestType?: 'plan' | 'detail' };
 
-        if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-            return res.status(400).json({ error: "Le 'prompt' est manquant, vide ou invalide." });
+        if (!prompt || typeof prompt !== 'string' || !chapterId || typeof chapterId !== 'string' || !requestType) {
+            return res.status(400).json({ error: "Les champs 'prompt', 'chapterId', et 'requestType' sont requis et doivent être valides." });
         }
-        if (!chapterId || typeof chapterId !== 'string') {
-            return res.status(400).json({ error: "Le 'chapterId' est manquant ou invalide." });
-        }
-        if (!requestType) {
-            return res.status(400).json({ error: "Le 'requestType' est manquant ('plan' ou 'detail')." });
-        }
-
+        
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const finalResponse: AIResponse = {};
 
-        if (requestType === 'plan') {
-            const planSchema = {
-                type: Type.OBJECT,
-                properties: {
-                    steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Une liste de 2 à 4 étapes concises pour résoudre le problème." },
-                    key_concepts: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Une liste de 2 à 3 concepts mathématiques essentiels liés à la question." }
-                }
-            };
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-                config: { responseMimeType: "application/json", responseSchema: planSchema }
-            });
-            const responseText = response.text?.trim() ?? '{}';
-            finalResponse.plan = JSON.parse(responseText);
+        // --- Find relevant video chunk function (to be run in parallel) ---
+        const findRelevantVideoChunk = async (): Promise<VideoChunk | undefined> => {
+            const questionMatch = prompt.match(/---QUESTION ÉLÈVE---\s*([\s\S]*)/);
+            const userQuestion = questionMatch ? questionMatch[1].trim() : '';
+            if (!userQuestion) return undefined;
 
-        } else { // 'detail'
-            const explanationResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-            });
-            finalResponse.explanation = explanationResponse.text ?? '';
-        }
-        
-        // --- Find Relevant Video Chunk (for both types of requests) ---
-        let relevantVideoChunk: VideoChunk | undefined = undefined;
-        const questionMatch = prompt.match(/QUESTION ÉLÈVE---\s*([\s\S]*)/);
-        const userQuestion = questionMatch ? questionMatch[1].trim() : prompt;
-        
-        if (userQuestion) {
-            const embeddingResult = await ai.models.embedContent({
-                model: 'text-embedding-004',
-                contents: userQuestion
-            });
-            
-            if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
-                const embedding = embeddingResult.embeddings[0].values;
-            
-                if (embedding) {
-                     const { data: chunkData, error: chunkError } = await supabase.rpc('match_video_chunk', {
+            try {
+                const embeddingResult = await ai.models.embedContent({
+                    model: 'text-embedding-004',
+                    contents: userQuestion
+                });
+                if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
+                    const embedding = embeddingResult.embeddings[0].values;
+                    const { data: chunkData } = await supabase.rpc('match_video_chunk', {
                         query_embedding: embedding,
                         target_chapter_id: chapterId
                     });
-
-                    if (chunkError) {
-                        console.error("Error fetching video chunk:", chunkError);
-                    } else if (chunkData) {
-                        relevantVideoChunk = chunkData as unknown as VideoChunk;
-                    }
+                    return chunkData as unknown as VideoChunk;
                 }
+            } catch (e) {
+                console.error("Error during video chunk search (non-blocking):", e);
             }
-        }
+            return undefined;
+        };
+        
+        // --- Generate AI explanation function (to be run in parallel) ---
+        const generateExplanation = async () => {
+            if (requestType === 'plan') {
+                const planSchema = {
+                    type: Type.OBJECT,
+                    properties: {
+                        steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                        key_concepts: { type: Type.ARRAY, items: { type: Type.STRING } }
+                    }
+                };
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash', contents: prompt,
+                    config: { responseMimeType: "application/json", responseSchema: planSchema }
+                });
+                finalResponse.plan = JSON.parse(response.text?.trim() ?? '{}');
+            } else { // 'detail'
+                const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+                finalResponse.explanation = response.text ?? '';
+            }
+        };
 
-        if (relevantVideoChunk) {
-            finalResponse.videoChunk = relevantVideoChunk;
+        // --- Run tasks in parallel ---
+        const [_, videoChunkResult] = await Promise.all([
+            generateExplanation(),
+            findRelevantVideoChunk()
+        ]);
+
+        if (videoChunkResult) {
+            finalResponse.videoChunk = videoChunkResult;
         }
 
         // Log successful AI call
@@ -132,6 +126,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (e: any) {
         console.error("Critical error in 'explain' function:", e);
-        return res.status(500).json({ error: "An internal server error occurred." });
+        let message = "An internal server error occurred.";
+        if (e.message?.includes("JSON")) {
+            message = "The AI returned an invalid response format.";
+        }
+        return res.status(500).json({ error: message });
     }
 }

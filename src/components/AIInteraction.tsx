@@ -59,7 +59,11 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
     }, [aiResponse, viewMode]);
 
     const buildBasePrompt = (studentQuestion: string) => {
-        const systemPromptHeader = "Tu es un tuteur de mathématiques expert et bienveillant. Ton public est constitué de lycéens marocains. Tes explications doivent être claires, concises, pédagogiques et en français. Utilise la syntaxe Markdown pour formater tes réponses, y compris les formules LaTeX (en utilisant les délimiteurs $$...$$ ou \\(...\\)).";
+        const systemPromptHeader = `
+CONTEXTE : Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains.
+RÈGLE STRICTE : Ta seule mission est d'aider à comprendre l'exercice fourni. Si la question de l'élève est hors-sujet (météo, histoire, etc.) ou inappropriée, réponds UNIQUEMENT et exactement par ce message : "Je ne peux répondre qu'à des questions concernant cet exercice de mathématiques.". Sinon, continue avec l'explication demandée.
+Tes explications doivent être claires, pédagogiques et en français. Utilise la syntaxe Markdown et LaTeX ($$...$$ ou \\(...\\)).
+`;
         const contextPrompt = fullCorrection
             ? `Le contexte est la correction détaillée suivante. N'hésite pas à y faire référence.\n---CORRECTION DÉTAILLÉE---\n${fullCorrection}`
             : `Le contexte est cet extrait de la correction.\n---EXTRAIT CORRECTION---\n${correctionSnippet}`;

@@ -1,4 +1,5 @@
 
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './data-access.js';
@@ -112,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             }
             case 'DELETE_ITEM': {
-                const { type, ids } = payload.payload as DeletionInfo; // The payload is nested inside another payload
+                const { type, ids } = payload as DeletionInfo; // CORRECTED: No longer nested payload.payload
                 switch(type) {
                     case 'level':
                         curriculum = curriculum.filter(l => l.id !== ids.levelId);

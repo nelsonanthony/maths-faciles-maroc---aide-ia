@@ -280,7 +280,7 @@ export const App: React.FC = () => {
         });
         setCurriculum(newCurriculum);
         // If creating, we stay in the quiz modal to add questions.
-        if (quizData.id === modal?.payload.quiz?.id) {
+        if (modal?.type === 'editQuiz' && modal.payload.quiz?.id === quizData.id) {
              // Re-open the modal with the updated quiz data
             openModal({ type: 'editQuiz', payload: { quiz: quizData, chapterId } });
         } else {
@@ -356,17 +356,17 @@ export const App: React.FC = () => {
 
     if (isLoadingData || isAuthLoading) {
         return (
-            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
                 <div className="text-center">
                     <SpinnerIcon className="w-12 h-12 animate-spin text-brand-blue-500 mx-auto" />
-                    <p className="mt-4 text-lg text-gray-300">Chargement du programme...</p>
+                    <p className="mt-4 text-lg text-slate-400">Chargement du programme...</p>
                 </div>
             </div>
         );
     }
     
     return (
-        <div className="flex flex-col min-h-screen font-sans text-gray-200">
+        <div className="flex flex-col min-h-screen font-sans bg-slate-950 text-slate-300">
             <Header
                 onNavigate={handleNavigate}
                 onSaveChanges={handleSaveChanges}

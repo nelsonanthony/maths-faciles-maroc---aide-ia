@@ -23,6 +23,37 @@ const emptyExercise: Omit<Exercise, 'id'> = {
   latexFormula: ''
 };
 
+
+// Helper function to recursively parse complex correction objects
+const formatCorrectionObject = (obj: any, level: number): string => {
+    let result = '';
+    if (!obj || typeof obj !== 'object') return '';
+
+    // Sort keys to try to maintain a logical order (e.g., etape_1, etape_2)
+    const sortedKeys = Object.keys(obj).sort();
+
+    for (const key of sortedKeys) {
+        const value = obj[key];
+        const formattedKey = key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+
+        if (typeof value === 'string') {
+             result += `**${formattedKey}:**\n${value}\n\n`;
+        } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+             if (value.description) {
+                result += `${'#'.repeat(level + 2)} ${formattedKey}: ${value.description}\n\n`;
+            } else {
+                 result += `${'#'.repeat(level + 2)} ${formattedKey}\n\n`;
+            }
+            const nestedContent = Object.keys(value)
+                .filter(k => k !== 'description')
+                .reduce((acc, k) => ({ ...acc, [k]: value[k] }), {});
+            result += formatCorrectionObject(nestedContent, level + 1);
+        }
+    }
+    return result;
+};
+
+
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
   const [jsonInput, setJsonInput] = useState('');
@@ -44,30 +75,38 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
     }
     try {
         const parsedJson = JSON.parse(jsonInput);
-        const ex = parsedJson.exercice;
-        if (!ex) {
-            throw new Error("Le JSON doit contenir une clé 'exercice' à la racine.");
-        }
-
-        let statement = '';
-        if (ex.titre) statement += `${ex.titre}\n\n`;
-        if (ex.enonce) statement += `${ex.enonce}\n\n`;
-        if (ex.implication && ex.implication.hypothese && ex.implication.conclusion) {
-            statement += `Montrer que ${ex.implication.hypothese} $$\\implies$$ ${ex.implication.conclusion}`;
-        }
         
+        let statement = '';
         let fullCorrection = '';
-        if (ex.details) {
-            if (ex.details.methode) fullCorrection += `### Méthode\n\n${ex.details.methode}\n\n`;
-            if (ex.details.astuce) fullCorrection += `### Astuce\n\n${ex.details.astuce}\n\n`;
+
+        // --- Handle first format (xriadiat.e-monsite.com) ---
+        if (parsedJson.exercice && typeof parsedJson.exercice === 'object') {
+            const ex = parsedJson.exercice;
+            if (ex.titre) statement += `**${ex.titre}**\n\n`;
+            if (ex.enonce) statement += `${ex.enonce}\n\n`;
+            if (ex.implication && ex.implication.hypothese && ex.implication.conclusion) {
+                statement += `Montrer que ${ex.implication.hypothese} $$\\implies$$ ${ex.implication.conclusion}`;
+            }
+
+            if (ex.details) {
+                if (ex.details.methode) fullCorrection += `### Méthode\n\n${ex.details.methode}\n\n`;
+                if (ex.details.astuce) fullCorrection += `### Astuce\n\n${ex.details.astuce}\n\n`;
+            }
+            if (ex.exemple) {
+                fullCorrection += `### Exemples\n\n`;
+                const formatExample = (text: string) => text.replace(/\n/g, '\n  ');
+                if (ex.exemple.cas_particulier_1) fullCorrection += `* **Cas 1:** ${formatExample(ex.exemple.cas_particulier_1)}\n\n`;
+                if (ex.exemple.cas_particulier_2) fullCorrection += `* **Cas 2:** ${formatExample(ex.exemple.cas_particulier_2)}\n\n`;
+            }
+            if (ex.source) fullCorrection += `**Source :** ${ex.source}\n`;
+        
+        // --- Handle second format (nested correction steps) ---
+        } else if (typeof parsedJson.exercice === 'string' && typeof parsedJson.correction === 'object') {
+            statement = parsedJson.exercice;
+            fullCorrection = formatCorrectionObject(parsedJson.correction, 1);
+        } else {
+             throw new Error("Format JSON non reconnu. Assurez-vous que la structure est correcte.");
         }
-        if (ex.exemple) {
-            fullCorrection += `### Exemples\n\n`;
-            const formatExample = (text: string) => text.replace(/\n/g, '\n  ');
-            if (ex.exemple.cas_particulier_1) fullCorrection += `* **Cas 1:** ${formatExample(ex.exemple.cas_particulier_1)}\n\n`;
-            if (ex.exemple.cas_particulier_2) fullCorrection += `* **Cas 2:** ${formatExample(ex.exemple.cas_particulier_2)}\n\n`;
-        }
-        if (ex.source) fullCorrection += `**Source :** ${ex.source}\n`;
 
         setFormData(prev => ({
             ...prev,
@@ -170,7 +209,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
                 </button>
                 {isJsonImporterOpen && (
                     <div className="p-4 border-t border-gray-700 space-y-3">
-                        <label htmlFor="json-importer" className="text-sm text-gray-400">Collez un objet JSON (comme celui de xriadiat) pour pré-remplir les champs.</label>
+                        <label htmlFor="json-importer" className="text-sm text-gray-400">Collez un objet JSON structuré pour pré-remplir les champs.</label>
                         <textarea
                             id="json-importer"
                             value={jsonInput}

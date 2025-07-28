@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ModalState, Level, Chapter, Series, Exercise, Quiz, QuizQuestion } from '@/types.ts';
 import { EditLevelModal } from '@/components/EditLevelModal.tsx';
@@ -13,13 +14,13 @@ interface ModalManagerProps {
     levelId: string | null;
     openModal: (modalState: ModalState) => void;
     onClose: () => void;
-    onSaveLevel: (levelData: Level) => void;
-    onSaveChapter: (chapterData: Chapter) => void;
-    onSaveSeries: (seriesData: Series, chapterId: string) => void;
-    onSaveExercise: (exerciseData: Exercise, seriesId: string) => void;
-    onSaveQuiz: (quizData: Quiz, chapterId: string) => void;
-    onSaveQuizQuestion: (questionData: QuizQuestion, quizId: string, chapterId: string) => void;
-    onConfirmDelete: () => void;
+    onSaveLevel: (levelData: Level) => Promise<void>;
+    onSaveChapter: (chapterData: Chapter) => Promise<void>;
+    onSaveSeries: (seriesData: Series, chapterId: string) => Promise<void>;
+    onSaveExercise: (exerciseData: Exercise, seriesId: string) => Promise<void>;
+    onSaveQuiz: (quizData: Quiz, chapterId: string) => Promise<void>;
+    onSaveQuizQuestion: (questionData: QuizQuestion, quizId: string, chapterId: string) => Promise<void>;
+    onConfirmDelete: () => Promise<void>;
 }
 
 export const ModalManager: React.FC<ModalManagerProps> = ({

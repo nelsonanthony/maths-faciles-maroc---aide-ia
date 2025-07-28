@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
 import { Quiz, QuizQuestion } from '@/types';
-import { XMarkIcon, PencilIcon, TrashIcon, PlusCircleIcon } from '@/components/icons';
+import { XMarkIcon, PencilIcon, TrashIcon, PlusCircleIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 interface EditQuizModalProps {
   quiz: Quiz | null;
-  onSave: (quizData: Quiz) => void;
+  onSave: (quizData: Quiz) => Promise<void>;
   onClose: () => void;
   onAddQuestion: () => void;
   onEditQuestion: (question: QuizQuestion) => void;
@@ -19,6 +19,7 @@ const emptyQuiz: Omit<Quiz, 'id' | 'questions'> = {
 
 export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onClose, onAddQuestion, onEditQuestion, onDeleteQuestion }) => {
   const [formData, setFormData] = useState(quiz || emptyQuiz);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isCreating = !quiz;
   const modalTitle = isCreating ? "Ajouter un nouveau quiz" : "Modifier le quiz";
@@ -28,20 +29,26 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) {
       alert("Le titre du quiz est obligatoire.");
       return;
     }
 
-    const finalQuiz: Quiz = {
-      id: quiz?.id || `quiz-${Date.now()}`,
-      title: formData.title.trim(),
-      questions: quiz?.questions || [],
-    };
-    
-    onSave(finalQuiz);
+    setIsSaving(true);
+    try {
+        const finalQuiz: Quiz = {
+          id: quiz?.id || `quiz-${Date.now()}`,
+          title: formData.title.trim(),
+          questions: quiz?.questions || [],
+        };
+        await onSave(finalQuiz);
+    } catch (error) {
+        console.error("Save failed:", error);
+        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -50,7 +57,7 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-quiz-title"
-      onClick={onClose}
+      onClick={isSaving ? undefined : onClose}
     >
       <div
         className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
@@ -58,37 +65,37 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
       >
         <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
           <h2 id="edit-quiz-title" className="text-xl font-bold text-brand-blue-300">{modalTitle}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white">
+          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" disabled={isSaving}>
             <XMarkIcon className="w-6 h-6" />
           </button>
         </header>
 
         <div className="flex-grow overflow-y-auto p-6 space-y-6">
           <form onSubmit={handleSave} id="edit-quiz-form" className="space-y-4">
-            <div>
-              <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-1">Titre du Quiz</label>
-              <input
-                type="text"
-                id="title"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                required
-                className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-              />
-            </div>
+            <fieldset disabled={isSaving}>
+                <label htmlFor="title" className="block text-sm font-medium text-gray-300 mb-1">Titre du Quiz</label>
+                <input
+                  type="text"
+                  id="title"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleChange}
+                  required
+                  className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
+                />
+            </fieldset>
             {isCreating && (
                  <p className="text-sm text-yellow-400">Enregistrez le quiz pour pouvoir y ajouter des questions.</p>
             )}
           </form>
 
           {!isCreating && quiz && (
-            <div>
+            <fieldset disabled={isSaving}>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className="text-lg font-semibold text-gray-300">Questions</h3>
                     <button
                         onClick={onAddQuestion}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 bg-green-600/50 hover:bg-green-600 text-white"
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 bg-green-600/50 hover:bg-green-600 text-white disabled:opacity-50"
                         aria-label="Ajouter une question"
                     >
                         <PlusCircleIcon className="w-4 h-4" />
@@ -118,7 +125,7 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
                         <p className="text-center text-gray-500 py-4">Ce quiz ne contient aucune question.</p>
                     )}
                 </div>
-            </div>
+            </fieldset>
           )}
         </div>
 
@@ -126,16 +133,19 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             form="edit-quiz-form"
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
-            Enregistrer
+            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+            {isSaving ? 'Sauvegarde...' : 'Enregistrer'}
           </button>
         </footer>
       </div>

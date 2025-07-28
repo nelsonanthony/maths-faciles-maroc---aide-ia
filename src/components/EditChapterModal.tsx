@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Chapter, VideoLink } from '@/types';
-import { XMarkIcon, PlusCircleIcon, TrashIcon } from '@/components/icons';
+import { XMarkIcon, PlusCircleIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
 
 interface EditChapterModalProps {
   chapter: Chapter | null; // Null for creation
-  onSave: (chapterData: Chapter) => void;
+  onSave: (chapterData: Chapter) => Promise<void>;
   onClose: () => void;
 }
 
@@ -13,6 +13,7 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
   const [title, setTitle] = useState(chapter?.title || '');
   const [summary, setSummary] = useState(chapter?.summary || '');
   const [videoLinks, setVideoLinks] = useState<VideoLink[]>(chapter?.videoLinks || []);
+  const [isSaving, setIsSaving] = useState(false);
   
   const isCreating = !chapter;
   const modalTitle = isCreating ? "Ajouter un nouveau chapitre" : "Modifier le chapitre";
@@ -32,24 +33,29 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
     setVideoLinks(newVideoLinks);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       alert("Le titre est obligatoire.");
       return;
     }
-
-    const finalChapter: Chapter = {
-      id: chapter?.id || `ch-${Date.now()}`,
-      title: title.trim(),
-      summary: summary.trim(),
-      videoLinks: videoLinks.filter(link => link.id.trim() && link.title.trim()),
-      quizzes: chapter?.quizzes || [],
-      series: chapter?.series || [],
-    };
     
-    onSave(finalChapter);
-    onClose();
+    setIsSaving(true);
+    try {
+        const finalChapter: Chapter = {
+          id: chapter?.id || `ch-${Date.now()}`,
+          title: title.trim(),
+          summary: summary.trim(),
+          videoLinks: videoLinks.filter(link => link.id.trim() && link.title.trim()),
+          quizzes: chapter?.quizzes || [],
+          series: chapter?.series || [],
+        };
+        await onSave(finalChapter);
+    } catch (error) {
+        console.error("Save failed:", error);
+        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -58,7 +64,7 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-chapter-title"
-      onClick={onClose}
+      onClick={isSaving ? undefined : onClose}
     >
       <div
         className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col"
@@ -66,7 +72,7 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
       >
         <header className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 id="edit-chapter-title" className="text-xl font-bold text-brand-blue-300">{modalTitle}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white">
+          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" disabled={isSaving}>
             <XMarkIcon className="w-6 h-6" />
           </button>
         </header>
@@ -80,7 +86,8 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               required
-              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+              disabled={isSaving}
+              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
             />
           </div>
           <div>
@@ -90,11 +97,12 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               rows={8}
-              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+              disabled={isSaving}
+              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
             />
           </div>
           
-          <div>
+          <fieldset disabled={isSaving}>
             <label className="block text-sm font-medium text-gray-300 mb-2">Liens Vidéo YouTube</label>
             <div className="space-y-4">
               {videoLinks.map((link, index) => (
@@ -129,23 +137,26 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
                 Ajouter un lien vidéo
               </button>
             </div>
-          </div>
+          </fieldset>
         </form>
 
         <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             form="edit-chapter-form"
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {isCreating ? 'Ajouter le chapitre' : 'Enregistrer'}
+            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+            {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
           </button>
         </footer>
       </div>

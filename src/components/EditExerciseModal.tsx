@@ -1,14 +1,17 @@
 
+
 import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
-import { XMarkIcon } from '@/components/icons';
+import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 interface EditExerciseModalProps {
   exercise: Exercise | null; // Null for creation
   seriesId: string;
-  onSave: (exerciseData: Exercise, seriesId: string) => void;
+  onSave: (exerciseData: Exercise, seriesId: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -22,13 +25,64 @@ const emptyExercise: Omit<Exercise, 'id'> = {
 
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
+  const [jsonInput, setJsonInput] = useState('');
+  const [isJsonImporterOpen, setIsJsonImporterOpen] = useState(false);
   const [formulaError, setFormulaError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isCreating = !exercise;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleJsonImport = () => {
+    if (!jsonInput.trim()) {
+        alert("Veuillez coller le contenu JSON dans la zone de texte.");
+        return;
+    }
+    try {
+        const parsedJson = JSON.parse(jsonInput);
+        const ex = parsedJson.exercice;
+        if (!ex) {
+            throw new Error("Le JSON doit contenir une clé 'exercice' à la racine.");
+        }
+
+        let statement = '';
+        if (ex.titre) statement += `${ex.titre}\n\n`;
+        if (ex.enonce) statement += `${ex.enonce}\n\n`;
+        if (ex.implication && ex.implication.hypothese && ex.implication.conclusion) {
+            statement += `Montrer que ${ex.implication.hypothese} $$\\implies$$ ${ex.implication.conclusion}`;
+        }
+        
+        let fullCorrection = '';
+        if (ex.details) {
+            if (ex.details.methode) fullCorrection += `### Méthode\n\n${ex.details.methode}\n\n`;
+            if (ex.details.astuce) fullCorrection += `### Astuce\n\n${ex.details.astuce}\n\n`;
+        }
+        if (ex.exemple) {
+            fullCorrection += `### Exemples\n\n`;
+            const formatExample = (text: string) => text.replace(/\n/g, '\n  ');
+            if (ex.exemple.cas_particulier_1) fullCorrection += `* **Cas 1:** ${formatExample(ex.exemple.cas_particulier_1)}\n\n`;
+            if (ex.exemple.cas_particulier_2) fullCorrection += `* **Cas 2:** ${formatExample(ex.exemple.cas_particulier_2)}\n\n`;
+        }
+        if (ex.source) fullCorrection += `**Source :** ${ex.source}\n`;
+
+        setFormData(prev => ({
+            ...prev,
+            statement: statement.trim(),
+            fullCorrection: fullCorrection.trim()
+        }));
+
+        setJsonInput('');
+        setIsJsonImporterOpen(false);
+        alert("Champs remplis avec succès depuis le JSON !");
+
+    } catch (error) {
+        console.error("Erreur d'importation JSON:", error);
+        alert(`L'importation a échoué. Assurez-vous que le JSON est valide.\nErreur: ${error instanceof Error ? error.message : "Erreur inconnue"}`);
+    }
   };
 
   useEffect(() => {
@@ -40,28 +94,44 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
     }
   }, [formData.latexFormula]);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (formulaError) {
       alert(`Veuillez corriger l'erreur : ${formulaError}`);
       return;
     }
-
-    const fullCorrectionText = formData.fullCorrection?.trim() || '';
-    const snippet = fullCorrectionText.split('\n')[0] || '';
-
-    const finalExercise: Exercise = {
-      id: formData.id || `ex-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-      statement: formData.statement.trim(),
-      correctionSnippet: snippet,
-      fullCorrection: fullCorrectionText || undefined,
-      imageUrl: formData.imageUrl?.trim() || undefined,
-      latexFormula: formData.latexFormula?.trim() || undefined,
-    };
     
-    onSave(finalExercise, seriesId);
-    onClose();
+    setIsSaving(true);
+    try {
+        const fullCorrectionText = formData.fullCorrection?.trim() || '';
+        let snippet = fullCorrectionText.split('\n')[0] || '';
+        if (snippet.length > 250) {
+            snippet = snippet.substring(0, 250) + '...';
+        }
+
+        const finalExercise: Exercise = {
+          id: formData.id || `ex-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          statement: formData.statement.trim(),
+          correctionSnippet: snippet,
+          fullCorrection: fullCorrectionText || undefined,
+          imageUrl: formData.imageUrl?.trim() || undefined,
+          latexFormula: formData.latexFormula?.trim() || undefined,
+        };
+        
+        await onSave(finalExercise, seriesId);
+    } catch (error) {
+        console.error("Save failed:", error);
+        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        setIsSaving(false);
+    }
   };
+  
+  const getPreviewContent = (text: string | undefined, fallback: string) => {
+      const content = text || fallback;
+      const parsed = marked.parse(content, { breaks: true });
+      return DOMPurify.sanitize(parsed as string);
+  };
+
 
   return (
     <>
@@ -70,7 +140,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-exercise-title"
-        onClick={onClose}
+        onClick={isSaving ? undefined : onClose}
       >
         <div 
           className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col"
@@ -80,75 +150,111 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
             <h2 id="edit-exercise-title" className="text-xl font-bold text-brand-blue-300">
               {isCreating ? "Ajouter un Exercice" : "Modifier l'Exercice"}
             </h2>
-            <button onClick={onClose} aria-label="Fermer la modale" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white">
+            <button onClick={onClose} aria-label="Fermer la modale" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" disabled={isSaving}>
               <XMarkIcon className="w-6 h-6" />
             </button>
           </header>
 
           <form onSubmit={handleSave} id="edit-exercise-form" className="flex-grow overflow-y-auto p-6 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Column: Input */}
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="statement" className="block text-sm font-medium text-gray-300 mb-1">Énoncé (MathJax/LaTeX activé)</label>
-                  <textarea
-                    id="statement"
-                    name="statement"
-                    value={formData.statement}
-                    onChange={handleInputChange}
-                    rows={8}
-                    placeholder="Saisissez l'énoncé ici. Utilisez la syntaxe LaTeX comme $$...$$ ou \(...\) pour les formules."
-                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono"
-                  />
-                </div>
-                 <div>
-                  <label htmlFor="fullCorrection" className="block text-sm font-medium text-gray-300 mb-1">Correction Détaillée (optionnel)</label>
-                  <textarea
-                    id="fullCorrection"
-                    name="fullCorrection"
-                    value={formData.fullCorrection || ''}
-                    onChange={handleInputChange}
-                    rows={10}
-                    placeholder="Saisissez la correction détaillée ici. La première ligne servira d'aperçu pour l'IA."
-                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono"
-                  />
-                </div>
+            <fieldset disabled={isSaving} className="space-y-6">
+              
+              <div className="bg-gray-900/50 rounded-lg border border-gray-700">
+                <button
+                    type="button"
+                    onClick={() => setIsJsonImporterOpen(!isJsonImporterOpen)}
+                    className="w-full flex justify-between items-center p-3 text-left font-semibold text-gray-300"
+                    aria-expanded={isJsonImporterOpen}
+                >
+                    <span>Importer un exercice depuis JSON</span>
+                    <span className={`transition-transform transform ${isJsonImporterOpen ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+                {isJsonImporterOpen && (
+                    <div className="p-4 border-t border-gray-700 space-y-3">
+                        <label htmlFor="json-importer" className="text-sm text-gray-400">Collez un objet JSON (comme celui de xriadiat) pour pré-remplir les champs.</label>
+                        <textarea
+                            id="json-importer"
+                            value={jsonInput}
+                            onChange={(e) => setJsonInput(e.target.value)}
+                            rows={8}
+                            placeholder='Collez ici le JSON de l`exercice...'
+                            className="w-full p-2 bg-gray-950 border border-gray-600 rounded-md text-sm font-mono text-gray-300"
+                        />
+                        <button
+                            type="button"
+                            onClick={handleJsonImport}
+                            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                        >
+                            Importer et Remplir les Champs
+                        </button>
+                    </div>
+                )}
               </div>
 
-              {/* Right Column: Previews */}
-              <div className="space-y-6">
-                 <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de l'énoncé</h4>
-                    <div className="prose prose-invert max-w-none p-4 min-h-[10rem] bg-slate-900/50 rounded-lg border border-slate-700">
-                        <MathJaxRenderer content={formData.statement || "Aucun énoncé saisi..."} />
-                    </div>
-                 </div>
-                 <div>
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de la correction</h4>
-                    <div className="prose prose-invert max-w-none p-4 min-h-[12rem] bg-slate-900/50 rounded-lg border border-slate-700">
-                        <MathJaxRenderer content={formData.fullCorrection || "Aucune correction saisie..."} />
-                    </div>
-                 </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Left Column: Input */}
+                <div className="space-y-6">
+                  <div>
+                    <label htmlFor="statement" className="block text-sm font-medium text-gray-300 mb-1">Énoncé (MathJax/LaTeX &amp; Markdown activé)</label>
+                    <textarea
+                      id="statement"
+                      name="statement"
+                      value={formData.statement}
+                      onChange={handleInputChange}
+                      rows={8}
+                      placeholder="Saisissez l'énoncé ici. Utilisez $$...$$ pour les formules et Entrée pour les sauts de ligne."
+                      className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono disabled:opacity-50"
+                    />
+                  </div>
+                   <div>
+                    <label htmlFor="fullCorrection" className="block text-sm font-medium text-gray-300 mb-1">Correction Détaillée (optionnel)</label>
+                    <textarea
+                      id="fullCorrection"
+                      name="fullCorrection"
+                      value={formData.fullCorrection || ''}
+                      onChange={handleInputChange}
+                      rows={10}
+                      placeholder="Saisissez la correction détaillée ici. La première ligne servira d'aperçu pour l'IA."
+                      className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column: Previews */}
+                <div className="space-y-6">
+                   <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de l'énoncé</h4>
+                      <div className="prose prose-invert max-w-none p-4 min-h-[10rem] bg-slate-900/50 rounded-lg border border-slate-700">
+                          <MathJaxRenderer content={getPreviewContent(formData.statement, "Aucun énoncé saisi...")} />
+                      </div>
+                   </div>
+                   <div>
+                      <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de la correction</h4>
+                      <div className="prose prose-invert max-w-none p-4 min-h-[12rem] bg-slate-900/50 rounded-lg border border-slate-700">
+                          <MathJaxRenderer content={getPreviewContent(formData.fullCorrection, "Aucune correction saisie...")} />
+                      </div>
+                   </div>
+                </div>
               </div>
-            </div>
-             {/* Other fields below the grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t border-gray-700/50">
-               <div>
-                  <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-300 mb-1">URL de l'image (optionnel)</label>
-                  <input
-                    type="text" id="imageUrl" name="imageUrl" value={formData.imageUrl || ''} onChange={handleInputChange} placeholder="https://..."
-                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="latexFormula" className="block text-sm font-medium text-gray-300 mb-1">Formule du graphique Desmos (optionnel)</label>
-                  <input
-                    type="text" id="latexFormula" name="latexFormula" value={formData.latexFormula || ''} onChange={handleInputChange} placeholder="Ex: y = x^2 + 1"
-                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-                  />
-                  {formulaError && <p className="text-sm text-red-400 mt-1">{formulaError}</p>}
-                </div>
-            </div>
+               {/* Other fields below the grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t border-gray-700/50">
+                 <div>
+                    <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-300 mb-1">URL de l'image (optionnel)</label>
+                    <input
+                      type="text" id="imageUrl" name="imageUrl" value={formData.imageUrl || ''} onChange={handleInputChange} placeholder="https://..."
+                      className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="latexFormula" className="block text-sm font-medium text-gray-300 mb-1">Formule du graphique Desmos (optionnel)</label>
+                    <input
+                      type="text" id="latexFormula" name="latexFormula" value={formData.latexFormula || ''} onChange={handleInputChange} placeholder="Ex: y = x^2 + 1"
+                      className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
+                    />
+                    {formulaError && <p className="text-sm text-red-400 mt-1">{formulaError}</p>}
+                  </div>
+              </div>
+            </fieldset>
+
              {(formData.latexFormula?.trim() && !formulaError) ? (
                 <div className="pt-6 border-t border-gray-700/50">
                      <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation du graphique Desmos</h4>
@@ -160,13 +266,17 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
           <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50 flex-shrink-0">
             <button
               type="button" onClick={onClose}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300"
+              disabled={isSaving}
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
             > Annuler </button>
             <button
               type="submit" form="edit-exercise-form"
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50"
-              disabled={!!formulaError}
-            > {isCreating ? 'Ajouter l\'exercice' : 'Enregistrer les modifications'} </button>
+              disabled={!!formulaError || isSaving}
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
+            > 
+                {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+                {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
+            </button>
           </footer>
         </div>
       </div>

@@ -1,5 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Chapter, Quiz, VideoLink } from '@/types';
 import { ArrowLeftIcon, BookOpenIcon, QuestionMarkCircleIcon, DocumentTextIcon, PlayCircleIcon, PencilIcon, PlusCircleIcon, TrashIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
@@ -142,7 +144,9 @@ export const ChapterHomePage: React.FC<ChapterHomePageProps> = ({
                             Résumé de la Leçon
                         </h3>
                     </div>
-                    <MathJaxRenderer content={chapter.summary} className="text-gray-300 whitespace-pre-wrap" />
+                    <div className="prose prose-invert max-w-none text-gray-300">
+                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(chapter.summary) as string)} />
+                    </div>
                 </div>
 
                 {/* Main Actions */}

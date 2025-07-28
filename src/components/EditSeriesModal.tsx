@@ -1,11 +1,11 @@
 
 import React, { useState } from 'react';
 import { Series } from '@/types';
-import { XMarkIcon } from '@/components/icons';
+import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 
 interface EditSeriesModalProps {
   series: Series | null; // Null for creation
-  onSave: (seriesData: Series) => void;
+  onSave: (seriesData: Series) => Promise<void>;
   onClose: () => void;
 }
 
@@ -15,6 +15,7 @@ const emptySeries: Omit<Series, 'id' | 'exercises'> = {
 
 export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave, onClose }) => {
   const [formData, setFormData] = useState(series || emptySeries);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isCreating = !series;
   const modalTitle = isCreating ? "Ajouter une nouvelle série" : "Modifier la série";
@@ -24,21 +25,26 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) {
       alert("Le titre de la série est obligatoire.");
       return;
     }
-
-    const finalSeries: Series = {
-      id: series?.id || `series-${Date.now()}`,
-      title: formData.title.trim(),
-      exercises: series?.exercises || [],
-    };
     
-    onSave(finalSeries);
-    onClose();
+    setIsSaving(true);
+    try {
+        const finalSeries: Series = {
+          id: series?.id || `series-${Date.now()}`,
+          title: formData.title.trim(),
+          exercises: series?.exercises || [],
+        };
+        await onSave(finalSeries);
+    } catch (error) {
+        console.error("Save failed:", error);
+        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+        setIsSaving(false);
+    }
   };
 
   return (
@@ -47,7 +53,7 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
       role="dialog"
       aria-modal="true"
       aria-labelledby="edit-series-title"
-      onClick={onClose}
+      onClick={isSaving ? undefined : onClose}
     >
       <div
         className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-2xl"
@@ -55,7 +61,7 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
       >
         <header className="flex items-center justify-between p-4 border-b border-gray-700">
           <h2 id="edit-series-title" className="text-xl font-bold text-brand-blue-300">{modalTitle}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white">
+          <button onClick={onClose} aria-label="Fermer" className="p-1 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" disabled={isSaving}>
             <XMarkIcon className="w-6 h-6" />
           </button>
         </header>
@@ -70,7 +76,8 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
               value={formData.title}
               onChange={handleChange}
               required
-              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+              disabled={isSaving}
+              className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
             />
           </div>
         </form>
@@ -79,16 +86,19 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="submit"
             form="edit-series-form"
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700"
+            disabled={isSaving}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
           >
-            {isCreating ? 'Ajouter la série' : 'Enregistrer'}
+            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+            {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
           </button>
         </footer>
       </div>

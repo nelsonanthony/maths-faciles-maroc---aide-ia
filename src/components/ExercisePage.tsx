@@ -1,5 +1,7 @@
 
 import React, { useRef, useState } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { AIInteraction } from '@/components/AIInteraction';
 import { ArrowLeftIcon, PencilIcon, BookOpenIcon } from '@/components/icons';
 import { Exercise, Chapter, ExerciseContext } from '@/types';
@@ -71,7 +73,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                 <div className="text-gray-300">
                     <h3 className="font-semibold text-gray-400 uppercase tracking-wider text-sm mb-2">Énoncé de l'exercice</h3>
                      <div className="prose prose-invert max-w-none">
-                        <MathJaxRenderer content={exercise.statement} />
+                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement) as string)} />
                     </div>
                 </div>
 
@@ -99,7 +101,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                     {showOfficialCorrection && (
                         <div className="mt-4 pt-4 border-t border-gray-700/50">
                              <div className="prose prose-invert max-w-none">
-                                <MathJaxRenderer content={exercise.fullCorrection} />
+                                <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.fullCorrection) as string)} />
                             </div>
                         </div>
                     )}

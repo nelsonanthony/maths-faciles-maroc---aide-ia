@@ -1,11 +1,24 @@
 
+
 import { Level, Exercise } from '../src/types.js';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Simple in-memory cache for the serverless function instance.
 let cachedCurriculum: Level[] | null = null;
 let cacheTimestamp: number | null = null;
 const CACHE_DURATION_MS = 1 * 60 * 1000; // 1 minute cache
+
+function getSupabaseAdminClient(): SupabaseClient {
+     const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error("Server Config Error: Supabase URL or Service Key is missing in data-access.");
+        throw new Error("Database connection is not configured on the server.");
+    }
+    return createClient(supabaseUrl, supabaseServiceKey);
+}
+
 
 /**
  * Fetches the curriculum from Supabase, using an in-memory cache.
@@ -17,18 +30,10 @@ async function getCurriculumFromSupabase(): Promise<Level[]> {
         return cachedCurriculum;
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-        console.error("Server Config Error: Supabase URL or Service Key is missing in data-access.");
-        throw new Error("Database connection is not configured on the server.");
-    }
-
     try {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const { data, error } = await supabase
-            .from('curriculum')
+        const supabase = getSupabaseAdminClient();
+        const { data, error } = await (supabase
+            .from('curriculum') as any)
             .select('data')
             .eq('id', 1) // The main row ID
             .single();
@@ -36,6 +41,7 @@ async function getCurriculumFromSupabase(): Promise<Level[]> {
         if (error) {
             // If the row doesn't exist, it's not a critical error, just means no data yet.
             if (error.code === 'PGRST116') {
+                 console.warn("Curriculum row not found in Supabase. Returning empty array.");
                  cachedCurriculum = [];
                  cacheTimestamp = now;
                  return [];
@@ -116,3 +122,28 @@ export async function getExerciseById(exerciseId: string): Promise<Exercise | un
     const curriculum = await getCurriculumFromSupabase();
     return findExerciseInCurriculum(curriculum, exerciseId);
 }
+
+
+/**
+ * Saves the entire curriculum structure to the database.
+ */
+export async function saveCurriculumToSupabase(levels: Level[]): Promise<void> {
+    const supabase = getSupabaseAdminClient();
+    
+    const payload = { data: levels };
+    const { error } = await (supabase
+        .from('curriculum') as any)
+        .update(payload)
+        .eq('id', 1);
+
+    if (error) {
+        console.error('Erreur lors de la sauvegarde du programme sur Supabase:', error);
+        throw new Error('La sauvegarde des modifications a échoué.');
+    }
+    
+    // Invalidate cache after saving
+    cachedCurriculum = null;
+    cacheTimestamp = null;
+}
+
+export { getCurriculumFromSupabase };

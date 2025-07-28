@@ -1,16 +1,40 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, ExerciseContext, DeletionInfo, ModalState, View } from '@/types';
+import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, ExerciseContext, DeletionInfo, ModalState, View, CurriculumActionPayload } from '@/types';
 import { SpinnerIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { getCurriculum, saveCurriculum } from '@/services/api';
+import { getCurriculum } from '@/services/api';
 import { getSupabase } from '@/services/authService';
 import { MainContent } from '@/components/MainContent';
 import { ModalManager } from '@/components/ModalManager';
 
+
+const callUpdateApi = async (body: CurriculumActionPayload) => {
+    const supabase = getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        throw new Error("Vous devez être connecté pour effectuer cette action.");
+    }
+
+    const response = await fetch('/api/update-curriculum', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "La mise à jour a échoué.");
+    }
+    return response.json();
+};
 
 export const App: React.FC = () => {
     const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
@@ -18,8 +42,6 @@ export const App: React.FC = () => {
     const [view, setView] = useState<View>('home');
     const [curriculum, setCurriculum] = useState<Level[] | null>(null);
     const [isLoadingData, setIsLoadingData] = useState<boolean>(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [saveSuccess, setSaveSuccess] = useState(false);
     
     const [selectedLevelId, setSelectedLevelId] = useState<string | null>(null);
     const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
@@ -162,194 +184,72 @@ export const App: React.FC = () => {
     // --- MODAL & CRUD OPERATIONS ---
     const openModal = (modalState: ModalState) => setModal(modalState);
     const closeModal = () => setModal(null);
-
-    const handleSaveChanges = async () => {
-        if (!isAdmin || !curriculum) return;
-        
-        setIsSaving(true);
-        setSaveSuccess(false);
-        try {
-            await saveCurriculum(curriculum);
-            setSaveSuccess(true);
-            setTimeout(() => setSaveSuccess(false), 3000); // Hide message after 3 seconds
-        } catch (error) {
-            console.error("Save failed:", error);
-            const errorMessage = error instanceof Error ? error.message : "Une erreur inconnue est survenue.";
-            alert(`Erreur lors de la sauvegarde : ${errorMessage}`);
-        } finally {
-            setIsSaving(false);
-        }
-    };
-
-    const handleAddOrUpdateLevel = (levelData: Level) => {
-        if (!curriculum) return;
-        const levelExists = curriculum.some(l => l.id === levelData.id);
-        let newCurriculum;
-        if (levelExists) {
-            newCurriculum = curriculum.map(l => l.id === levelData.id ? levelData : l);
-        } else {
-            newCurriculum = [...curriculum, levelData];
-        }
-        setCurriculum(newCurriculum);
+    
+    const handleApiResponse = (response: { curriculum: Level[] }) => {
+        setCurriculum(response.curriculum);
         closeModal();
     };
 
-    const handleAddOrUpdateChapter = (chapterData: Chapter) => {
-        if (!curriculum || !selectedLevelId) return;
-        const newCurriculum = curriculum.map(level => {
-            if (level.id === selectedLevelId) {
-                const chapterExists = level.chapters.some(c => c.id === chapterData.id);
-                const newChapters = chapterExists
-                    ? level.chapters.map(c => c.id === chapterData.id ? chapterData : c)
-                    : [...level.chapters, chapterData];
-                return { ...level, chapters: newChapters };
-            }
-            return level;
-        });
-        setCurriculum(newCurriculum);
-        closeModal();
+    const handleAddOrUpdateLevel = async (levelData: Level) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
+        handleApiResponse(response);
     };
 
-    const handleAddOrUpdateSeries = (seriesData: Series, chapterId: string) => {
-        if (!curriculum || !selectedLevelId) return;
-        const newCurriculum = curriculum.map(level => {
-            if (level.id === selectedLevelId) {
-                const newChapters = level.chapters.map(chapter => {
-                    if (chapter.id === chapterId) {
-                        const seriesExists = chapter.series.some(s => s.id === seriesData.id);
-                        const newSeries = seriesExists
-                            ? chapter.series.map(s => s.id === seriesData.id ? seriesData : s)
-                            : [...chapter.series, seriesData];
-                        return { ...chapter, series: newSeries };
-                    }
-                    return chapter;
-                });
-                return { ...level, chapters: newChapters };
-            }
-            return level;
-        });
-        setCurriculum(newCurriculum);
-        closeModal();
+    const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
+        handleApiResponse(response);
+    };
+
+    const handleAddOrUpdateSeries = async (seriesData: Series, chapterId: string) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId: chapterId, series: seriesData } });
+        handleApiResponse(response);
     };
     
-    const handleAddOrUpdateExercise = (exerciseData: Exercise, seriesId: string) => {
-        if (!curriculum || !selectedLevelId || !selectedChapterId) return;
-        const newCurriculum = curriculum.map(level => {
-            if (level.id === selectedLevelId) {
-                const newChapters = level.chapters.map(chapter => {
-                    if (chapter.id === selectedChapterId) {
-                        const newSeries = chapter.series.map(series => {
-                            if (series.id === seriesId) {
-                                const exerciseExists = series.exercises.some(e => e.id === exerciseData.id);
-                                const newExercises = exerciseExists
-                                    ? series.exercises.map(e => e.id === exerciseData.id ? exerciseData : e)
-                                    : [...series.exercises, exerciseData];
-                                return { ...series, exercises: newExercises };
-                            }
-                            return series;
-                        });
-                        return { ...chapter, series: newSeries };
-                    }
-                    return chapter;
-                });
-                return { ...level, chapters: newChapters };
-            }
-            return level;
-        });
-        setCurriculum(newCurriculum);
-        closeModal();
+    const handleAddOrUpdateExercise = async (exerciseData: Exercise, seriesId: string) => {
+         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId: seriesId, exercise: exerciseData } });
+        handleApiResponse(response);
     };
     
-    const handleAddOrUpdateQuiz = (quizData: Quiz, chapterId: string) => {
-        if (!curriculum || !selectedLevelId) return;
-        const newCurriculum = curriculum.map(level => {
-            if (level.id === selectedLevelId) {
-                const newChapters = level.chapters.map(chapter => {
-                    if (chapter.id === chapterId) {
-                        const quizExists = chapter.quizzes.some(q => q.id === quizData.id);
-                        const newQuizzes = quizExists
-                            ? chapter.quizzes.map(q => q.id === quizData.id ? quizData : q)
-                            : [...chapter.quizzes, quizData];
-                        return { ...chapter, quizzes: newQuizzes };
-                    }
-                    return chapter;
-                });
-                return { ...level, chapters: newChapters };
-            }
-            return level;
-        });
-        setCurriculum(newCurriculum);
+    const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId: chapterId, quiz: quizData } });
+        setCurriculum(response.curriculum);
         // If creating, we stay in the quiz modal to add questions.
-        if (modal?.type === 'editQuiz' && modal.payload.quiz?.id === quizData.id) {
-             // Re-open the modal with the updated quiz data
+        const isCreating = modal?.type === 'editQuiz' && !modal.payload.quiz;
+        if (isCreating) {
+            closeModal();
             openModal({ type: 'editQuiz', payload: { quiz: quizData, chapterId } });
         } else {
             closeModal();
         }
     };
     
-    const handleAddOrUpdateQuizQuestion = (questionData: QuizQuestion, quizId: string, chapterId: string) => {
-        if (!curriculum || !selectedLevelId) return;
-        const newCurriculum = curriculum.map(level => {
-            if (level.id === selectedLevelId) {
-                const newChapters = level.chapters.map(chapter => {
-                    if (chapter.id === chapterId) {
-                        const newQuizzes = chapter.quizzes.map(quiz => {
-                            if (quiz.id === quizId) {
-                                const questionExists = quiz.questions.some(q => q.id === questionData.id);
-                                const newQuestions = questionExists
-                                    ? quiz.questions.map(q => q.id === questionData.id ? questionData : q)
-                                    : [...quiz.questions, questionData];
-                                return { ...quiz, questions: newQuestions };
-                            }
-                            return quiz;
-                        });
-                        return { ...chapter, quizzes: newQuizzes };
-                    }
-                    return chapter;
-                });
-                return { ...level, chapters: newChapters };
-            }
-            return level;
-        });
-        setCurriculum(newCurriculum);
+    const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
+        setCurriculum(response.curriculum);
         closeModal();
-         // Re-open parent quiz modal
-        const updatedQuiz = newCurriculum.find(l => l.id === selectedLevelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
+        // Re-open parent quiz modal
+        const updatedQuiz = response.curriculum.find((l: Level) => l.id === selectedLevelId)?.chapters.find((c: Chapter) => c.id === chapterId)?.quizzes.find((q: Quiz) => q.id === quizId);
         if (updatedQuiz) {
              openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
         }
     };
 
-    const handleConfirmDelete = () => {
-        if (!modal || modal.type !== 'delete' || !curriculum) return;
-    
-        const { type, ids } = modal.payload;
-        let newCurriculum = [...curriculum];
-    
-        if (type === 'level') {
-            newCurriculum = curriculum.filter(l => l.id !== ids.levelId);
-        } else if (type === 'chapter' && ids.chapterId) {
-            newCurriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter(c => c.id !== ids.chapterId) } : l);
-        } else if (type === 'series' && ids.chapterId && ids.seriesId) {
-            newCurriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.filter(s => s.id !== ids.seriesId) } : c) } : l);
-        } else if (type === 'exercise' && ids.chapterId && ids.seriesId && ids.exerciseId) {
-            newCurriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.map(s => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter(e => e.id !== ids.exerciseId) } : s) } : c) } : l);
-        } else if (type === 'quiz' && ids.chapterId && ids.quizId) {
-             newCurriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter(q => q.id !== ids.quizId) } : c) } : l);
-        } else if (type === 'quizQuestion' && ids.chapterId && ids.quizId && ids.questionId) {
-            newCurriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map(q => q.id === ids.quizId ? { ...q, questions: q.questions.filter(qu => qu.id !== ids.questionId) } : q) } : c) } : l);
-             // After deleting a question, re-open the quiz modal to see the updated list
-            const updatedQuiz = newCurriculum.find(l => l.id === ids.levelId)?.chapters.find(c => c.id === ids.chapterId)?.quizzes.find(q => q.id === ids.quizId);
-             closeModal();
-            if (updatedQuiz) {
+    const handleConfirmDelete = async () => {
+        if (!modal || modal.type !== 'delete') return;
+        const { payload: deletionInfo } = modal;
+        const response = await callUpdateApi({ action: 'DELETE_ITEM', payload: deletionInfo });
+        setCurriculum(response.curriculum);
+        
+        // After deleting a question, re-open the quiz modal to see the updated list
+        if (deletionInfo.type === 'quizQuestion') {
+            const { ids } = deletionInfo;
+            const updatedQuiz = response.curriculum.find((l: Level) => l.id === ids.levelId)?.chapters.find((c: Chapter) => c.id === ids.chapterId)?.quizzes.find((q: Quiz) => q.id === ids.quizId);
+            closeModal();
+            if (updatedQuiz && ids.chapterId) {
                 openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId: ids.chapterId } });
             }
-        }
-    
-        setCurriculum(newCurriculum);
-        if (type !== 'quizQuestion') {
-             closeModal();
+        } else {
+            closeModal();
         }
     };
     
@@ -369,9 +269,6 @@ export const App: React.FC = () => {
         <div className="flex flex-col min-h-screen font-sans bg-slate-950 text-slate-300">
             <Header
                 onNavigate={handleNavigate}
-                onSaveChanges={handleSaveChanges}
-                isSaving={isSaving}
-                saveSuccess={saveSuccess}
             />
             <main className="flex-grow container mx-auto px-4 py-8">
                 {curriculum ? (

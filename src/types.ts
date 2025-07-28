@@ -1,5 +1,4 @@
 
-
 export interface Exercise {
     id: string;
     statement: string;
@@ -210,3 +209,11 @@ export type MathKeyboardLayout = {
     keys: MathKey[][];
   };
 };
+
+// Type for Curriculum Update API
+export type CurriculumActionType = 'ADD_OR_UPDATE_LEVEL' | 'ADD_OR_UPDATE_CHAPTER' | 'ADD_OR_UPDATE_SERIES' | 'ADD_OR_UPDATE_EXERCISE' | 'ADD_OR_UPDATE_QUIZ' | 'ADD_OR_UPDATE_QUIZ_QUESTION' | 'DELETE_ITEM';
+
+export interface CurriculumActionPayload {
+    action: CurriculumActionType;
+    payload: any; // The payload will vary based on the action
+}

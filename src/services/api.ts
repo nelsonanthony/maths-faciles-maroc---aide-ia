@@ -116,21 +116,3 @@ export const getCurriculum = async (): Promise<Level[]> => {
         }
     }
 };
-
-/**
- * Saves the entire curriculum structure to the database.
- */
-export const saveCurriculum = async (levels: Level[]): Promise<void> => {
-    const supabase = getSupabase();
-    
-    const payload = { data: levels };
-    const { error } = await (supabase
-        .from(TABLE_NAME) as any)
-        .update(payload)
-        .eq('id', ROW_ID);
-
-    if (error) {
-        console.error('Erreur lors de la sauvegarde du programme sur Supabase:', error);
-        throw new Error('La sauvegarde des modifications a échoué.');
-    }
-};

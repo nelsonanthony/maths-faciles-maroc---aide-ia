@@ -1,0 +1,150 @@
+
+import { createClient } from "@supabase/supabase-js";
+import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './data-access.js';
+import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
+
+// This function runs on Vercel's servers (Node.js environment)
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
+    res.setHeader(
+        'access-control-allow-headers',
+        'authorization, x-csrf-token, x-requested-with, accept, accept-version, content-length, content-md5, content-type, date, x-api-version'
+    );
+
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+
+    if (req.method !== 'POST') {
+        res.setHeader('Allow', ['POST']);
+        return res.status(405).end(`Method ${req.method} Not Allowed`);
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+    const adminEmail = process.env.VITE_ADMIN_EMAIL;
+
+    if (!supabaseUrl || !supabaseServiceKey || !adminEmail) {
+        return res.status(500).json({ error: "La configuration du serveur est incomplète. Veuillez vérifier les variables d'environnement." });
+    }
+
+    try {
+        // --- User Authentication & Authorization ---
+        const authHeader = req.headers.authorization;
+        if (!authHeader) {
+            return res.status(401).json({ error: 'L\'authentification est requise.' });
+        }
+        const token = authHeader.split(' ')[1];
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+
+        if (userError || !user) {
+            return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });
+        }
+        
+        // --- Authorization Check ---
+        if (user.email?.toLowerCase() !== adminEmail.toLowerCase()) {
+            return res.status(403).json({ error: 'Accès refusé. Seul un administrateur peut effectuer cette action.' });
+        }
+
+        const { action, payload } = req.body;
+        if (!action || !payload) {
+            return res.status(400).json({ error: "L'action et le payload sont requis." });
+        }
+        
+        let curriculum = await getCurriculumFromSupabase();
+
+        switch (action) {
+            case 'ADD_OR_UPDATE_LEVEL': {
+                const levelData = payload.level as Level;
+                const index = curriculum.findIndex(l => l.id === levelData.id);
+                if (index > -1) curriculum[index] = levelData;
+                else curriculum.push(levelData);
+                break;
+            }
+            case 'ADD_OR_UPDATE_CHAPTER': {
+                const { levelId, chapter } = payload;
+                const level = curriculum.find(l => l.id === levelId);
+                if (!level) throw new Error("Niveau non trouvé.");
+                const index = level.chapters.findIndex(c => c.id === chapter.id);
+                if (index > -1) level.chapters[index] = chapter;
+                else level.chapters.push(chapter);
+                break;
+            }
+             case 'ADD_OR_UPDATE_SERIES': {
+                const { levelId, chapterId, series } = payload;
+                const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                if (!chapter) throw new Error("Chapitre non trouvé.");
+                const index = chapter.series.findIndex(s => s.id === series.id);
+                if (index > -1) chapter.series[index] = series;
+                else chapter.series.push(series);
+                break;
+            }
+            case 'ADD_OR_UPDATE_EXERCISE': {
+                const { levelId, chapterId, seriesId, exercise } = payload;
+                const series = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.series.find(s => s.id === seriesId);
+                if (!series) throw new Error("Série non trouvée.");
+                const index = series.exercises.findIndex(e => e.id === exercise.id);
+                if (index > -1) series.exercises[index] = exercise;
+                else series.exercises.push(exercise);
+                break;
+            }
+            case 'ADD_OR_UPDATE_QUIZ': {
+                const { levelId, chapterId, quiz } = payload;
+                const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                if (!chapter) throw new Error("Chapitre non trouvé.");
+                const index = chapter.quizzes.findIndex(q => q.id === quiz.id);
+                if (index > -1) chapter.quizzes[index] = quiz;
+                else chapter.quizzes.push(quiz);
+                break;
+            }
+            case 'ADD_OR_UPDATE_QUIZ_QUESTION': {
+                const { levelId, chapterId, quizId, question } = payload;
+                const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
+                if (!quiz) throw new Error("Quiz non trouvé.");
+                const index = quiz.questions.findIndex(q => q.id === question.id);
+                if (index > -1) quiz.questions[index] = question;
+                else quiz.questions.push(question);
+                break;
+            }
+            case 'DELETE_ITEM': {
+                const { type, ids } = payload.payload as DeletionInfo; // The payload is nested inside another payload
+                switch(type) {
+                    case 'level':
+                        curriculum = curriculum.filter(l => l.id !== ids.levelId);
+                        break;
+                    case 'chapter':
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter(c => c.id !== ids.chapterId) } : l);
+                        break;
+                    case 'series':
+                         curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.filter(s => s.id !== ids.seriesId) } : c) } : l);
+                        break;
+                    case 'exercise':
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.map(s => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter(e => e.id !== ids.exerciseId) } : s) } : c) } : l);
+                        break;
+                     case 'quiz':
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter(q => q.id !== ids.quizId) } : c) } : l);
+                        break;
+                    case 'quizQuestion':
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map(q => q.id === ids.quizId ? { ...q, questions: q.questions.filter(qu => qu.id !== ids.questionId) } : q) } : c) } : l);
+                        break;
+                }
+                break;
+            }
+            default:
+                return res.status(400).json({ error: `Action inconnue: ${action}` });
+        }
+        
+        await saveCurriculumToSupabase(curriculum);
+        
+        return res.status(200).json({ success: true, curriculum });
+
+    } catch (e: any) {
+        console.error("Erreur critique dans la fonction 'update-curriculum':", e);
+        return res.status(500).json({ error: e.message || "Une erreur interne est survenue." });
+    }
+}

@@ -7,12 +7,9 @@ import { View } from '@/types';
 
 interface HeaderProps {
     onNavigate: (view: View) => void;
-    onSaveChanges: () => void;
-    isSaving: boolean;
-    saveSuccess: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNavigate, onSaveChanges, isSaving, saveSuccess }) => {
+export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
     const { user, isAdmin, logout } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -34,16 +31,6 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onSaveChanges, isSav
             onNavigate('login');
         }
     };
-    
-    const getSaveButtonClass = () => {
-        if (isSaving) {
-            return "bg-slate-500 border-slate-400 cursor-not-allowed";
-        }
-        if (saveSuccess) {
-            return "bg-green-600 border-green-500";
-        }
-        return "bg-blue-600 border-blue-500 hover:bg-blue-500";
-    };
 
     return (
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
@@ -59,21 +46,6 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate, onSaveChanges, isSav
                         >
                             Cours
                         </button>
-                        {isAdmin && (
-                             <button
-                                onClick={onSaveChanges}
-                                disabled={isSaving || saveSuccess}
-                                className={`hidden sm:flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg transition-all duration-300 text-white disabled:cursor-not-allowed ${getSaveButtonClass()}`}
-                            >
-                                {isSaving 
-                                    ? <SpinnerIcon className="w-5 h-5 animate-spin" /> 
-                                    : saveSuccess 
-                                        ? <CheckCircleIcon className="w-5 h-5" /> 
-                                        : <ArrowDownTrayIcon className="w-5 h-5" />}
-                                
-                                {isSaving ? 'Sauvegarde...' : saveSuccess ? 'Sauvegardé !' : 'Sauvegarder'}
-                            </button>
-                        )}
                         
                         {!user ? (
                             <div className="flex items-center gap-2">

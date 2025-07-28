@@ -80,7 +80,6 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                 <AIInteraction 
                     exerciseStatement={exercise.statement}
                     correctionSnippet={exercise.correctionSnippet}
-                    fullCorrection={exercise.fullCorrection}
                     chapterId={chapter.id}
                     levelId={levelId}
                     onNavigateToTimestamp={onNavigateToTimestamp}

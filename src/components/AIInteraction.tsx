@@ -1,30 +1,72 @@
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useAIExplain } from '@/hooks/useAIExplain';
 import { SpinnerIcon, PlayCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { DialogueMessage, SocraticPath } from '@/types';
+import { DialogueMessage, SocraticPath, AIResponse } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
+import { getSupabase } from '@/services/authService';
+
+// =================================================================
+// == INSTRUCTIONS SQL POUR LA BASE DE DONNÉES (SUPABASE) ==
+// =================================================================
+/*
+-- 1. Table pour les corrigés officiels
+-- Cette table stocke les corrections détaillées validées par les administrateurs.
+CREATE TABLE IF NOT EXISTS public.corrections (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  question TEXT NOT NULL,
+  correction TEXT NOT NULL,
+  chapter_id TEXT NOT NULL,
+  level_id TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT unique_correction_exercise UNIQUE (chapter_id, level_id, question)
+);
+ALTER TABLE public.corrections ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public read access for corrections" ON public.corrections FOR SELECT USING (true);
+CREATE POLICY "Admin write access for corrections" ON public.corrections FOR ALL USING (auth.role() = 'service_role');
+
+
+-- 2. Table pour les corrigés proposés par l'IA (Bonus)
+-- L'IA enregistre ici ses réponses quand aucun corrigé officiel n'existe.
+-- Un admin peut ensuite les valider et les transférer dans la table `corrections`.
+CREATE TABLE IF NOT EXISTS public.corrections_proposees (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  question TEXT NOT NULL,
+  chapter_id TEXT NOT NULL,
+  level_id TEXT NOT NULL,
+  proposed_correction JSONB, -- Stocke la réponse structurée de l'IA (socraticPath ou explanation)
+  status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+ALTER TABLE public.corrections_proposees ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow authenticated users to insert proposed corrections" ON public.corrections_proposees FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Admin can manage proposed corrections" ON public.corrections_proposees FOR ALL USING (auth.role() = 'service_role');
+*/
+// =================================================================
 
 interface AIInteractionProps {
     exerciseStatement: string;
-    correctionSnippet: string;
-    fullCorrection?: string;
+    correctionSnippet: string; // Gardé pour le contexte si aucune correction n'est trouvée
     initialQuestion?: string;
     chapterId: string;
     levelId: string;
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
 }
 
-export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement, correctionSnippet, fullCorrection, initialQuestion, chapterId, levelId, onNavigateToTimestamp }) => {
+export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp }) => {
     const { user } = useAuth();
     const [mainQuestion, setMainQuestion] = useState(initialQuestion || '');
     const { data: aiResponse, isLoading, error, explain, reset } = useAIExplain();
     const [isAIFeatureEnabled, setIsAIFeatureEnabled] = useState(true);
+
+    // State pour la logique hybride
+    const [fullCorrection, setFullCorrection] = useState<string | null>(null);
+    const [isFetchingCorrection, setIsFetchingCorrection] = useState(true);
     
-    // State for Socratic Tutor
+    // State pour le Tuteur Socratique
     const [dialogue, setDialogue] = useState<DialogueMessage[]>([]);
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
@@ -33,9 +75,90 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
     const [isTutorFinished, setIsTutorFinished] = useState(false);
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
-
     const videoChunk = aiResponse?.videoChunk;
     
+    /**
+     * Récupère le corrigé détaillé depuis Supabase quand le composant se charge
+     * ou quand l'exercice change.
+     */
+    useEffect(() => {
+        const fetchCorrection = async () => {
+            if (!chapterId || !levelId || !exerciseStatement) return;
+
+            setIsFetchingCorrection(true);
+            setFullCorrection(null);
+            const supabase = getSupabase();
+
+            try {
+                const { data, error } = await supabase
+                    .from('corrections')
+                    .select('correction')
+                    .eq('level_id', levelId)
+                    .eq('chapter_id', chapterId)
+                    .eq('question', exerciseStatement)
+                    .limit(1)
+                    .single();
+
+                if (error && error.code !== 'PGRST116') { // PGRST116: row not found
+                    console.error("Erreur lors de la recherche du corrigé:", error);
+                }
+
+                if (data) {
+                    setFullCorrection(data.correction);
+                }
+            } catch (err) {
+                console.error("Exception dans fetchCorrection:", err);
+            } finally {
+                setIsFetchingCorrection(false);
+            }
+        };
+
+        fetchCorrection();
+    }, [exerciseStatement, chapterId, levelId]);
+
+
+    /**
+     * [Bonus] Enregistre une correction générée par l'IA dans une table
+     * `corrections_proposees` pour validation par un administrateur.
+     */
+    const logGeneratedCorrection = useCallback(async (response: AIResponse) => {
+        if (fullCorrection === null && response) {
+            const supabase = getSupabase();
+            try {
+                await supabase
+                    .from('corrections_proposees')
+                    .insert({
+                        question: exerciseStatement,
+                        chapter_id: chapterId,
+                        level_id: levelId,
+                        proposed_correction: response.socraticPath || { explanation: response.explanation },
+                    });
+            } catch (err) {
+                 console.error("Exception dans logGeneratedCorrection:", err);
+            }
+        }
+    }, [fullCorrection, exerciseStatement, chapterId, levelId]);
+
+    
+    useEffect(() => {
+        if (aiResponse) {
+            if (aiResponse.socraticPath) {
+                setSocraticPath(aiResponse.socraticPath);
+                setDialogue([{ role: 'ai', content: aiResponse.socraticPath[0].ia_question }]);
+                setCurrentStep(0);
+                setIsTutorActive(true);
+                setIsTutorFinished(false);
+            }
+            if (aiResponse.explanation) {
+                 setDialogue([{ role: 'ai', content: aiResponse.explanation }]);
+                 setIsTutorActive(false);
+            }
+            // Log la réponse pour validation future si elle a été générée par l'IA
+            logGeneratedCorrection(aiResponse);
+        }
+    }, [aiResponse, logGeneratedCorrection]);
+
+
     useEffect(() => {
         dialogueEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [dialogue]);
@@ -46,29 +169,19 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
         }
     }, [error]);
 
-    useEffect(() => {
-        if (aiResponse?.socraticPath) {
-            setSocraticPath(aiResponse.socraticPath);
-            setDialogue([{ role: 'ai', content: aiResponse.socraticPath[0].ia_question }]);
-            setCurrentStep(0);
-            setIsTutorActive(true);
-            setIsTutorFinished(false);
-        }
-        if (aiResponse?.explanation) {
-             setDialogue([{ role: 'ai', content: aiResponse.explanation }]);
-             setIsTutorActive(false); // Direct answer mode
-        }
-    }, [aiResponse]);
-
+    /**
+     * Construit le prompt de base pour l'IA, en utilisant la correction détaillée si elle
+     * existe, ou en demandant un raisonnement autonome sinon.
+     */
     const buildBasePrompt = (studentQuestion: string) => {
          const systemPromptHeader = `
 CONTEXTE : Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains.
-RÈGLE STRICTE : Ta seule mission est d'aider à comprendre l'exercice fourni. Si la question de l'élève est hors-sujet (météo, histoire, etc.) ou inappropriée, tu dois le signaler dans ta réponse JSON.
+RÈGLE STRICTE : Ta seule mission est d'aider à comprendre l'exercice fourni. Si la question de l'élève est hors-sujet (météo, histoire, etc.), tu dois le signaler dans ta réponse JSON.
 Tes explications doivent être claires, pédagogiques et en français. Utilise la syntaxe Markdown et LaTeX ($$...$$ ou \\(...\\)).
 `;
         const contextPrompt = fullCorrection
-            ? `Le contexte est la correction détaillée suivante. N'hésite pas à y faire référence.\n---CORRECTION DÉTAILLÉE---\n${fullCorrection}`
-            : `Le contexte est cet extrait de la correction.\n---EXTRAIT CORRECTION---\n${correctionSnippet}`;
+            ? `Le contexte est la correction détaillée officielle suivante. BASE IMPÉRATIVEMENT TON EXPLICATION SUR CETTE CORRECTION. N'invente pas une autre méthode.\n---CORRECTION DÉTAILLÉE---\n${fullCorrection}`
+            : `Aucune correction détaillée n'est disponible. Tu dois donc raisonner par toi-même pour guider l'élève. Le contexte est l'énoncé et un bref extrait de la correction.\n---EXTRAIT CORRECTION---\n${correctionSnippet}`;
 
         return `${systemPromptHeader}\n---CONTEXTE EXERCICE---\n${exerciseStatement}\n${contextPrompt}\n---QUESTION ÉLÈVE---\n${studentQuestion}`;
     };
@@ -133,7 +246,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         setMainQuestion('');
     }
 
-    const isReadyForUser = !!user && isAIFeatureEnabled;
+    const isReadyForUser = !!user && isAIFeatureEnabled && !isFetchingCorrection;
 
     return (
         <div className="bg-gray-800/50 backdrop-blur-md rounded-xl border border-gray-700/50 shadow-lg p-6 space-y-6">
@@ -147,12 +260,12 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     </div>
                 )}
                  <div className="space-y-4 mt-4">
-                    <textarea value={mainQuestion} onChange={(e) => setMainQuestion(e.target.value)} placeholder="Posez votre question principale ici..." className="w-full h-24 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition" disabled={!isReadyForUser || isLoading || isTutorActive} />
+                    <textarea value={mainQuestion} onChange={(e) => setMainQuestion(e.target.value)} placeholder="Posez votre question principale ici..." className="w-full h-24 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition disabled:opacity-50" disabled={!isReadyForUser || isLoading || isTutorActive} />
                     <div className="flex flex-wrap gap-2">
-                        <button type="button" onClick={handleStartSocraticTutor} disabled={isLoading || !mainQuestion.trim() || !isReadyForUser || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                        <button type="button" onClick={handleStartSocraticTutor} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
                              Démarrer le tutorat interactif
                         </button>
-                        <button type="button" onClick={handleAskForDirectAnswer} disabled={isLoading || !mainQuestion.trim() || !isReadyForUser || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-gray-200 bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                        <button type="button" onClick={handleAskForDirectAnswer} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-gray-200 bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-70 disabled:cursor-not-allowed">
                             Voir la réponse directe
                         </button>
                     </div>
@@ -169,14 +282,16 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                         </div>
                     ))}
                      <div ref={dialogueEndRef} />
-                     {isLoading && (
+                     {isLoading || isFetchingCorrection ? (
                         <div className="flex flex-col items-center justify-center text-gray-400 p-8">
                             <SpinnerIcon className="w-10 h-10 animate-spin text-brand-blue-500" />
-                            <p className="mt-3 text-md">L'IA prépare votre tutorat...</p>
+                            <p className="mt-3 text-md">
+                                {isFetchingCorrection ? "Recherche d'un corrigé existant..." : "L'IA prépare votre tutorat..."}
+                            </p>
                         </div>
-                    )}
+                    ) : null}
                     {error && (<div className="flex items-center justify-center h-full text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {error}</p></div>)}
-                    {dialogue.length === 0 && !isLoading && !error && (<div className="flex items-center justify-center h-full text-gray-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
+                    {dialogue.length === 0 && !isLoading && !isFetchingCorrection && !error && (<div className="flex items-center justify-center h-full text-gray-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
                 </div>
 
                 {isTutorActive && !isTutorFinished && !isLoading && (

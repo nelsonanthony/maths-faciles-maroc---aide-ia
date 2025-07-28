@@ -8,8 +8,8 @@ interface CircularProgressBarProps {
 
 export const CircularProgressBar: React.FC<CircularProgressBarProps> = ({ 
     percentage, 
-    size = 150, 
-    strokeWidth = 12 
+    size = 60, 
+    strokeWidth = 5
 }) => {
     const [animatedPercentage, setAnimatedPercentage] = useState(0);
 
@@ -24,10 +24,10 @@ export const CircularProgressBar: React.FC<CircularProgressBarProps> = ({
     const circumference = 2 * Math.PI * radius;
     const offset = circumference - (animatedPercentage / 100) * circumference;
     
-    const color = percentage >= 75 ? 'text-green-400' : percentage >= 50 ? 'text-yellow-400' : 'text-red-400';
+    const color = percentage === 100 ? 'text-green-500' : 'text-rose-500';
 
     return (
-        <div className="relative" style={{ width: size, height: size }}>
+        <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
             <svg
                 className="transform -rotate-90"
                 width={size}
@@ -35,7 +35,7 @@ export const CircularProgressBar: React.FC<CircularProgressBarProps> = ({
             >
                 {/* Background circle */}
                 <circle
-                    stroke="rgba(255, 255, 255, 0.1)"
+                    className="stroke-slate-700"
                     fill="transparent"
                     strokeWidth={strokeWidth}
                     r={radius}
@@ -57,8 +57,9 @@ export const CircularProgressBar: React.FC<CircularProgressBarProps> = ({
                 />
             </svg>
             <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-4xl font-bold ${color}`}>
-                    {Math.round(animatedPercentage)}%
+                <span className={`text-xl font-bold ${color}`}>
+                    {Math.round(animatedPercentage)}
+                    <span className="text-xs -top-1.5 relative">%</span>
                 </span>
             </div>
         </div>

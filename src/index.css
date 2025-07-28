@@ -62,7 +62,7 @@
 
   /* Custom MathQuill input field styling */
   .mq-editable-field {
-    @apply w-full p-4 text-lg text-gray-200;
+    @apply w-full p-4 text-lg text-gray-200 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition;
   }
   .mq-editable-field .mq-cursor {
     @apply border-l-2 border-brand-blue-400;
@@ -71,12 +71,42 @@
     background-color: theme('colors.brand-blue.900/50') !important;
   }
 
-  /* Custom MathKeyboard button styling */
-  .math-keyboard-button {
-    @apply p-3 rounded-lg text-lg font-semibold text-gray-200 transition-colors duration-150 flex items-center justify-center;
+  /* New MathKeyboard styles */
+  .keyboard-overlay {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4;
   }
-  .math-keyboard-button .mjx-container {
-    font-size: 0.9em; /* Adjust font size inside buttons if needed */
+
+  .keyboard-container {
+     @apply bg-gray-800/80 backdrop-blur-lg border border-gray-700 rounded-lg p-2 space-y-2 w-full max-w-3xl shadow-2xl;
+  }
+
+  .keyboard-tabs {
+    @apply flex border-b border-gray-600;
+  }
+  .keyboard-tab-button {
+    @apply px-4 py-2 text-sm font-semibold transition-colors duration-200;
+  }
+  .keyboard-tab-button.active {
+    @apply text-brand-blue-300 border-b-2 border-brand-blue-400;
+  }
+  .keyboard-tab-button.inactive {
+    @apply text-gray-400 hover:bg-gray-700/50;
+  }
+
+  .keyboard-key {
+    @apply p-2 rounded-md h-12 flex items-center justify-center text-lg transition-colors duration-150;
+  }
+  .keyboard-key.main {
+    @apply bg-gray-700/80 hover:bg-gray-700 font-mono;
+  }
+  .keyboard-key.func {
+    @apply bg-gray-600/80 hover:bg-gray-600;
+  }
+  .keyboard-key.action {
+    @apply bg-brand-blue-700 hover:bg-brand-blue-600 text-white;
+  }
+  .keyboard-key .mjx-container {
+    font-size: 0.9em !important;
   }
 }
 

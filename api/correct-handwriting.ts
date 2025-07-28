@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -59,8 +60,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: "ocrText and exerciseId are required." });
         }
         
-        // --- Fetch Exercise using the new cached method ---
-        const exercise = await getExerciseById(supabase, exerciseId);
+        // --- Fetch Exercise using the new optimized method ---
+        const exercise = await getExerciseById(exerciseId);
         if (!exercise) {
             return res.status(404).json({ error: "Exercise not found." });
         }

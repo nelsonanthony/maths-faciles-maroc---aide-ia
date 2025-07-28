@@ -76,7 +76,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 3. The RPC function returns only IDs. We need to find the full exercise data from the live curriculum.
-        const allExercisesMap = await getAllExercisesMap(supabase);
+        const allExercisesMap = await getAllExercisesMap();
         
         // 4. Map the IDs from the RPC result to full Exercise objects.
         const rpcResult: { id: string }[] = similarExercisesData || [];

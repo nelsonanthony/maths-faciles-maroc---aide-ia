@@ -1,147 +1,171 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { MathJaxRenderer } from './MathJaxRenderer';
-import { EditableMathField } from 'react-mathquill';
-
-// L'appel à addStyles() a été déplacé dans App.tsx pour garantir une exécution unique et sécurisée côté client.
+import { EditableMathField, MathField } from 'react-mathquill';
+import { MathKeyboardLayout, MathKey } from '@/types';
 
 interface MathKeyboardProps {
-  onExpressionChange: (latex: string) => void;
+  onConfirm: (latex: string) => void;
+  onClose: () => void;
   initialValue?: string;
-  placeholder?: string;
-  disabled?: boolean;
-  showPreview?: boolean;
 }
 
-const KEY_LAYOUT = [
-  ['7', '8', '9', '(', ')'],
-  ['4', '5', '6', '+', '-'],
-  ['1', '2', '3', '*', '/'],
-  ['0', '.', '=', 'x', 'y'],
-];
+const KEY_LAYOUTS: MathKeyboardLayout = {
+  'Principal': [
+    [
+      { display: 'x^2', type: 'write', value: '^2' },
+      { display: 'x^n', type: 'write', value: '^' },
+      { display: '|x|', type: 'cmd', value: '|' },
+      { display: '7', type: 'write', value: '7', category: 'main' },
+      { display: '8', type: 'write', value: '8', category: 'main' },
+      { display: '9', type: 'write', value: '9', category: 'main' },
+      { display: '\\div', type: 'cmd', value: '\\div' },
+    ],
+    [
+      { display: '\\sqrt{x}', type: 'cmd', value: '\\sqrt' },
+      { display: '\\sqrt[n]{x}', type: 'cmd', value: '\\sqrt[n]' },
+      { display: '\\pi', type: 'cmd', value: '\\pi' },
+      { display: '4', type: 'write', value: '4', category: 'main' },
+      { display: '5', type: 'write', value: '5', category: 'main' },
+      { display: '6', type: 'write', value: '6', category: 'main' },
+      { display: '\\times', type: 'cmd', value: '\\times' },
+    ],
+    [
+      { display: '(', type: 'write', value: '(' },
+      { display: ')', type: 'write', value: ')' },
+      { display: ',', type: 'write', value: ',' },
+      { display: '1', type: 'write', value: '1', category: 'main' },
+      { display: '2', type: 'write', value: '2', category: 'main' },
+      { display: '3', type: 'write', value: '3', category: 'main' },
+      { display: '-', type: 'write', value: '-' },
+    ],
+    [
+      { display: '\\frac{a}{b}', type: 'cmd', value: '\\frac' },
+      { display: 'x_n', type: 'write', value: '_' },
+      { display: '=', type: 'write', value: '=' },
+      { display: '0', type: 'write', value: '0', category: 'main' },
+      { display: '.', type: 'write', value: '.', category: 'main' },
+      { display: '\\rightarrow', type: 'keystroke', value: 'Right' },
+      { display: '+', type: 'write', value: '+' },
+    ],
+  ],
+  'Fonctions': [
+    [
+      { display: 'sin', type: 'cmd', value: 'sin' }, { display: 'cos', type: 'cmd', value: 'cos' },
+      { display: 'tan', type: 'cmd', value: 'tan' }, { display: 'ln', type: 'cmd', value: 'ln' },
+      { display: '\\sum', type: 'cmd', value: '\\sum' }, { display: '\\int', type: 'cmd', value: '\\int' },
+    ],
+    [
+      { display: 'csc', type: 'cmd', value: 'csc' }, { display: 'sec', type: 'cmd', value: 'sec' },
+      { display: 'cot', type: 'cmd', value: 'cot' }, { display: 'log', type: 'cmd', value: 'log' },
+      { display: '\\lim_{x \\to a}', type: 'cmd', value: '\\lim' }, { display: 'e^x', type: 'write', value: 'e^' },
+    ],
+  ],
+  'Symboles': [
+    [
+      { display: '<', type: 'write', value: '<' }, { display: '>', type: 'write', value: '>' },
+      { display: '\\le', type: 'cmd', value: '\\le' }, { display: '\\ge', type: 'cmd', value: '\\ge' },
+      { display: '\\ne', type: 'cmd', value: '\\ne' }, { display: '\\infty', type: 'cmd', value: '\\infty' },
+    ],
+    [
+      { display: '\\in', type: 'cmd', value: '\\in' }, { display: '\\notin', type: 'cmd', value: '\\notin' },
+      { display: '\\subset', type: 'cmd', value: '\\subset' }, { display: '\\cup', type: 'cmd', value: '\\cup' },
+      { display: '\\cap', type: 'cmd', value: '\\cap' }, { display: '\\pm', type: 'cmd', value: '\\pm' },
+    ],
+     [
+      { display: '\\forall', type: 'cmd', value: '\\forall' }, { display: '\\exists', type: 'cmd', value: '\\exists' },
+      { display: '\\vec{v}', type: 'cmd', value: '\\vec' },
+    ],
+  ],
+  'Lettres Grecques': [
+    [
+      { display: '\\alpha', type: 'cmd', value: '\\alpha' }, { display: '\\beta', type: 'cmd', value: '\\beta' },
+      { display: '\\gamma', type: 'cmd', value: '\\gamma' }, { display: '\\delta', type: 'cmd', value: '\\delta' },
+      { display: '\\epsilon', type: 'cmd', value: '\\epsilon' }, { display: '\\zeta', type: 'cmd', value: '\\zeta' },
+    ],
+    [
+      { display: '\\eta', type: 'cmd', value: '\\eta' }, { display: '\\theta', type: 'cmd', value: '\\theta' },
+      { display: '\\iota', type: 'cmd', value: '\\iota' }, { display: '\\kappa', type: 'cmd', value: '\\kappa' },
+      { display: '\\lambda', type: 'cmd', value: '\\lambda' }, { display: '\\mu', type: 'cmd', value: '\\mu' },
+    ],
+    [
+      { display: '\\nu', type: 'cmd', value: '\\nu' }, { display: '\\xi', type: 'cmd', value: '\\xi' },
+      { display: '\\rho', type: 'cmd', value: '\\rho' }, { display: '\\sigma', type: 'cmd', value: '\\sigma' },
+      { display: '\\tau', type: 'cmd', value: '\\tau' }, { display: '\\phi', type: 'cmd', value: '\\phi' },
+    ],
+  ],
+};
 
-const FUNCTION_LAYOUT = [
-    { display: '\\sqrt{\\ }', cmd: '\\sqrt' },
-    { display: 'x^2', type: '^', value: '2' },
-    { display: '\\frac{x}{y}', cmd: '\\frac' },
-    { display: 'x^n', type: '^' },
-    { display: 'x_n', type: '_' },
-    { display: '\\pi', cmd: '\\pi' },
-    { display: '\\le', cmd: '\\le' },
-    { display: '\\ge', cmd: '\\ge' },
-];
 
-export const MathKeyboard: React.FC<MathKeyboardProps> = ({
-  onExpressionChange,
-  initialValue = '',
-  placeholder = "Saisissez votre expression...",
-  disabled = false,
-  showPreview = false,
-}) => {
+export const MathKeyboard: React.FC<MathKeyboardProps> = ({ onConfirm, onClose, initialValue = '' }) => {
   const [latex, setLatex] = useState(initialValue);
-  const [mathField, setMathField] = useState<any>(null); // To store the MathField API instance
+  const [mathField, setMathField] = useState<MathField | null>(null);
+  const [activeTab, setActiveTab] = useState(Object.keys(KEY_LAYOUTS)[0]);
 
-  useEffect(() => {
-    // This effect is crucial for a controlled component.
-    // It calls the parent's callback whenever the internal latex state changes.
-    onExpressionChange(latex);
-  }, [latex, onExpressionChange]);
-  
-  // This effect syncs the internal state if the parent provides a new initialValue.
-  useEffect(() => {
-    if (initialValue !== latex) {
-      setLatex(initialValue || '');
-    }
-  }, [initialValue]);
-
-  const handleInteraction = (action: (mf: any) => void) => {
+  const handleInteraction = (action: (mf: MathField) => void) => {
     if (mathField) {
       action(mathField);
       mathField.focus();
     }
   };
 
-  const handleButtonClick = useCallback((key: string) => {
-    handleInteraction(mf => mf.typedText(key));
-  }, [mathField]);
-
-  const handleFunctionClick = useCallback((func: { display: string; cmd?: string; type?: string; value?: string }) => {
+  const handleKeyClick = useCallback((key: MathKey) => {
     handleInteraction(mf => {
-        if (func.cmd) {
-            mf.cmd(func.cmd);
-        } else if (func.type) {
-            mf.typedText(func.type);
-            if (func.value) {
-                mf.typedText(func.value);
-            }
+        switch (key.type) {
+            case 'write': mf.write(key.value); break;
+            case 'cmd': mf.cmd(key.value); break;
+            case 'keystroke': mf.keystroke(key.value); break;
         }
     });
   }, [mathField]);
-
+  
+  const handleConfirm = () => {
+    onConfirm(latex);
+  };
+  
   return (
-    <div className={`w-full transition-opacity ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
-      <div className="w-full bg-gray-900 border-2 border-gray-700 rounded-t-lg text-gray-300 focus-within:ring-2 focus-within:ring-brand-blue-500 focus-within:border-brand-blue-500">
-        <EditableMathField
-            latex={latex}
-            onChange={(field) => {
-                setLatex(field.latex());
-            }}
-            mathquillDidMount={(field) => {
-                setMathField(field);
-            }}
-            style={{ width: '100%' }} // Ensures the field takes full width
-            className="mq-editable-field"
-        />
-      </div>
-      
-      <div className="grid grid-cols-2 bg-gray-800/80 border-x-2 border-b-2 border-gray-700 rounded-b-lg p-2 gap-2">
-         {/* Numeric and basic operators keypad */}
-        <div className="grid grid-cols-5 gap-2">
-            {KEY_LAYOUT.flat().map((key) => (
-                <button
-                    key={key}
-                    type="button"
-                    onClick={() => handleButtonClick(key)}
-                    className="math-keyboard-button bg-gray-700/80 hover:bg-gray-700"
-                    aria-label={`Touche ${key}`}
-                >
-                    {key}
-                </button>
-            ))}
+    <div className="keyboard-overlay" onClick={onClose}>
+      <div className="keyboard-container" onClick={e => e.stopPropagation()}>
+        <div className="w-full bg-gray-900 border-2 border-gray-700 rounded-t-lg text-gray-300 focus-within:ring-2 focus-within:ring-brand-blue-500 focus-within:border-brand-blue-500">
+            <EditableMathField
+                latex={latex}
+                onChange={(field) => setLatex(field.latex())}
+                mathquillDidMount={(field) => setMathField(field)}
+                style={{ width: '100%', minHeight: '80px', padding: '1rem' }}
+            />
         </div>
-        {/* Functions keypad */}
-        <div className="grid grid-cols-4 gap-2">
-            {FUNCTION_LAYOUT.map((func) => (
-                <button
-                    key={func.display}
-                    type="button"
-                    onClick={() => handleFunctionClick(func)}
-                    className="math-keyboard-button bg-gray-600/80 hover:bg-gray-600"
-                    aria-label={`Fonction ${func.display}`}
-                >
-                   <MathJaxRenderer content={`$$${func.display}$$`} />
-                </button>
-            ))}
-             <button
-                type="button"
-                onClick={() => handleInteraction(mf => mf.keystroke('Backspace'))}
-                className="col-span-2 math-keyboard-button bg-red-800/80 hover:bg-red-700"
-                aria-label="Effacer"
-            >
-                Effacer
-            </button>
-        </div>
-      </div>
+        
+        <div className="bg-gray-800/80 border-x-2 border-b-2 border-gray-700 rounded-b-lg p-2 space-y-2">
+            <header className="keyboard-tabs">
+                {Object.keys(KEY_LAYOUTS).map(tabName => (
+                    <button
+                        key={tabName} type="button" onClick={() => setActiveTab(tabName)}
+                        className={`keyboard-tab-button ${activeTab === tabName ? 'active' : 'inactive'}`}
+                    >
+                        {tabName}
+                    </button>
+                ))}
+            </header>
 
-       {showPreview && (
-         <div className="mt-2 p-3 min-h-[4rem] bg-gray-900/50 rounded-lg border border-gray-700">
-            <h4 className="text-xs text-gray-400 mb-1">Aperçu</h4>
-            <div className="text-lg">
-                {latex ? <MathJaxRenderer content={`$$${latex}$$`} /> : <span className="text-gray-500">{placeholder}</span>}
-            </div>
-         </div>
-      )}
+            <main className="grid grid-cols-7 gap-1">
+                {KEY_LAYOUTS[activeTab].flat().map((key, index) => (
+                    <button
+                        key={`${activeTab}-${index}`} type="button" onClick={() => handleKeyClick(key)}
+                        className={`keyboard-key ${key.category || 'func'}`}
+                        aria-label={`Touche ${key.display}`}
+                        style={{ gridColumn: `span ${key.width || 1}` }}
+                    >
+                       <MathJaxRenderer content={`$$${key.display}$$`} />
+                    </button>
+                ))}
+            </main>
+            <footer className="grid grid-cols-4 gap-1 pt-2 border-t border-gray-700/50">
+                 <button type="button" onClick={() => handleInteraction(mf => mf.keystroke('Left'))} className="keyboard-key main">←</button>
+                 <button type="button" onClick={() => handleInteraction(mf => mf.keystroke('Right'))} className="keyboard-key main">→</button>
+                 <button type="button" onClick={() => handleInteraction(mf => mf.keystroke('Backspace'))} className="keyboard-key main">⌫</button>
+                 <button type="button" onClick={handleConfirm} className="keyboard-key action font-semibold">OK</button>
+            </footer>
+        </div>
+      </div>
     </div>
   );
 };

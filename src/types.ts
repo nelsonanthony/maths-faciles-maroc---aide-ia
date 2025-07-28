@@ -194,3 +194,14 @@ export interface UserQuizAttempt {
     taken_at: string;
     chapter_id: string; // This field is now mandatory for aggregation
 }
+
+// Type for Math Keyboard
+export interface MathKey {
+    display: string; // What's shown on the button (can be LaTeX)
+    type: 'cmd' | 'write' | 'keystroke';
+    value: string; // The command, text, or keystroke name
+    width?: number; // Column span
+    category?: 'main' | 'func' | 'action';
+}
+
+export type MathKeyboardLayout = Record<string, MathKey[][]>;

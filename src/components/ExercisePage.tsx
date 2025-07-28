@@ -1,7 +1,7 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { AIInteraction } from '@/components/AIInteraction';
-import { ArrowLeftIcon, PencilIcon } from '@/components/icons';
+import { ArrowLeftIcon, PencilIcon, BookOpenIcon } from '@/components/icons';
 import { Exercise, Chapter, ExerciseContext } from '@/types';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 import { DesmosGraph } from '@/components/DesmosGraph';
@@ -25,6 +25,7 @@ interface ExercisePageProps {
 export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, seriesId, levelId, onBack, onEdit, onNavigateToTimestamp, onSelectExercise, onNavigateToChat }) => {
     const { isAdmin } = useAuth();
     const aiInteractionRef = useRef<HTMLDivElement>(null);
+    const [showOfficialCorrection, setShowOfficialCorrection] = useState(false);
     
     return (
         <div className="max-w-4xl mx-auto space-y-8">
@@ -69,12 +70,41 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                 
                 <div className="text-gray-300">
                     <h3 className="font-semibold text-gray-400 uppercase tracking-wider text-sm mb-2">Énoncé de l'exercice</h3>
-                    <MathJaxRenderer content={exercise.statement} className="whitespace-pre-wrap" />
+                     <div className="prose prose-invert max-w-none">
+                        <MathJaxRenderer content={exercise.statement} />
+                    </div>
                 </div>
 
 
                 <CompletionButton exercise={exercise} />
             </div>
+
+            {/* Official Correction Section */}
+            {exercise.fullCorrection && (
+                 <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
+                    <button 
+                        onClick={() => setShowOfficialCorrection(!showOfficialCorrection)}
+                        className="w-full flex justify-between items-center text-left"
+                        aria-expanded={showOfficialCorrection}
+                    >
+                        <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3">
+                           <BookOpenIcon className="w-6 h-6" />
+                            Correction Officielle
+                        </h3>
+                         <span className="text-sm font-semibold text-brand-blue-400 hover:text-brand-blue-300">
+                             {showOfficialCorrection ? 'Masquer' : 'Afficher'}
+                         </span>
+                    </button>
+                    
+                    {showOfficialCorrection && (
+                        <div className="mt-4 pt-4 border-t border-gray-700/50">
+                             <div className="prose prose-invert max-w-none">
+                                <MathJaxRenderer content={exercise.fullCorrection} />
+                            </div>
+                        </div>
+                    )}
+                 </div>
+            )}
 
             <div ref={aiInteractionRef}>
                 <AIInteraction 

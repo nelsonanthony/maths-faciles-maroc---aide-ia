@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
 import { XMarkIcon } from '@/components/icons';
+import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 interface EditExerciseModalProps {
   exercise: Exercise | null; // Null for creation
@@ -72,7 +73,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         onClick={onClose}
       >
         <div 
-          className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col"
+          className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-6xl max-h-[90vh] flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           <header className="flex items-center justify-between p-4 border-b border-gray-700 flex-shrink-0">
@@ -85,10 +86,11 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
           </header>
 
           <form onSubmit={handleSave} id="edit-exercise-form" className="flex-grow overflow-y-auto p-6 space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column: Input */}
+              <div className="space-y-6">
                 <div>
-                  <label htmlFor="statement" className="block text-sm font-medium text-gray-300 mb-1">Énoncé</label>
+                  <label htmlFor="statement" className="block text-sm font-medium text-gray-300 mb-1">Énoncé (MathJax/LaTeX activé)</label>
                   <textarea
                     id="statement"
                     name="statement"
@@ -106,44 +108,53 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
                     name="fullCorrection"
                     value={formData.fullCorrection || ''}
                     onChange={handleInputChange}
-                    rows={8}
-                    placeholder="Saisissez la correction détaillée ici. La première ligne servira d'aperçu."
+                    rows={10}
+                    placeholder="Saisissez la correction détaillée ici. La première ligne servira d'aperçu pour l'IA."
                     className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono"
                   />
                 </div>
-                <div>
+              </div>
+
+              {/* Right Column: Previews */}
+              <div className="space-y-6">
+                 <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de l'énoncé</h4>
+                    <div className="prose prose-invert max-w-none p-4 min-h-[10rem] bg-slate-900/50 rounded-lg border border-slate-700">
+                        <MathJaxRenderer content={formData.statement || "Aucun énoncé saisi..."} />
+                    </div>
+                 </div>
+                 <div>
+                    <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation de la correction</h4>
+                    <div className="prose prose-invert max-w-none p-4 min-h-[12rem] bg-slate-900/50 rounded-lg border border-slate-700">
+                        <MathJaxRenderer content={formData.fullCorrection || "Aucune correction saisie..."} />
+                    </div>
+                 </div>
+              </div>
+            </div>
+             {/* Other fields below the grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6 border-t border-gray-700/50">
+               <div>
                   <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-300 mb-1">URL de l'image (optionnel)</label>
                   <input
                     type="text" id="imageUrl" name="imageUrl" value={formData.imageUrl || ''} onChange={handleInputChange} placeholder="https://..."
                     className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
                   />
                 </div>
-              </div>
-
-              <div className="space-y-4">
                 <div>
-                  <label htmlFor="latexFormula" className="block text-sm font-medium text-gray-300 mb-1">Formule du graphique (optionnel)</label>
+                  <label htmlFor="latexFormula" className="block text-sm font-medium text-gray-300 mb-1">Formule du graphique Desmos (optionnel)</label>
                   <input
                     type="text" id="latexFormula" name="latexFormula" value={formData.latexFormula || ''} onChange={handleInputChange} placeholder="Ex: y = x^2 + 1"
                     className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
                   />
                   {formulaError && <p className="text-sm text-red-400 mt-1">{formulaError}</p>}
                 </div>
-
-                <div>
-                  <h4 className="text-sm font-medium text-gray-300 mb-2">Prévisualisation du graphique</h4>
-                  {(formData.latexFormula?.trim() && !formulaError) ? (
-                    <DesmosGraph latexFormula={formData.latexFormula} />
-                  ) : (
-                    <div className="w-full h-[300px] flex items-center justify-center rounded-lg border-2 border-dashed border-gray-600 bg-gray-900/50">
-                      <p className="text-gray-500 text-center text-sm px-4">
-                        {formulaError ? "Formule invalide pour la prévisualisation" : "Saisissez une formule valide pour voir un aperçu"}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
+             {(formData.latexFormula?.trim() && !formulaError) ? (
+                <div className="pt-6 border-t border-gray-700/50">
+                     <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation du graphique Desmos</h4>
+                    <DesmosGraph latexFormula={formData.latexFormula} />
+                </div>
+            ) : null}
           </form>
           
           <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50 flex-shrink-0">

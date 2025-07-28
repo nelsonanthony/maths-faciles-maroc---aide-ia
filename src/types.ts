@@ -201,7 +201,12 @@ export interface MathKey {
     type: 'cmd' | 'write' | 'keystroke';
     value: string; // The command, text, or keystroke name
     width?: number; // Column span
-    category?: 'main' | 'func' | 'action';
+    category?: 'main' | 'func' | 'action' | 'spacer';
 }
 
-export type MathKeyboardLayout = Record<string, MathKey[][]>;
+export type MathKeyboardLayout = {
+  [name: string]: {
+    cols: number;
+    keys: MathKey[][];
+  };
+};

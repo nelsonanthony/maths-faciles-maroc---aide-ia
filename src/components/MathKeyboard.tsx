@@ -10,89 +10,118 @@ interface MathKeyboardProps {
 }
 
 const KEY_LAYOUTS: MathKeyboardLayout = {
-  'Principal': [
-    [
-      { display: 'x^2', type: 'write', value: '^2' },
-      { display: 'x^n', type: 'write', value: '^' },
-      { display: '|x|', type: 'cmd', value: '|' },
-      { display: '7', type: 'write', value: '7', category: 'main' },
-      { display: '8', type: 'write', value: '8', category: 'main' },
-      { display: '9', type: 'write', value: '9', category: 'main' },
-      { display: '\\div', type: 'cmd', value: '\\div' },
-    ],
-    [
-      { display: '\\sqrt{x}', type: 'cmd', value: '\\sqrt' },
-      { display: '\\sqrt[n]{x}', type: 'cmd', value: '\\sqrt[n]' },
-      { display: '\\pi', type: 'cmd', value: '\\pi' },
-      { display: '4', type: 'write', value: '4', category: 'main' },
-      { display: '5', type: 'write', value: '5', category: 'main' },
-      { display: '6', type: 'write', value: '6', category: 'main' },
-      { display: '\\times', type: 'cmd', value: '\\times' },
-    ],
-    [
-      { display: '(', type: 'write', value: '(' },
-      { display: ')', type: 'write', value: ')' },
-      { display: ',', type: 'write', value: ',' },
-      { display: '1', type: 'write', value: '1', category: 'main' },
-      { display: '2', type: 'write', value: '2', category: 'main' },
-      { display: '3', type: 'write', value: '3', category: 'main' },
-      { display: '-', type: 'write', value: '-' },
-    ],
-    [
-      { display: '\\frac{a}{b}', type: 'cmd', value: '\\frac' },
-      { display: 'x_n', type: 'write', value: '_' },
-      { display: '=', type: 'write', value: '=' },
-      { display: '0', type: 'write', value: '0', category: 'main' },
-      { display: '.', type: 'write', value: '.', category: 'main' },
-      { display: '\\rightarrow', type: 'keystroke', value: 'Right' },
-      { display: '+', type: 'write', value: '+' },
-    ],
-  ],
-  'Fonctions': [
-    [
-      { display: 'sin', type: 'cmd', value: 'sin' }, { display: 'cos', type: 'cmd', value: 'cos' },
-      { display: 'tan', type: 'cmd', value: 'tan' }, { display: 'ln', type: 'cmd', value: 'ln' },
-      { display: '\\sum', type: 'cmd', value: '\\sum' }, { display: '\\int', type: 'cmd', value: '\\int' },
-    ],
-    [
-      { display: 'csc', type: 'cmd', value: 'csc' }, { display: 'sec', type: 'cmd', value: 'sec' },
-      { display: 'cot', type: 'cmd', value: 'cot' }, { display: 'log', type: 'cmd', value: 'log' },
-      { display: '\\lim_{x \\to a}', type: 'cmd', value: '\\lim' }, { display: 'e^x', type: 'write', value: 'e^' },
-    ],
-  ],
-  'Symboles': [
-    [
-      { display: '<', type: 'write', value: '<' }, { display: '>', type: 'write', value: '>' },
-      { display: '\\le', type: 'cmd', value: '\\le' }, { display: '\\ge', type: 'cmd', value: '\\ge' },
-      { display: '\\ne', type: 'cmd', value: '\\ne' }, { display: '\\infty', type: 'cmd', value: '\\infty' },
-    ],
-    [
-      { display: '\\in', type: 'cmd', value: '\\in' }, { display: '\\notin', type: 'cmd', value: '\\notin' },
-      { display: '\\subset', type: 'cmd', value: '\\subset' }, { display: '\\cup', type: 'cmd', value: '\\cup' },
-      { display: '\\cap', type: 'cmd', value: '\\cap' }, { display: '\\pm', type: 'cmd', value: '\\pm' },
-    ],
-     [
-      { display: '\\forall', type: 'cmd', value: '\\forall' }, { display: '\\exists', type: 'cmd', value: '\\exists' },
-      { display: '\\vec{v}', type: 'cmd', value: '\\vec' },
-    ],
-  ],
-  'Lettres Grecques': [
-    [
-      { display: '\\alpha', type: 'cmd', value: '\\alpha' }, { display: '\\beta', type: 'cmd', value: '\\beta' },
-      { display: '\\gamma', type: 'cmd', value: '\\gamma' }, { display: '\\delta', type: 'cmd', value: '\\delta' },
-      { display: '\\epsilon', type: 'cmd', value: '\\epsilon' }, { display: '\\zeta', type: 'cmd', value: '\\zeta' },
-    ],
-    [
-      { display: '\\eta', type: 'cmd', value: '\\eta' }, { display: '\\theta', type: 'cmd', value: '\\theta' },
-      { display: '\\iota', type: 'cmd', value: '\\iota' }, { display: '\\kappa', type: 'cmd', value: '\\kappa' },
-      { display: '\\lambda', type: 'cmd', value: '\\lambda' }, { display: '\\mu', type: 'cmd', value: '\\mu' },
-    ],
-    [
-      { display: '\\nu', type: 'cmd', value: '\\nu' }, { display: '\\xi', type: 'cmd', value: '\\xi' },
-      { display: '\\rho', type: 'cmd', value: '\\rho' }, { display: '\\sigma', type: 'cmd', value: '\\sigma' },
-      { display: '\\tau', type: 'cmd', value: '\\tau' }, { display: '\\phi', type: 'cmd', value: '\\phi' },
-    ],
-  ],
+  'main': {
+    cols: 12,
+    keys: [
+      [
+        { display: 'a^2', type: 'write', value: '^2', category: 'func', width: 2 },
+        { display: 'a^b', type: 'write', value: '^', category: 'func', width: 2 },
+        { display: '|a|', type: 'cmd', value: '|', category: 'func', width: 2 },
+        { display: '7', type: 'write', value: '7', category: 'main' },
+        { display: '8', type: 'write', value: '8', category: 'main' },
+        { display: '9', type: 'write', value: '9', category: 'main' },
+        { display: '\\div', type: 'cmd', value: '\\div', category: 'func' },
+        { display: '%', type: 'write', value: '%', category: 'func' },
+        { display: '\\frac{a}{b}', type: 'cmd', value: '\\frac', category: 'func' },
+      ],
+      [
+        { display: '\\sqrt{x}', type: 'cmd', value: '\\sqrt', category: 'func', width: 2 },
+        { display: '\\sqrt[n]{x}', type: 'cmd', value: '\\sqrt[n]', category: 'func', width: 2 },
+        { display: '\\pi', type: 'cmd', value: '\\pi', category: 'func', width: 2 },
+        { display: '4', type: 'write', value: '4', category: 'main' },
+        { display: '5', type: 'write', value: '5', category: 'main' },
+        { display: '6', type: 'write', value: '6', category: 'main' },
+        { display: '\\times', type: 'cmd', value: '\\times', category: 'func' },
+        { display: '←', type: 'keystroke', value: 'Left', category: 'main' },
+        { display: '→', type: 'keystroke', value: 'Right', category: 'main' },
+      ],
+      [
+        { display: 'sin', type: 'cmd', value: 'sin', category: 'func', width: 2 },
+        { display: 'cos', type: 'cmd', value: 'cos', category: 'func', width: 2 },
+        { display: 'tan', type: 'cmd', value: 'tan', category: 'func', width: 2 },
+        { display: '1', type: 'write', value: '1', category: 'main' },
+        { display: '2', type: 'write', value: '2', category: 'main' },
+        { display: '3', type: 'write', value: '3', category: 'main' },
+        { display: '-', type: 'write', value: '-', category: 'func' },
+        { display: '⌫', type: 'keystroke', value: 'Backspace', category: 'main', width: 2 },
+      ],
+      [
+        { display: '(', type: 'write', value: '(', category: 'func', width: 2 },
+        { display: ')', type: 'write', value: ')', category: 'func', width: 2 },
+        { display: ',', type: 'write', value: ',', category: 'func', width: 2 },
+        { display: '0', type: 'write', value: '0', category: 'main' },
+        { display: '.', type: 'write', value: '.', category: 'main' },
+        { display: 'ans', type: 'write', value: 'ans', category: 'func' },
+        { display: '+', type: 'write', value: '+', category: 'func' },
+        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action', width: 2 },
+      ],
+    ]
+  },
+  'abc': {
+    cols: 20,
+    keys: [
+      ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'].map(k => ({ display: k, type: 'write', value: k, category: 'main', width: 2 })),
+      [
+        { display: '', type: 'write', value: '', category: 'spacer', width: 1 },
+        ...['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'].map(k => ({ display: k, type: 'write', value: k, category: 'main', width: 2 })),
+        { display: '', type: 'write', value: '', category: 'spacer', width: 1 },
+      ],
+      [
+        { display: '=', type: 'write', value: '=', category: 'func', width: 2 },
+        ...['z', 'x', 'c', 'v', 'b', 'n', 'm'].map(k => ({ display: k, type: 'write', value: k, category: 'main', width: 2 })),
+        { display: ',', type: 'write', value: ',', category: 'func', width: 2 },
+        { display: '⌫', type: 'keystroke', value: 'Backspace', category: 'main', width: 2 },
+      ],
+      [
+        { display: '↑', type: 'keystroke', value: 'Shift', category: 'main', width: 3 },
+        { display: '(', type: 'write', value: '(', category: 'func', width: 2 },
+        { display: ')', type: 'write', value: ')', category: 'func', width: 2 },
+        { display: '[', type: 'write', value: '[', category: 'func', width: 2 },
+        { display: ']', type: 'write', value: ']', category: 'func', width: 2 },
+        { display: '!', type: 'write', value: '!', category: 'func', width: 2 },
+        { display: "'", type: 'write', value: "'", category: 'func', width: 2 },
+        { display: '\\pi', type: 'cmd', value: '\\pi', category: 'func', width: 2 },
+        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action', width: 3 },
+      ]
+    ]
+  },
+  'func': {
+    cols: 6,
+    keys: [
+      [
+        { display: 'sin', type: 'cmd', value: 'sin', category: 'func' },
+        { display: 'cos', type: 'cmd', value: 'cos', category: 'func' },
+        { display: 'tan', type: 'cmd', value: 'tan', category: 'func' },
+        { display: 'a^b', type: 'write', value: '^', category: 'func' },
+        { display: '\\sqrt{x}', type: 'cmd', value: '\\sqrt', category: 'func' },
+        { display: '\\sqrt[n]{x}', type: 'cmd', value: '\\sqrt[n]', category: 'func' },
+      ],
+      [
+        { display: 'sin^{-1}', type: 'write', value: 'sin^{-1}', category: 'func' },
+        { display: 'cos^{-1}', type: 'write', value: 'cos^{-1}', category: 'func' },
+        { display: 'tan^{-1}', type: 'write', value: 'tan^{-1}', category: 'func' },
+        { display: 'e^x', type: 'write', value: 'e^', category: 'func' },
+        { display: 'abs', type: 'cmd', value: 'abs', category: 'func' },
+        { display: 'round', type: 'write', value: 'round', category: 'func' },
+      ],
+      [
+        { display: 'mean', type: 'write', value: 'mean', category: 'func' },
+        { display: 'stdev', type: 'write', value: 'stdev', category: 'func' },
+        { display: 'stdevp', type: 'write', value: 'stdevp', category: 'func' },
+        { display: 'ln', type: 'cmd', value: 'ln', category: 'func' },
+        { display: 'log', type: 'cmd', value: 'log', category: 'func' },
+        { display: '⌫', type: 'keystroke', value: 'Backspace', category: 'main' },
+      ],
+      [
+        { display: 'nPr', type: 'write', value: 'nPr', category: 'func' },
+        { display: 'nCr', type: 'write', value: 'nCr', category: 'func' },
+        { display: '!', type: 'write', value: '!', category: 'func' },
+        { display: 'e', type: 'write', value: 'e', category: 'func' },
+        { display: '\\pi', type: 'cmd', value: '\\pi', category: 'func' },
+        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action' },
+      ]
+    ]
+  }
 };
 
 
@@ -122,6 +151,8 @@ export const MathKeyboard: React.FC<MathKeyboardProps> = ({ onConfirm, onClose, 
     onConfirm(latex);
   };
   
+  const currentLayout = KEY_LAYOUTS[activeTab];
+
   return (
     <div className="keyboard-overlay" onClick={onClose}>
       <div className="keyboard-container" onClick={e => e.stopPropagation()}>
@@ -139,23 +170,27 @@ export const MathKeyboard: React.FC<MathKeyboardProps> = ({ onConfirm, onClose, 
                 {Object.keys(KEY_LAYOUTS).map(tabName => (
                     <button
                         key={tabName} type="button" onClick={() => setActiveTab(tabName)}
-                        className={`keyboard-tab-button ${activeTab === tabName ? 'active' : 'inactive'}`}
+                        className={`keyboard-tab-button capitalize ${activeTab === tabName ? 'active' : 'inactive'}`}
                     >
                         {tabName}
                     </button>
                 ))}
             </header>
 
-            <main className="grid grid-cols-7 gap-1">
-                {KEY_LAYOUTS[activeTab].flat().map((key, index) => (
-                    <button
-                        key={`${activeTab}-${index}`} type="button" onClick={() => handleKeyClick(key)}
-                        className={`keyboard-key ${key.category || 'func'}`}
-                        aria-label={`Touche ${key.display}`}
-                        style={{ gridColumn: `span ${key.width || 1}` }}
-                    >
-                       <MathJaxRenderer content={`$$${key.display}$$`} />
-                    </button>
+            <main className={`grid gap-1`} style={{ gridTemplateColumns: `repeat(${currentLayout.cols}, minmax(0, 1fr))` }}>
+                {currentLayout.keys.flat().map((key, index) => (
+                    key.category === 'spacer' ? (
+                        <div key={`${activeTab}-spacer-${index}`} style={{ gridColumn: `span ${key.width || 1}` }} />
+                    ) : (
+                        <button
+                            key={`${activeTab}-${index}`} type="button" onClick={() => handleKeyClick(key)}
+                            className={`keyboard-key ${key.category || 'func'}`}
+                            aria-label={`Touche ${key.display}`}
+                            style={{ gridColumn: `span ${key.width || 1}` }}
+                        >
+                           <MathJaxRenderer content={key.display.includes('\\') ? `$$${key.display}$$` : key.display} />
+                        </button>
+                    )
                 ))}
             </main>
             <footer className="grid grid-cols-4 gap-1 pt-2 border-t border-gray-700/50">

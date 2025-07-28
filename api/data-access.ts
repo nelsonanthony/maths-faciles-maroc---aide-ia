@@ -1,38 +1,62 @@
+
 import { Level, Exercise } from '../src/types.js';
-import fs from 'fs/promises';
-import path from 'path';
+import { createClient } from '@supabase/supabase-js';
 
 // Simple in-memory cache for the serverless function instance.
 let cachedCurriculum: Level[] | null = null;
+let cacheTimestamp: number | null = null;
+const CACHE_DURATION_MS = 1 * 60 * 1000; // 1 minute cache
 
 /**
- * Fetches the curriculum from the local data.json file, using an in-memory cache.
- * This is much faster than fetching from the database on every call.
+ * Fetches the curriculum from Supabase, using an in-memory cache.
+ * This ensures data consistency between frontend and backend.
  */
-async function getCurriculumFromFile(): Promise<Level[]> {
-    if (cachedCurriculum) {
+async function getCurriculumFromSupabase(): Promise<Level[]> {
+    const now = Date.now();
+    if (cachedCurriculum && cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION_MS)) {
         return cachedCurriculum;
     }
 
-    // On Vercel, process.cwd() is the root of the deployment.
-    // The `public` directory is available at the root.
-    const filePath = path.join((process as any).cwd(), 'public', 'data.json');
-    
-    try {
-        const fileContent = await fs.readFile(filePath, 'utf-8');
-        const data = JSON.parse(fileContent);
-        
-        if (!data?.levels || !Array.isArray(data.levels)) {
-            console.error("Local data.json is malformed or 'levels' array is missing.");
-            throw new Error("Local data.json is malformed.");
-        }
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-        cachedCurriculum = data.levels as Level[];
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error("Server Config Error: Supabase URL or Service Key is missing in data-access.");
+        throw new Error("Database connection is not configured on the server.");
+    }
+
+    try {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const { data, error } = await supabase
+            .from('curriculum')
+            .select('data')
+            .eq('id', 1) // The main row ID
+            .single();
+
+        if (error) {
+            // If the row doesn't exist, it's not a critical error, just means no data yet.
+            if (error.code === 'PGRST116') {
+                 cachedCurriculum = [];
+                 cacheTimestamp = now;
+                 return [];
+            }
+            console.error("Error fetching curriculum from Supabase:", error);
+            throw new Error('Failed to fetch curriculum from database.');
+        }
+        
+        if (!data?.data || !Array.isArray(data.data)) {
+            // This is a valid state if no curriculum has been created yet. Return empty array.
+            cachedCurriculum = [];
+            cacheTimestamp = now;
+            return [];
+        }
+        
+        cachedCurriculum = data.data as Level[];
+        cacheTimestamp = now;
         return cachedCurriculum;
     } catch (error) {
-        console.error("Critical Error: Could not read or parse local data.json from path:", filePath, error);
-        // Fallback or throw an error
-        throw new Error("Impossible de charger le contenu pédagogique depuis le serveur.");
+        console.error("Critical Error: Could not fetch curriculum from Supabase.", error);
+        throw new Error("Could not load curriculum from the server.");
     }
 }
 
@@ -65,7 +89,7 @@ function findExerciseInCurriculum(levels: Level[], exerciseId: string): Exercise
  * @returns A Map of exerciseId to Exercise object.
  */
 export async function getAllExercisesMap(): Promise<Map<string, Exercise>> {
-    const levels = await getCurriculumFromFile();
+    const levels = await getCurriculumFromSupabase();
     const allExercisesMap = new Map<string, Exercise>();
 
     for (const level of levels) {
@@ -89,6 +113,6 @@ export async function getAllExercisesMap(): Promise<Map<string, Exercise>> {
  * @returns The Exercise object or undefined if not found.
  */
 export async function getExerciseById(exerciseId: string): Promise<Exercise | undefined> {
-    const curriculum = await getCurriculumFromFile();
+    const curriculum = await getCurriculumFromSupabase();
     return findExerciseInCurriculum(curriculum, exerciseId);
 }

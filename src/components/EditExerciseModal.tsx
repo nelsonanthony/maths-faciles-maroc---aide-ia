@@ -3,8 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
 import { XMarkIcon } from '@/components/icons';
-import { MathKeyboard } from '@/components/MathKeyboard';
-import { MathJaxRenderer } from './MathJaxRenderer';
 
 interface EditExerciseModalProps {
   exercise: Exercise | null; // Null for creation
@@ -24,11 +22,10 @@ const emptyExercise: Omit<Exercise, 'id'> = {
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
   const [formulaError, setFormulaError] = useState<string | null>(null);
-  const [activeKeyboard, setActiveKeyboard] = useState<'statement' | 'fullCorrection' | null>(null);
 
   const isCreating = !exercise;
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -64,13 +61,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
     onSave(finalExercise, seriesId);
     onClose();
   };
-  
-  const handleKeyboardConfirm = (latex: string) => {
-      if (activeKeyboard) {
-          setFormData(prev => ({ ...prev, [activeKeyboard]: latex }));
-      }
-      setActiveKeyboard(null);
-  }
 
   return (
     <>
@@ -99,17 +89,27 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
               <div className="space-y-4">
                 <div>
                   <label htmlFor="statement" className="block text-sm font-medium text-gray-300 mb-1">Énoncé</label>
-                   <div className="p-4 min-h-[120px] bg-gray-900/50 rounded-lg border border-gray-600">
-                        <MathJaxRenderer content={formData.statement ? `$$${formData.statement}$$` : '<span class="text-gray-500">Aperçu de l\'énoncé</span>'} />
-                   </div>
-                  <button type="button" onClick={() => setActiveKeyboard('statement')} className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-700">Éditer avec le clavier...</button>
+                  <textarea
+                    id="statement"
+                    name="statement"
+                    value={formData.statement}
+                    onChange={handleInputChange}
+                    rows={8}
+                    placeholder="Saisissez l'énoncé ici. Utilisez la syntaxe LaTeX comme $$...$$ ou \(...\) pour les formules."
+                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono"
+                  />
                 </div>
                  <div>
                   <label htmlFor="fullCorrection" className="block text-sm font-medium text-gray-300 mb-1">Correction Détaillée (optionnel)</label>
-                   <div className="p-4 min-h-[120px] bg-gray-900/50 rounded-lg border border-gray-600">
-                        <MathJaxRenderer content={formData.fullCorrection ? `$$${formData.fullCorrection}$$` : '<span class="text-gray-500">Aperçu de la correction</span>'} />
-                   </div>
-                   <button type="button" onClick={() => setActiveKeyboard('fullCorrection')} className="mt-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-700">Éditer avec le clavier...</button>
+                  <textarea
+                    id="fullCorrection"
+                    name="fullCorrection"
+                    value={formData.fullCorrection || ''}
+                    onChange={handleInputChange}
+                    rows={8}
+                    placeholder="Saisissez la correction détaillée ici. La première ligne servira d'aperçu."
+                    className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 font-mono"
+                  />
                 </div>
                 <div>
                   <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-300 mb-1">URL de l'image (optionnel)</label>
@@ -159,14 +159,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
           </footer>
         </div>
       </div>
-
-      {activeKeyboard && (
-         <MathKeyboard
-            initialValue={formData[activeKeyboard] || ''}
-            onConfirm={handleKeyboardConfirm}
-            onClose={() => setActiveKeyboard(null)}
-         />
-      )}
     </>
   );
 };

@@ -71,6 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapter } = payload;
                 const level = curriculum.find(l => l.id === levelId);
                 if (!level) throw new Error("Niveau non trouvé.");
+                if (!level.chapters) level.chapters = [];
                 const index = level.chapters.findIndex(c => c.id === chapter.id);
                 if (index > -1) level.chapters[index] = chapter;
                 else level.chapters.push(chapter);
@@ -78,57 +79,45 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
              case 'ADD_OR_UPDATE_SERIES': {
                 const { levelId, chapterId, series } = payload;
-                const levelIndex = curriculum.findIndex(l => l.id === levelId);
-                if (levelIndex === -1) {
-                    throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
-                }
-            
-                const chapterIndex = curriculum[levelIndex].chapters.findIndex(c => c.id === chapterId);
-                if (chapterIndex === -1) {
-                    throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
-                }
-            
-                const targetChapter = curriculum[levelIndex].chapters[chapterIndex];
-                if (!targetChapter.series) {
-                    targetChapter.series = [];
+                const level = curriculum.find(l => l.id === levelId);
+                if (!level) throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
+                
+                const chapter = level.chapters?.find(c => c.id === chapterId);
+                if (!chapter) throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
+
+                if (!chapter.series) {
+                    chapter.series = [];
                 }
                 
-                const seriesIndex = targetChapter.series.findIndex(s => s.id === series.id);
+                const seriesIndex = chapter.series.findIndex(s => s.id === series.id);
                 if (seriesIndex > -1) {
-                    targetChapter.series[seriesIndex] = series;
+                    chapter.series[seriesIndex] = series;
                 } else {
-                    targetChapter.series.push(series);
+                    chapter.series.push(series);
                 }
                 break;
             }
             case 'ADD_OR_UPDATE_EXERCISE': {
                 const { levelId, chapterId, seriesId, exercise } = payload;
 
-                const levelIndex = curriculum.findIndex(l => l.id === levelId);
-                if (levelIndex === -1) {
-                    throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
-                }
+                const level = curriculum.find(l => l.id === levelId);
+                if (!level) throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
+                
+                const chapter = level.chapters?.find(c => c.id === chapterId);
+                if (!chapter) throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
 
-                const chapterIndex = curriculum[levelIndex].chapters.findIndex(c => c.id === chapterId);
-                if (chapterIndex === -1) {
-                    throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
-                }
-
-                const seriesIndex = curriculum[levelIndex].chapters[chapterIndex].series.findIndex(s => s.id === seriesId);
-                if (seriesIndex === -1) {
-                    throw new Error(`Série non trouvée pour l'ID : ${seriesId}`);
-                }
-
-                const targetSeries = curriculum[levelIndex].chapters[chapterIndex].series[seriesIndex];
-                if (!targetSeries.exercises) {
-                    targetSeries.exercises = [];
+                const series = chapter.series?.find(s => s.id === seriesId);
+                if (!series) throw new Error(`Série non trouvée pour l'ID : ${seriesId}`);
+                
+                if (!series.exercises) {
+                    series.exercises = [];
                 }
                 
-                const exerciseIndex = targetSeries.exercises.findIndex(e => e.id === exercise.id);
+                const exerciseIndex = series.exercises.findIndex(e => e.id === exercise.id);
                 if (exerciseIndex > -1) {
-                    targetSeries.exercises[exerciseIndex] = exercise;
+                    series.exercises[exerciseIndex] = exercise;
                 } else {
-                    targetSeries.exercises.push(exercise);
+                    series.exercises.push(exercise);
                 }
                 break;
             }
@@ -136,6 +125,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapterId, quiz } = payload;
                 const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
                 if (!chapter) throw new Error("Chapitre non trouvé.");
+                if (!chapter.quizzes) chapter.quizzes = [];
                 const index = chapter.quizzes.findIndex(q => q.id === quiz.id);
                 if (index > -1) chapter.quizzes[index] = quiz;
                 else chapter.quizzes.push(quiz);
@@ -145,13 +135,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapterId, quizId, question } = payload;
                 const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
                 if (!quiz) throw new Error("Quiz non trouvé.");
+                if (!quiz.questions) quiz.questions = [];
                 const index = quiz.questions.findIndex(q => q.id === question.id);
                 if (index > -1) quiz.questions[index] = question;
                 else quiz.questions.push(question);
                 break;
             }
             case 'DELETE_ITEM': {
-                const { type, ids } = payload as DeletionInfo; // CORRECTED: No longer nested payload.payload
+                const { type, ids } = payload as DeletionInfo;
                 switch(type) {
                     case 'level':
                         curriculum = curriculum.filter(l => l.id !== ids.levelId);

@@ -54,12 +54,63 @@ const formatCorrectionObject = (obj: any, level: number): string => {
 };
 
 
+const formatNewCorrectionJson = (correction: any, adaptation: any): string => {
+    let markdown = '';
+
+    if (correction?.bilan) {
+        markdown += `### Bilan\n\n`;
+        for (const [key, value] of Object.entries(correction.bilan)) {
+            markdown += `*   **${key.charAt(0).toUpperCase() + key.slice(1)}:** ${value}\n`;
+        }
+        markdown += `\n---\n`;
+    }
+
+    if (correction?.détails) {
+        markdown += `## Correction Détaillée\n\n`;
+        for (const detail of correction.détails) {
+            markdown += `### Partie ${detail.partie}\n\n`;
+            if (detail.étapes) {
+                for (const etape of detail.étapes) {
+                    if (etape.action) markdown += `**Action :** ${etape.action}\n`;
+                    if (etape.calcul) markdown += `> **Calcul :**\n> $$${etape.calcul}$$\n`;
+                    if (etape.explication) markdown += `*Explication :* ${etape.explication}\n`;
+                     if (etape.piège) markdown += `*Piège à éviter :* ${etape.piège}\n\n`;
+                     if (etape.exemple) markdown += `*Exemple :* ${etape.exemple}\n\n`;
+                     if (etape.argument) markdown += `*Argument :* ${etape.argument}\n\n`;
+                }
+            }
+            if (detail.conclusion) markdown += `**Conclusion :** ${detail.conclusion}\n\n`;
+            if (detail.astuce) markdown += `**Astuce :** ${detail.astuce}\n\n`;
+        }
+        markdown += `\n---\n`;
+    }
+
+    if (correction?.méthodologie) {
+        markdown += `## Méthodologie\n\n`;
+        const meth = correction.méthodologie;
+        if (meth.difficulté) markdown += `*   **Difficulté :** ${meth.difficulté}\n`;
+        if (meth.points_clés) markdown += `*   **Points Clés :**\n    *   ${meth.points_clés.join('\n    *   ')}\n`;
+        if (meth.erreurs_fréquentes) markdown += `*   **Erreurs fréquentes :**\n    *   ${meth.erreurs_fréquentes.join('\n    *   ')}\n`;
+        markdown += `\n---\n`;
+    }
+    
+    if (adaptation?.analogies) {
+        markdown += `## Analogies pour mieux comprendre\n\n`;
+        for (const [key, value] of Object.entries(adaptation.analogies)) {
+            markdown += `*   **${key.charAt(0).toUpperCase() + key.slice(1)} :** ${value}\n`;
+        }
+    }
+
+    return markdown;
+};
+
+
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
   const [jsonInput, setJsonInput] = useState('');
   const [isJsonImporterOpen, setIsJsonImporterOpen] = useState(false);
   const [formulaError, setFormulaError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = = useState(false);
 
   const isCreating = !exercise;
 
@@ -78,9 +129,24 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         
         let statement = '';
         let fullCorrection = '';
+        let latexFormula = '';
+
+        // --- Handle new detailed format ---
+        if (parsedJson.énoncé && parsedJson.correction) {
+            const { énoncé, correction, adaptation } = parsedJson;
+            if (énoncé.fonction) {
+                statement += `Soit la fonction ${énoncé.fonction}.\n\n`;
+                latexFormula = énoncé.fonction.split(' = ')[1] || '';
+            }
+            if (énoncé.questions && Array.isArray(énoncé.questions)) {
+                statement += énoncé.questions
+                    .map((q: any) => `*   **${q.partie}** ${q.énoncé}`)
+                    .join('\n');
+            }
+            fullCorrection = formatNewCorrectionJson(correction, adaptation);
 
         // --- Handle first format (xriadiat.e-monsite.com) ---
-        if (parsedJson.exercice && typeof parsedJson.exercice === 'object') {
+        } else if (parsedJson.exercice && typeof parsedJson.exercice === 'object') {
             const ex = parsedJson.exercice;
             if (ex.titre) statement += `**${ex.titre}**\n\n`;
             if (ex.enonce) statement += `${ex.enonce}\n\n`;
@@ -111,7 +177,8 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         setFormData(prev => ({
             ...prev,
             statement: statement.trim(),
-            fullCorrection: fullCorrection.trim()
+            fullCorrection: fullCorrection.trim(),
+            latexFormula: latexFormula.trim(),
         }));
 
         setJsonInput('');

@@ -1,9 +1,10 @@
 
+
 import React, { useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { AIInteraction } from '@/components/AIInteraction';
-import { ArrowLeftIcon, PencilIcon, BookOpenIcon } from '@/components/icons';
+import { ArrowLeftIcon, PencilIcon, BookOpenIcon, QuestionMarkCircleIcon } from '@/components/icons';
 import { Exercise, Chapter, ExerciseContext } from '@/types';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 import { DesmosGraph } from '@/components/DesmosGraph';
@@ -11,6 +12,33 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RelatedExercises } from '@/components/RelatedExercises';
 import { ChatLauncher } from '@/components/ChatLauncher';
 import { CompletionButton } from '@/components/CompletionButton';
+
+interface PreCorrectionGuideProps {
+    onConfirm: () => void;
+}
+
+const PreCorrectionGuide: React.FC<PreCorrectionGuideProps> = ({ onConfirm }) => (
+    <div className="space-y-4">
+        <div className="p-4 bg-yellow-900/20 border-l-4 border-yellow-500 rounded-r-lg">
+             <h4 className="font-semibold text-yellow-300 flex items-center gap-2 mb-2">
+                <QuestionMarkCircleIcon className="w-5 h-5" />
+                Avant de continuer, avez-vous réfléchi à :
+             </h4>
+             <ul className="list-disc list-inside text-sm text-yellow-200/80 space-y-1">
+                <li>La méthode principale ou la formule à utiliser ?</li>
+                <li>Les définitions exactes des termes mathématiques de l'énoncé ?</li>
+                <li>Les pièges courants (erreurs de signe, cas particuliers oubliés) ?</li>
+             </ul>
+        </div>
+        <button
+            onClick={onConfirm}
+            className="w-full px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors"
+        >
+            Je suis prêt, afficher la correction détaillée
+        </button>
+    </div>
+);
+
 
 interface ExercisePageProps {
     exercise: Exercise;
@@ -84,26 +112,19 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
             {/* Official Correction Section */}
             {exercise.fullCorrection && (
                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
-                    <button 
-                        onClick={() => setShowOfficialCorrection(!showOfficialCorrection)}
-                        className="w-full flex justify-between items-center text-left"
-                        aria-expanded={showOfficialCorrection}
-                    >
-                        <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3">
-                           <BookOpenIcon className="w-6 h-6" />
-                            Correction Officielle
-                        </h3>
-                         <span className="text-sm font-semibold text-brand-blue-400 hover:text-brand-blue-300">
-                             {showOfficialCorrection ? 'Masquer' : 'Afficher'}
-                         </span>
-                    </button>
+                     <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3 mb-4">
+                        <BookOpenIcon className="w-6 h-6" />
+                         Correction Officielle
+                     </h3>
                     
-                    {showOfficialCorrection && (
+                    {showOfficialCorrection ? (
                         <div className="mt-4 pt-4 border-t border-gray-700/50">
                              <div className="prose prose-invert max-w-none">
                                 <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.fullCorrection) as string)} />
                             </div>
                         </div>
+                    ) : (
+                        <PreCorrectionGuide onConfirm={() => setShowOfficialCorrection(true)} />
                     )}
                  </div>
             )}

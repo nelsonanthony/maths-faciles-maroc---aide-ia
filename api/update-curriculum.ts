@@ -1,5 +1,4 @@
 
-
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './data-access.js';
@@ -78,11 +77,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
              case 'ADD_OR_UPDATE_SERIES': {
                 const { levelId, chapterId, series } = payload;
-                const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
-                if (!chapter) throw new Error("Chapitre non trouvé.");
-                const index = chapter.series.findIndex(s => s.id === series.id);
-                if (index > -1) chapter.series[index] = series;
-                else chapter.series.push(series);
+                const levelIndex = curriculum.findIndex(l => l.id === levelId);
+                if (levelIndex === -1) {
+                    throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
+                }
+            
+                const chapterIndex = curriculum[levelIndex].chapters.findIndex(c => c.id === chapterId);
+                if (chapterIndex === -1) {
+                    throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
+                }
+            
+                const targetChapter = curriculum[levelIndex].chapters[chapterIndex];
+                if (!targetChapter.series) {
+                    targetChapter.series = [];
+                }
+                
+                const seriesIndex = targetChapter.series.findIndex(s => s.id === series.id);
+                if (seriesIndex > -1) {
+                    targetChapter.series[seriesIndex] = series;
+                } else {
+                    targetChapter.series.push(series);
+                }
                 break;
             }
             case 'ADD_OR_UPDATE_EXERCISE': {

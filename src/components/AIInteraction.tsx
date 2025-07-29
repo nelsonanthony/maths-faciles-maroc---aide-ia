@@ -73,6 +73,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const [studentInput, setStudentInput] = useState('');
     const [isTutorActive, setIsTutorActive] = useState(false);
     const [isTutorFinished, setIsTutorFinished] = useState(false);
+    const [isStuck, setIsStuck] = useState(false);
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
     const videoChunk = aiResponse?.videoChunk;
@@ -207,6 +208,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         e.preventDefault();
         if (!studentInput.trim() || !socraticPath || isTutorFinished) return;
         
+        setIsStuck(false); // Hide button as soon as user tries again
         const newDialogue: DialogueMessage[] = [...dialogue, { role: 'user', content: studentInput }];
 
         const currentSocraticStep = socraticPath[currentStep];
@@ -226,12 +228,40 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
             }
         } else {
             newDialogue.push({ role: 'ai', content: currentSocraticStep.hint_for_wrong_answer });
+            setIsStuck(true); // Show the "I'm stuck" button
         }
         
         setDialogue(newDialogue);
         setStudentInput('');
     }
     
+    const handleImStuck = () => {
+        if (!socraticPath || isTutorFinished) return;
+
+        const currentSocraticStep = socraticPath[currentStep];
+        const expected = currentSocraticStep.expected_answer_keywords.join('" ou "');
+        const newDialogue: DialogueMessage[] = [
+            ...dialogue, 
+            { 
+                role: 'system', 
+                content: `Pas de problème, voici la réponse pour cette étape : **"${expected}"**. Continuons.`
+            }
+        ];
+
+        setIsStuck(false);
+
+        const nextStep = currentStep + 1;
+        if (nextStep < socraticPath.length) {
+            newDialogue.push({ role: 'ai', content: socraticPath[nextStep].ia_question });
+            setCurrentStep(nextStep);
+        } else {
+            newDialogue.push({ role: 'system', content: 'Félicitations, vous avez terminé ce parcours !' });
+            setIsTutorFinished(true);
+        }
+
+        setDialogue(newDialogue);
+    };
+
     const resetState = () => {
         reset();
         setDialogue([]);
@@ -240,6 +270,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         setStudentInput('');
         setIsTutorActive(false);
         setIsTutorFinished(false);
+        setIsStuck(false);
     };
     
     const resetForNewQuestion = () => {
@@ -296,17 +327,28 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                 </div>
 
                 {isTutorActive && !isTutorFinished && !isLoading && (
-                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-gray-700 flex gap-2">
+                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2">
                         <input 
                             type="text"
                             value={studentInput}
                             onChange={(e) => setStudentInput(e.target.value)}
                             placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                            className="w-full p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500"
+                            className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500"
                         />
-                        <button type="submit" disabled={!studentInput.trim()} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
-                            Envoyer
-                        </button>
+                        <div className="flex gap-2 self-end sm:self-auto">
+                            <button type="submit" disabled={!studentInput.trim()} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                                Envoyer
+                            </button>
+                            {isStuck && (
+                                <button 
+                                    type="button" 
+                                    onClick={handleImStuck}
+                                    className="px-4 py-2 bg-yellow-600 text-white text-sm font-semibold rounded-lg hover:bg-yellow-700 animate-pulse"
+                                >
+                                    Je suis bloqué
+                                </button>
+                            )}
+                        </div>
                     </form>
                 )}
                  {(dialogue.length > 0) && !isLoading && (

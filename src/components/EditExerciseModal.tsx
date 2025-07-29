@@ -110,7 +110,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
   const [jsonInput, setJsonInput] = useState('');
   const [isJsonImporterOpen, setIsJsonImporterOpen] = useState(false);
   const [formulaError, setFormulaError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isCreating = !exercise;
 

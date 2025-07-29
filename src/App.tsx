@@ -185,40 +185,52 @@ export const App: React.FC = () => {
     const openModal = (modalState: ModalState) => setModal(modalState);
     const closeModal = () => setModal(null);
     
-    const handleApiResponse = (response: { curriculum: Level[] }) => {
+    const handleAddOrUpdateLevel = async (levelData: Level) => {
+        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
         setCurriculum(response.curriculum);
         closeModal();
     };
 
-    const handleAddOrUpdateLevel = async (levelData: Level) => {
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
-        handleApiResponse(response);
-    };
-
     const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
-        handleApiResponse(response);
+        setCurriculum(response.curriculum);
+        closeModal();
     };
 
     const handleAddOrUpdateSeries = async (seriesData: Series, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId: chapterId, series: seriesData } });
-        handleApiResponse(response);
+        setCurriculum(response.curriculum);
+        closeModal();
     };
     
     const handleAddOrUpdateExercise = async (exerciseData: Exercise, seriesId: string) => {
          const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId: seriesId, exercise: exerciseData } });
-        handleApiResponse(response);
+        setCurriculum(response.curriculum);
+        closeModal();
     };
     
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId: chapterId, quiz: quizData } });
         setCurriculum(response.curriculum);
-        // If creating, we stay in the quiz modal to add questions.
+        
         const isCreating = modal?.type === 'editQuiz' && !modal.payload.quiz;
         if (isCreating) {
+            // Find the newly created quiz in the response from the server to get the definitive version.
+            const newQuiz = response.curriculum
+                .find((l: Level) => l.id === selectedLevelId)
+                ?.chapters.find((c: Chapter) => c.id === chapterId)
+                ?.quizzes.find((q: Quiz) => q.id === quizData.id); // Match by the temporary ID
+
             closeModal();
-            openModal({ type: 'editQuiz', payload: { quiz: quizData, chapterId } });
+            
+            if (newQuiz) {
+                // Re-open the modal with the new quiz data.
+                openModal({ type: 'editQuiz', payload: { quiz: newQuiz, chapterId } });
+            } else {
+                console.warn("Could not find the newly created quiz in the API response. Modal will not reopen.");
+            }
         } else {
+            // If we are just updating, simply close the modal.
             closeModal();
         }
     };

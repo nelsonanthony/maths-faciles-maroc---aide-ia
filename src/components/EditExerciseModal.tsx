@@ -105,6 +105,60 @@ const formatNewCorrectionJson = (correction: any, adaptation: any): string => {
     return markdown;
 };
 
+// Helper function for the "structured analysis" format
+const formatStructuredAnalysisCorrection = (data: any): string => {
+    let markdown = '';
+
+    // Pistes de réflexion
+    if (data['sous-questions_préalables'] && Array.isArray(data['sous-questions_préalables'])) {
+        markdown += `## Pistes de réflexion\n\n`;
+        markdown += data['sous-questions_préalables'].map((q: string) => `*   ${q}`).join('\n');
+        markdown += `\n\n---\n\n`;
+    }
+
+    // Correction détaillée
+    if (data.correction && typeof data.correction === 'object') {
+        markdown += `## Correction Détaillée\n\n`;
+        const sortedParties = Object.keys(data.correction).sort();
+
+        for (const partie of sortedParties) {
+            markdown += `### Partie ${partie}\n\n`;
+            const details = data.correction[partie];
+            if (typeof details === 'object') {
+                for (const key in details) {
+                    const value = details[key];
+                    const formattedKey = key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+                    if (key === 'calcul') {
+                         markdown += `> **${formattedKey}:**\n> $$${value}$$\n\n`;
+                    } else {
+                        markdown += `*   **${formattedKey}:** ${value}\n`;
+                    }
+                }
+            }
+             markdown += `\n`;
+        }
+        markdown += `\n---\n\n`;
+    }
+    
+    // Conclusion
+    if (data.conclusion && typeof data.conclusion === 'object') {
+        markdown += `## Conclusion\n\n`;
+        if (data.conclusion.résumé) {
+            markdown += `### Résumé\n\n`;
+            const resumeLines = data.conclusion.résumé.split('\n').map((line: string) => `*   ${line}`);
+            markdown += resumeLines.join('\n') + `\n\n`;
+        }
+        if (data.conclusion.astuce_générale) {
+             markdown += `### Astuce Générale\n\n`;
+             const astuceLines = data.conclusion.astuce_générale.split('\n').map((line: string) => `*   ${line}`);
+             markdown += astuceLines.join('\n') + `\n`;
+        }
+    }
+
+    return markdown.trim();
+};
+
+
 // Helper function for the "propositions" format
 const formatPropositionsCorrection = (correction: any): string => {
     let markdown = '';
@@ -170,8 +224,13 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         let fullCorrection = '';
         let latexFormula = '';
 
-        // --- Handle new detailed format ---
-        if (parsedJson.énoncé && parsedJson.correction) {
+        // --- Handle structured analysis format (most complex) ---
+        if (parsedJson.énoncé?.texte && parsedJson.correction && parsedJson.conclusion) {
+             statement = parsedJson.énoncé.texte;
+             fullCorrection = formatStructuredAnalysisCorrection(parsedJson);
+
+        // --- Handle detailed function analysis format ---
+        } else if (parsedJson.énoncé && parsedJson.correction) {
             const { énoncé, correction, adaptation } = parsedJson;
             if (énoncé.fonction) {
                 statement += `Soit la fonction ${énoncé.fonction}.\n\n`;
@@ -184,7 +243,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
             }
             fullCorrection = formatNewCorrectionJson(correction, adaptation);
         
-        // --- NEW: Handle propositions/solutions format ---
+        // --- Handle propositions/solutions format ---
         } else if (parsedJson.exercice?.propositions && parsedJson.correction?.solutions) {
             const ex = parsedJson.exercice;
             const corr = parsedJson.correction;

@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
@@ -212,35 +211,17 @@ export const App: React.FC = () => {
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId: chapterId, quiz: quizData } });
         setCurriculum(response.curriculum);
-        
-        const isCreating = modal?.type === 'editQuiz' && !modal.payload.quiz;
-        if (isCreating) {
-            // Find the newly created quiz in the response from the server to get the definitive version.
-            const newQuiz = response.curriculum
-                .find((l: Level) => l.id === selectedLevelId)
-                ?.chapters.find((c: Chapter) => c.id === chapterId)
-                ?.quizzes.find((q: Quiz) => q.id === quizData.id); // Match by the temporary ID
-
-            closeModal();
-            
-            if (newQuiz) {
-                // Re-open the modal with the new quiz data.
-                openModal({ type: 'editQuiz', payload: { quiz: newQuiz, chapterId } });
-            } else {
-                console.warn("Could not find the newly created quiz in the API response. Modal will not reopen.");
-            }
-        } else {
-            // If we are just updating, simply close the modal.
-            closeModal();
-        }
+        closeModal();
     };
     
     const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
         setCurriculum(response.curriculum);
-        closeModal();
-        // Re-open parent quiz modal
+        
+        // After adding/editing a question, we must re-open the parent quiz modal to maintain UX flow.
         const updatedQuiz = response.curriculum.find((l: Level) => l.id === selectedLevelId)?.chapters.find((c: Chapter) => c.id === chapterId)?.quizzes.find((q: Quiz) => q.id === quizId);
+        
+        closeModal(); // Close question modal first
         if (updatedQuiz) {
              openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
         }
@@ -253,16 +234,17 @@ export const App: React.FC = () => {
         setCurriculum(response.curriculum);
         
         // After deleting a question, re-open the quiz modal to see the updated list
-        if (deletionInfo.type === 'quizQuestion') {
+        if (deletionInfo.type === 'quizQuestion' && deletionInfo.ids.chapterId && deletionInfo.ids.quizId && deletionInfo.ids.levelId) {
             const { ids } = deletionInfo;
             const updatedQuiz = response.curriculum.find((l: Level) => l.id === ids.levelId)?.chapters.find((c: Chapter) => c.id === ids.chapterId)?.quizzes.find((q: Quiz) => q.id === ids.quizId);
-            closeModal();
-            if (updatedQuiz && ids.chapterId) {
+            closeModal(); // Close delete confirmation
+            if (updatedQuiz) {
                 openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId: ids.chapterId } });
+                return; // Return early to avoid closing the newly opened modal
             }
-        } else {
-            closeModal();
         }
+        
+        closeModal(); // Close delete confirmation for all other cases
     };
     
 
@@ -304,7 +286,7 @@ export const App: React.FC = () => {
                         onSelectExercise={handleSelectExercise}
                         onSelectQuiz={handleSelectQuiz}
                         onNavigateToChat={handleNavigateToChat}
-                        onNavigateToTimestamp={handleNavigateToTimestamp}
+                        onNavigateToTimestamp={onNavigateToTimestamp}
                         onBackToDefault={handleBackToDefault}
                         resetSelections={resetSelections}
                         openModal={openModal}

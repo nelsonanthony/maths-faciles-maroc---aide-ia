@@ -1,4 +1,5 @@
 
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './data-access.js';
@@ -102,11 +103,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             case 'ADD_OR_UPDATE_EXERCISE': {
                 const { levelId, chapterId, seriesId, exercise } = payload;
-                const series = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.series.find(s => s.id === seriesId);
-                if (!series) throw new Error("Série non trouvée.");
-                const index = series.exercises.findIndex(e => e.id === exercise.id);
-                if (index > -1) series.exercises[index] = exercise;
-                else series.exercises.push(exercise);
+
+                const levelIndex = curriculum.findIndex(l => l.id === levelId);
+                if (levelIndex === -1) {
+                    throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
+                }
+
+                const chapterIndex = curriculum[levelIndex].chapters.findIndex(c => c.id === chapterId);
+                if (chapterIndex === -1) {
+                    throw new Error(`Chapitre non trouvé pour l'ID : ${chapterId}`);
+                }
+
+                const seriesIndex = curriculum[levelIndex].chapters[chapterIndex].series.findIndex(s => s.id === seriesId);
+                if (seriesIndex === -1) {
+                    throw new Error(`Série non trouvée pour l'ID : ${seriesId}`);
+                }
+
+                const targetSeries = curriculum[levelIndex].chapters[chapterIndex].series[seriesIndex];
+                if (!targetSeries.exercises) {
+                    targetSeries.exercises = [];
+                }
+                
+                const exerciseIndex = targetSeries.exercises.findIndex(e => e.id === exercise.id);
+                if (exerciseIndex > -1) {
+                    targetSeries.exercises[exerciseIndex] = exercise;
+                } else {
+                    targetSeries.exercises.push(exercise);
+                }
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ': {

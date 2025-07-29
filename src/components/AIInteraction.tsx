@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -13,31 +14,29 @@ import { getSupabase } from '@/services/authService';
 // == INSTRUCTIONS SQL POUR LA BASE DE DONNÉES (SUPABASE) ==
 // =================================================================
 /*
+-- IMPORTANT: Cette mise à jour corrige un bug critique mais nécessite de recréer les tables de corrections.
+-- Les anciennes données dans `corrections` et `corrections_proposees` seront perdues.
+
 -- 1. Table pour les corrigés officiels
--- Cette table stocke les corrections détaillées validées par les administrateurs.
+DROP TABLE IF EXISTS public.corrections;
 CREATE TABLE IF NOT EXISTS public.corrections (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  question TEXT NOT NULL,
+  exercise_id TEXT NOT NULL UNIQUE, -- Clé unique qui lie au contenu de data.json
   correction TEXT NOT NULL,
-  chapter_id TEXT NOT NULL,
-  level_id TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  CONSTRAINT unique_correction_exercise UNIQUE (chapter_id, level_id, question)
+  created_at TIMESTAMPTZ DEFAULT now()
 );
 ALTER TABLE public.corrections ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read access for corrections" ON public.corrections FOR SELECT USING (true);
-CREATE POLICY "Admin write access for corrections" ON public.corrections FOR ALL USING (auth.role() = 'service_role');
+-- Seul le 'service_role' (depuis le backend) peut écrire. L'ajout se fait manuellement ou via des scripts sécurisés.
+CREATE POLICY "Admin write access for corrections" ON public.corrections FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
 
 -- 2. Table pour les corrigés proposés par l'IA (Bonus)
--- L'IA enregistre ici ses réponses quand aucun corrigé officiel n'existe.
--- Un admin peut ensuite les valider et les transférer dans la table `corrections`.
+DROP TABLE IF EXISTS public.corrections_proposees;
 CREATE TABLE IF NOT EXISTS public.corrections_proposees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  question TEXT NOT NULL,
-  chapter_id TEXT NOT NULL,
-  level_id TEXT NOT NULL,
-  proposed_correction JSONB, -- Stocke la réponse structurée de l'IA (socraticPath ou explanation)
+  exercise_id TEXT NOT NULL UNIQUE, -- Clé unique qui lie au contenu de data.json
+  proposed_correction JSONB, -- Stocke la réponse structurée de l'IA
   status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'rejected'
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -48,6 +47,7 @@ CREATE POLICY "Admin can manage proposed corrections" ON public.corrections_prop
 // =================================================================
 
 interface AIInteractionProps {
+    exerciseId: string;
     exerciseStatement: string;
     correctionSnippet: string; // Gardé pour le contexte si aucune correction n'est trouvée
     initialQuestion?: string;
@@ -56,7 +56,7 @@ interface AIInteractionProps {
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
 }
 
-export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp }) => {
+export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp }) => {
     const { user } = useAuth();
     const [mainQuestion, setMainQuestion] = useState(initialQuestion || '');
     const { data: aiResponse, isLoading, error, explain, reset } = useAIExplain();
@@ -83,7 +83,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
      */
     useEffect(() => {
         const fetchCorrection = async () => {
-            if (!chapterId || !levelId || !exerciseStatement) return;
+            if (!exerciseId) return;
 
             setIsFetchingCorrection(true);
             setFullCorrection(null);
@@ -93,9 +93,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
                 const { data, error } = await supabase
                     .from('corrections')
                     .select('correction')
-                    .eq('level_id', levelId)
-                    .eq('chapter_id', chapterId)
-                    .eq('question', exerciseStatement)
+                    .eq('exercise_id', exerciseId)
                     .limit(1)
                     .single();
 
@@ -114,7 +112,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
         };
 
         fetchCorrection();
-    }, [exerciseStatement, chapterId, levelId]);
+    }, [exerciseId]);
 
 
     /**
@@ -128,16 +126,19 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseStatement,
                 await supabase
                     .from('corrections_proposees')
                     .insert({
-                        question: exerciseStatement,
-                        chapter_id: chapterId,
-                        level_id: levelId,
+                        exercise_id: exerciseId,
                         proposed_correction: response.socraticPath || { explanation: response.explanation },
                     });
             } catch (err) {
-                 console.error("Exception dans logGeneratedCorrection:", err);
+                 // Ignore unique constraint violation errors, it just means another user already submitted it.
+                 if (err instanceof Error && (err as any).code === '23505') {
+                    // This is expected if another user triggered the same correction generation.
+                 } else {
+                    console.error("Exception dans logGeneratedCorrection:", err);
+                 }
             }
         }
-    }, [fullCorrection, exerciseStatement, chapterId, levelId]);
+    }, [fullCorrection, exerciseId]);
 
     
     useEffect(() => {

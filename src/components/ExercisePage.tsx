@@ -131,6 +131,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
 
             <div ref={aiInteractionRef}>
                 <AIInteraction 
+                    exerciseId={exercise.id}
                     exerciseStatement={exercise.statement}
                     correctionSnippet={exercise.correctionSnippet}
                     chapterId={chapter.id}

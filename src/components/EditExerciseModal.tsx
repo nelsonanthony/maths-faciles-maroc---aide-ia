@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -104,6 +105,44 @@ const formatNewCorrectionJson = (correction: any, adaptation: any): string => {
     return markdown;
 };
 
+// Helper function for the "propositions" format
+const formatPropositionsCorrection = (correction: any): string => {
+    let markdown = '';
+
+    if (correction?.solutions && Array.isArray(correction.solutions)) {
+        markdown += `## Solutions Détaillées\n\n`;
+        for (const sol of correction.solutions) {
+            markdown += `### Proposition ${sol.proposition}\n`;
+            markdown += `*   **Réponse :** ${sol.reponse}\n`;
+            markdown += `*   **Explication :** ${sol.explication}\n`;
+            if (sol.methode) {
+                markdown += `*   **Méthode :** ${sol.methode}\n`;
+            }
+            markdown += '\n';
+        }
+        markdown += '---\n\n';
+    }
+
+    if (correction?.astuces && typeof correction.astuces === 'object') {
+        markdown += `## Astuces Générales\n\n`;
+        for (const [key, value] of Object.entries(correction.astuces)) {
+            const formattedKey = key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+            markdown += `*   **${formattedKey} :** ${value}\n`;
+        }
+        markdown += '\n---\n\n';
+    }
+
+    if (correction?.erreurs_frequentes && Array.isArray(correction.erreurs_frequentes)) {
+        markdown += `## Erreurs Fréquentes à Éviter\n\n`;
+        for (const err of correction.erreurs_frequentes) {
+            markdown += `*   ${err}\n`;
+        }
+        markdown += '\n';
+    }
+
+    return markdown.trim();
+};
+
 
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
@@ -144,6 +183,24 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
                     .join('\n');
             }
             fullCorrection = formatNewCorrectionJson(correction, adaptation);
+        
+        // --- NEW: Handle propositions/solutions format ---
+        } else if (parsedJson.exercice?.propositions && parsedJson.correction?.solutions) {
+            const ex = parsedJson.exercice;
+            const corr = parsedJson.correction;
+            
+            let statementBuilder = '';
+            if (ex.titre) {
+                statementBuilder += `**${ex.titre}**\n\n`;
+            }
+            if (Array.isArray(ex.propositions)) {
+                 statementBuilder += ex.propositions
+                    .map((p: any) => `*   **${p.numero})** ${p.enonce}`)
+                    .join('\n');
+            }
+            statement = statementBuilder;
+
+            fullCorrection = formatPropositionsCorrection(corr);
 
         // --- Handle first format (xriadiat.e-monsite.com) ---
         } else if (parsedJson.exercice && typeof parsedJson.exercice === 'object') {

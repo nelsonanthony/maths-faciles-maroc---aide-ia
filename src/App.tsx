@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
@@ -286,7 +287,7 @@ export const App: React.FC = () => {
                         onSelectExercise={handleSelectExercise}
                         onSelectQuiz={handleSelectQuiz}
                         onNavigateToChat={handleNavigateToChat}
-                        onNavigateToTimestamp={onNavigateToTimestamp}
+                        onNavigateToTimestamp={handleNavigateToTimestamp}
                         onBackToDefault={handleBackToDefault}
                         resetSelections={resetSelections}
                         openModal={openModal}

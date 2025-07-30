@@ -1,10 +1,13 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
 import { getExerciseById } from "./_lib/data-access.js";
+
+interface ImagePayload {
+    image: string; // base64 encoded
+    mimeType: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -52,28 +55,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- Body validation ---
-        const { image, mimeType, exerciseId } = req.body;
-        if (!image || !mimeType || !exerciseId) {
-            return res.status(400).json({ error: "Les champs 'image' (base64), 'mimeType' et 'exerciseId' sont requis." });
+        const { images, exerciseId } = req.body as { images?: ImagePayload[], exerciseId?: string };
+        if (!exerciseId || !Array.isArray(images) || images.length === 0) {
+            return res.status(400).json({ error: "Les champs 'images' (un tableau d'objets image) et 'exerciseId' sont requis." });
         }
 
         const ai = new GoogleGenAI({ apiKey });
 
-        // --- STEP 1: OCR with Gemini ---
-        const ocrImagePart = { inlineData: { data: image, mimeType } };
-        const ocrTextPart = { text: "Transcris le texte mathématique manuscrit dans l'image. Ne renvoie que le texte." };
+        // --- STEP 1: OCR on all images ---
+        let combinedOcrText = "";
+        for (const [index, imagePayload] of images.entries()) {
+             const ocrImagePart = { inlineData: { data: imagePayload.image, mimeType: imagePayload.mimeType } };
+             const ocrTextPart = { text: "Transcris le texte mathématique manuscrit dans l'image. Ne renvoie que le texte." };
+            
+             const ocrResponse = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: { parts: [ocrImagePart, ocrTextPart] },
+             });
+             const ocrText = ocrResponse.text?.trim() ?? '';
+             combinedOcrText += `--- PAGE ${index + 1} ---\n${ocrText}\n\n`;
+        }
         
-        const ocrResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [ocrImagePart, ocrTextPart] },
-        });
-
-        const studentAnswer = ocrResponse.text;
-        if (!studentAnswer?.trim()) {
-            return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte de l'image. Essayez une photo plus nette." });
+        if (!combinedOcrText.trim()) {
+            return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
 
-        // --- STEP 2: Check Answer ---
+        // --- STEP 2: Validate the combined text ---
         const exercise = await getExerciseById(exerciseId);
         if (!exercise) {
             return res.status(404).json({ error: "Exercice non trouvé." });
@@ -98,8 +105,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             CORRECTION (sert de référence pour la validité):
             ${truncatedCorrection}
             ---
-            RÉPONSE DE L'ÉLÈVE:
-            ${studentAnswer}
+            RÉPONSE DE L'ÉLÈVE (peut être sur plusieurs pages):
+            ${combinedOcrText}
             ---
             MAINTENANT, FOURNIS L'ÉVALUATION EN JSON:
         `;
@@ -107,8 +114,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const answerSchema = {
             type: Type.OBJECT,
             properties: {
-                is_correct: { type: Type.BOOLEAN, description: "True if the student's answer is correct." },
-                feedback: { type: Type.STRING, description: "Feedback for the student. Use LaTeX for math." }
+                is_correct: {
+                    type: Type.BOOLEAN,
+                    description: "True if the student's answer is correct, false otherwise."
+                },
+                feedback: {
+                    type: Type.STRING,
+                    description: "A short, encouraging feedback message for the student, explaining why their answer is correct or what is wrong. IMPORTANT: All math expressions must be in LaTeX format using \\(...\\) for inline and $$...$$ for blocks. Never use single dollar signs."
+                }
             },
             required: ["is_correct", "feedback"],
         };
@@ -133,7 +146,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(parsedJson);
 
     } catch (error: any) {
-        console.error("Error in check-photo-answer:", error);
+        console.error("Error in check-multipage-answer:", error);
         let message = "Une erreur serveur est survenue lors du traitement de la réponse.";
         if (error.message?.includes("JSON")) {
             message = "Erreur du serveur : La réponse de l'IA n'était pas dans le format JSON attendu.";

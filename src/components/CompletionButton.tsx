@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import * as userService from '../services/userService';
-import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon } from './icons';
+import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon, TrashIcon, PlusCircleIcon } from './icons';
 import { Exercise } from '../types';
 import { getSupabase } from '../services/authService';
 import imageCompression from 'browser-image-compression';
@@ -17,6 +17,13 @@ interface CheckAnswerResponse {
 interface CompletionButtonProps {
     exercise: Exercise;
 }
+
+type UploadedImage = {
+    id: string;
+    src: string;
+    file: File;
+};
+
 
 const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -37,9 +44,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
 
     const [studentAnswer, setStudentAnswer] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [imageSrc, setImageSrc] = useState<string | null>(null);
-    const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
-    const [photoProcessingMessage, setPhotoProcessingMessage] = useState('');
+    const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
 
     const [isChecking, setIsChecking] = useState(false);
     const [checkResult, setCheckResult] = useState<CheckAnswerResponse | null>(null);
@@ -50,15 +55,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
     if (!user || user.is_admin) return null;
 
     const isAlreadyCompleted = user.completed_exercises.includes(exercise.id);
-
-    const resetState = () => {
-        setError(null);
-        setCheckResult(null);
-        setStudentAnswer('');
-        setImageSrc(null);
-        setIsKeyboardOpen(false);
-    }
-
+    
     const handleCheckAnswer = async (answerText: string) => {
         const safeAnswer = answerText || '';
         if (!safeAnswer.trim() || !user) return;
@@ -101,37 +98,57 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
             setError(err instanceof Error ? err.message : "Une erreur inconnue est survenue.");
         } finally {
             setIsChecking(false);
-            setIsProcessingPhoto(false);
         }
     };
+    
+    const handleFilesSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files) return;
 
-    const handleProcessImage = async (file: File) => {
-        setIsProcessingPhoto(true);
-        setPhotoProcessingMessage('Compression de l\'image...');
+        setCheckResult(null);
+        setError(null);
+
+        const newImages: UploadedImage[] = Array.from(files).map(file => ({
+            id: `${file.name}-${file.lastModified}-${Math.random()}`,
+            src: URL.createObjectURL(file),
+            file,
+        }));
+        setUploadedImages(prev => [...prev, ...newImages]);
+    };
+
+    const handleRemoveImage = (idToRemove: string) => {
+        setUploadedImages(prev => prev.filter(img => img.id !== idToRemove));
+    };
+
+    const handleCheckMultipageAnswer = async () => {
+        if (uploadedImages.length === 0 || !user) return;
+        
+        setIsChecking(true);
         setError(null);
         setCheckResult(null);
-        setImageSrc(URL.createObjectURL(file));
-
+        
         try {
             const supabase = getSupabase();
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
 
-            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-            const compressedFile = await imageCompression(file, options);
-            const base64Image = await fileToBase64(compressedFile);
+            const imagePayloads = await Promise.all(
+                uploadedImages.map(async (image) => {
+                    const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+                    const compressedFile = await imageCompression(image.file, options);
+                    const base64Image = await fileToBase64(compressedFile);
+                    return { image: base64Image, mimeType: compressedFile.type };
+                })
+            );
 
-            setPhotoProcessingMessage('Envoi à l\'IA pour analyse et vérification...');
-
-            const response = await fetch('/api/check-photo-answer', {
+            const response = await fetch('/api/check-multipage-answer', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`,
                 },
                 body: JSON.stringify({
-                    image: base64Image,
-                    mimeType: compressedFile.type,
+                    images: imagePayloads,
                     exerciseId: exercise.id
                 }),
             });
@@ -153,17 +170,10 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
             setCheckResult(result);
 
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement de l\'image.');
+            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement des images.');
         } finally {
-            setIsProcessingPhoto(false);
-            setPhotoProcessingMessage('');
+            setIsChecking(false);
         }
-    };
-
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        await handleProcessImage(file);
     };
     
     const handleCompleteExercise = async () => {
@@ -243,27 +253,37 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
             )}
 
              {inputMode === 'photo' && (
-                <div>
-                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
-                     <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isProcessingPhoto}
-                        className="w-full flex items-center justify-center gap-3 px-5 py-3 font-semibold text-white bg-gray-600 rounded-lg shadow-md hover:bg-gray-500 transition-colors disabled:opacity-70"
-                    >
-                        <CameraIcon className="w-6 h-6" />
-                        {imageSrc ? "Choisir une autre photo" : "Prendre / Choisir une photo"}
-                    </button>
-                    {isProcessingPhoto && (
-                        <div className="text-center mt-4">
-                            <SpinnerIcon className="w-6 h-6 animate-spin mx-auto text-brand-blue-400" />
-                            <p className="text-sm text-gray-400 mt-2">{photoProcessingMessage}</p>
-                        </div>
-                    )}
-                     {imageSrc && !isProcessingPhoto && (
-                        <div className="mt-4 p-2 border border-gray-600 rounded-lg">
-                            <img src={imageSrc} alt="Prévisualisation de la réponse" className="max-h-64 w-auto mx-auto rounded"/>
+                <div className="space-y-4">
+                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFilesSelected} className="hidden" multiple />
+                     {uploadedImages.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                            {uploadedImages.map((image) => (
+                                <div key={image.id} className="relative group aspect-[3/4]">
+                                    <img src={image.src} alt="Copie de l'élève" className="rounded-lg w-full h-full object-cover" />
+                                    <button onClick={() => handleRemoveImage(image.id)} className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <TrashIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            ))}
+                            <button onClick={() => fileInputRef.current?.click()} disabled={isChecking} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
+                                <PlusCircleIcon className="w-8 h-8"/>
+                                <span className="text-sm mt-1">Ajouter</span>
+                            </button>
                         </div>
                      )}
+
+                     <button
+                        onClick={uploadedImages.length === 0 ? () => fileInputRef.current?.click() : handleCheckMultipageAnswer}
+                        disabled={isChecking}
+                        className="w-full flex items-center justify-center gap-3 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-70"
+                    >
+                        {isChecking ? (
+                            <SpinnerIcon className="w-6 h-6 animate-spin" />
+                        ) : (
+                           <CameraIcon className="w-6 h-6" />
+                        )}
+                        {uploadedImages.length === 0 ? "Prendre / Choisir des photos" : "Vérifier les photos"}
+                    </button>
                 </div>
              )}
 

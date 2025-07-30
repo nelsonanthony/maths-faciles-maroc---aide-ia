@@ -58,7 +58,7 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         const files = event.target.files;
         if (!files || files.length === 0) return;
 
-        const newImages: UploadedImage[] = Array.from(files).map(file => ({
+        const newImages: UploadedImage[] = Array.from(files).map((file: File) => ({
             id: `${file.name}-${file.lastModified}-${Math.random()}`,
             src: URL.createObjectURL(file),
             file,

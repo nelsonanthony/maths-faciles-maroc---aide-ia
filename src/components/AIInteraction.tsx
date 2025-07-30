@@ -94,19 +94,21 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
             const supabase = getSupabase();
 
             try {
+                // Use .limit(1) without .single() to avoid 406 error.
+                // The result will be an array.
                 const { data, error } = await supabase
                     .from('corrections')
                     .select('correction')
                     .eq('exercise_id', exerciseId)
-                    .limit(1)
-                    .single();
+                    .limit(1);
 
-                if (error && error.code !== 'PGRST116') { // PGRST116: row not found
+                if (error) {
                     console.error("Erreur lors de la recherche du corrigé:", error);
                 }
 
-                if (data) {
-                    setFullCorrection(data.correction);
+                // Check if data is an array and has at least one item
+                if (data && data.length > 0) {
+                    setFullCorrection(data[0].correction);
                 }
             } catch (err) {
                 console.error("Exception dans fetchCorrection:", err);

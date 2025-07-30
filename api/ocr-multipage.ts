@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -76,22 +77,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 3.  **AUCUN COMMENTAIRE** : Ne renvoie que le texte transcrit. Pas d'en-tête, pas d'introduction, rien d'autre.
 4.  Respecte les sauts de ligne du texte original.`;
 
-        // --- STEP 1: OCR on all images ---
-        let combinedOcrText = "";
-        for (const [index, imagePayload] of images.entries()) {
-             const ocrImagePart = { inlineData: { data: imagePayload.image, mimeType: imagePayload.mimeType } };
-             const ocrTextPart = { text: ocrPromptText };
+        // --- STEP 1: OCR on all images in parallel ---
+        const ocrPromises = images.map(imagePayload => {
+            const ocrImagePart = { inlineData: { data: imagePayload.image, mimeType: imagePayload.mimeType } };
+            const ocrTextPart = { text: ocrPromptText };
             
-             const ocrResponse = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: { parts: [ocrImagePart, ocrTextPart] },
-             });
-             const ocrText = ocrResponse.text?.trim() ?? '';
-             combinedOcrText += `--- Photo ${index + 1} ---\n${ocrText}\n\n`;
+            return ai.models.generateContent({
+               model: 'gemini-2.5-flash',
+               contents: { parts: [ocrImagePart, ocrTextPart] },
+            });
+        });
 
-             // Log one call per image processed
-             await logAiCall(supabase, user.id, 'OCR');
-        }
+        const ocrResults = await Promise.all(ocrPromises);
+
+        // --- Log successful calls ---
+        const logPromises = images.map(() => logAiCall(supabase, user.id, 'OCR'));
+        await Promise.all(logPromises);
+
+        // --- Combine results ---
+        const combinedOcrText = ocrResults.map((ocrResponse, index) => {
+            const ocrText = ocrResponse.text?.trim() ?? '';
+            return `--- Photo ${index + 1} ---\n${ocrText}`;
+        }).join('\n\n');
         
         if (!combinedOcrText.trim()) {
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });

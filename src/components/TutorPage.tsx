@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -174,38 +175,41 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         
         setIsOcrLoading(true);
         setSubmissionError(null);
-
+    
         try {
             const supabase = getSupabase();
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Vous devez être connecté pour analyser des images.");
-
-            const ocrTexts: string[] = [];
-            for (const [index, file] of Array.from(files).entries()) {
-                const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-                const compressedFile = await imageCompression(file, options);
-                const base64Image = await fileToBase64(compressedFile);
-
-                const response = await fetch('/api/ocr-with-gemini', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                    body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type })
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `L'analyse de la page ${index + 1} a échoué.`);
-                }
-                const { text } = await response.json();
-                ocrTexts.push(`--- Photo ${index + 1} ---\n${text}`);
-            }
+    
+            const imagePayloads = await Promise.all(
+                Array.from(files).map(async (file) => {
+                    const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+                    const compressedFile = await imageCompression(file, options);
+                    const base64Image = await fileToBase64(compressedFile);
+                    return { image: base64Image, mimeType: compressedFile.type };
+                })
+            );
             
-            const combinedText = ocrTexts.join('\n\n');
-            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${combinedText}`.trim();
+            const response = await fetch('/api/ocr-multipage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({ images: imagePayloads }),
+            });
+    
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || `L'analyse des photos a échoué.`);
+            }
+            const { text } = await response.json();
+            
+            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${text}`.trim();
             
             setOcrResultText(newOcrText);
             setIsVerificationStep(true);
-
+    
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
             setSubmissionError(errorMessage);

@@ -1,6 +1,4 @@
 
-
-
 import React, { useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';

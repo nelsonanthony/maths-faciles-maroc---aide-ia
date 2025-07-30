@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -71,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             properties: {
                 score: {
                     type: Type.NUMBER,
-                    description: "A score from 0 to 100 for the student's answer."
+                    description: "A score from 0 to 100 for the student's answer based on its relevance and correctness for the specific exercise."
                 },
                 lines: {
                     type: Type.ARRAY,
@@ -90,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             status: {
                                 type: Type.STRING,
                                 enum: ["correct", "error"],
-                                description: "The status of the line: 'correct' or 'error'."
+                                description: "The status of the line: 'correct' if it's a valid and relevant step, 'error' if it's mathematically wrong, irrelevant, or an unnecessary step."
                             },
                             explanation: {
                                 type: Type.STRING,
@@ -102,20 +101,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 },
                 global_feedback: {
                     type: Type.STRING,
-                    description: "A global, encouraging feedback summary for the student."
+                    description: "A global, encouraging feedback summary for the student about their work on this specific exercise."
                 }
             },
             required: ["score", "lines", "global_feedback"]
         };
 
+        const correctionContext = exercise.fullCorrection || exercise.correctionSnippet;
+
         const prompt = `
-            CONTEXTE : Tu es un professeur de mathématiques expert et bienveillant qui corrige la copie d'un élève marocain.
-            MISSION : Analyse la réponse de l'élève ligne par ligne, compare-la à l'énoncé et à l'extrait de la correction, et fournis un feedback structuré.
-            FORMAT DE SORTIE OBLIGATOIRE : Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après. Ton JSON doit impérativement respecter le schéma fourni.
-            ÉNONCÉ : ${exercise.statement}
-            CORRECTION ATTENDUE : ${exercise.correctionSnippet}
-            RÉPONSE DE L'ÉLÈVE (OCR) : ${ocrText}
-            MAINTENANT, FOURNIS LA CORRECTION EN JSON :
+            CONTEXTE : Tu es un professeur de mathématiques expert et rigoureux qui corrige la copie d'un élève pour un exercice bien précis.
+
+            MISSION : Évalue la réponse manuscrite de l'élève. Ton analyse doit être STRICTEMENT basée sur sa pertinence par rapport à l'exercice fourni.
+
+            1.  **Compare** la réponse de l'élève avec l'énoncé et la correction de référence.
+            2.  **Identifie** chaque ligne de calcul ou de raisonnement de l'élève.
+            3.  **Note** chaque ligne comme "correcte" si elle est une étape valide et pertinente pour résoudre l'exercice, ou "erreur" si elle est mathématiquement fausse, hors-sujet, ou une étape inutile.
+            4.  **Calcule** un score global sur 100, qui reflète la proportion de la solution correcte que l'élève a fournie. Si la réponse est complètement hors-sujet, le score doit être 0.
+            5.  **Fournis** un commentaire global qui résume les points forts et les points à améliorer.
+
+            FORMAT DE SORTIE OBLIGATOIRE : Réponds UNIQUEMENT avec un objet JSON valide respectant le schéma fourni. Ne fournis aucun texte en dehors de l'objet JSON.
+
+            ---
+            ÉNONCÉ DE L'EXERCICE SPÉCIFIQUE:
+            ${exercise.statement}
+            ---
+            CORRECTION DE RÉFÉRENCE:
+            ${correctionContext}
+            ---
+            RÉPONSE MANUSCRITE DE L'ÉLÈVE (transcrite par OCR):
+            ${ocrText}
+            ---
+            MAINTENANT, FOURNIS L'ÉVALUATION STRUCTURÉE EN JSON :
         `;
 
         const ai = new GoogleGenAI({ apiKey: apiKey });

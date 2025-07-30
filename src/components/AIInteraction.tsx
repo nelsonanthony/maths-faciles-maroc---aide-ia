@@ -89,7 +89,9 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const [isStuck, setIsStuck] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isOcrLoading, setIsOcrLoading] = useState(false);
     const [submissionError, setSubmissionError] = useState<string|null>(null);
+
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -185,11 +187,11 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
         explain(`${basePrompt}\n\nMISSION: ${directMission}`, chapterId, 'direct');
     };
 
-    const handleFileSelectAndOCR = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setIsSubmitting(true);
+    const handleFileSelectAndOcr = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+        
+        setIsOcrLoading(true);
         setSubmissionError(null);
 
         try {
@@ -197,30 +199,34 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Vous devez être connecté pour analyser des images.");
 
-            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-            const compressedFile = await imageCompression(file, options);
-            const base64Image = await fileToBase64(compressedFile);
+            const ocrTexts: string[] = [];
+            for (const [index, file] of Array.from(files).entries()) {
+                const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+                const compressedFile = await imageCompression(file, options);
+                const base64Image = await fileToBase64(compressedFile);
 
-            const response = await fetch('/api/ocr-with-gemini', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type })
-            });
-            
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `L'analyse de l'image a échoué.`);
+                const response = await fetch('/api/ocr-with-gemini', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `L'analyse de la page ${index + 1} a échoué.`);
+                }
+                const { text } = await response.json();
+                ocrTexts.push(`--- Photo ${index + 1} ---\n${text}`);
             }
 
-            const { text } = await response.json();
-            setStudentInput(prev => (prev ? `${prev}\n\n${text}` : text).trim());
-
+            const combinedText = ocrTexts.join('\n\n');
+            setStudentInput(prev => `${prev ? prev + '\n\n' : ''}${combinedText}`);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
             setSubmissionError(errorMessage);
         } finally {
-            setIsSubmitting(false);
-            if (event.target) event.target.value = '';
+            setIsOcrLoading(false);
+            if (event.target) event.target.value = ''; // Reset file input
         }
     };
 
@@ -228,9 +234,11 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const handleStudentResponse = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!studentInput.trim() || !socraticPath || isTutorFinished || isSubmitting) return;
-        
+
         setIsStuck(false);
+        
         setDialogue(prev => [...prev, { role: 'user', content: studentInput }]);
+
         const currentInput = studentInput;
         setStudentInput('');
         setIsSubmitting(true);
@@ -244,7 +252,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
             const requestBody = {
                 studentAnswer: currentInput,
                 currentIaQuestion: socraticPath[currentStep].ia_question,
-                expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords
+                expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
             };
 
             const response = await fetch('/api/validate-socratic-answer', {
@@ -329,7 +337,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     };
 
     const isReadyForUser = !!user && isAIFeatureEnabled && !isFetchingCorrection;
-    const isProcessing = isLoading || isFetchingCorrection || isSubmitting;
+    const isProcessing = isLoading || isFetchingCorrection || isSubmitting || isOcrLoading;
 
     return (
         <div className="bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-lg p-6 space-y-6">
@@ -381,21 +389,21 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
 
                 {isTutorActive && !isTutorFinished && !isLoading && (
                     <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-slate-700 space-y-2">
-                        <div className="flex flex-col sm:flex-row gap-2">
+                         <div className="flex flex-col sm:flex-row gap-2">
                             <textarea
                                 value={studentInput}
                                 onChange={(e) => setStudentInput(e.target.value)}
                                 placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse... (ou joignez une photo)"}
-                                disabled={isSubmitting}
+                                disabled={isSubmitting || isOcrLoading}
                                 rows={3}
                                 className="flex-grow p-2 bg-slate-800 border-2 border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
                             />
                             <div className="flex items-center gap-2 self-start sm:self-auto">
-                                <input type="file" ref={fileInputRef} onChange={handleFileSelectAndOCR} className="hidden" accept="image/*" />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting} className="p-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50" aria-label="Attach file">
-                                    <PaperClipIcon className="w-5 h-5" />
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelectAndOcr} className="hidden" accept="image/*" multiple />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isSubmitting || isOcrLoading} className="p-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50 relative" aria-label="Attach file">
+                                    {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <PaperClipIcon className="w-5 h-5" />}
                                 </button>
-                                <button type="submit" disabled={!studentInput.trim() || isSubmitting} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                                <button type="submit" disabled={!studentInput.trim() || isSubmitting || isOcrLoading} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
                                     Envoyer
                                 </button>
                             </div>

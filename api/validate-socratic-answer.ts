@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -50,26 +49,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         const { studentAnswer, currentIaQuestion, expectedAnswerKeywords } = req.body as { studentAnswer?: string, currentIaQuestion?: string, expectedAnswerKeywords?: string[] };
-        if (!studentAnswer) {
-            return res.status(400).json({ error: "Le champ 'studentAnswer' est requis." });
+        
+        if (studentAnswer === undefined) {
+             return res.status(400).json({ error: "Le champ 'studentAnswer' est requis (peut être vide)." });
         }
         if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords)) {
             return res.status(400).json({ error: "Les champs 'currentIaQuestion' et 'expectedAnswerKeywords' sont requis." });
         }
         
-        const contents = `
-            CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève.
-            MISSION: Détermine si la réponse de l'élève est correcte. La réponse de l'élève n'a pas besoin d'être une phrase complète, mais elle doit être conceptuellement juste. Sois flexible avec la formulation.
-            
-            QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
-            
-            CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
-            
-            RÉPONSE DE L'ÉLÈVE: "${studentAnswer}"
-
-            FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
-            { "is_correct": boolean }
-        `;
+        const ai = new GoogleGenAI({ apiKey: apiKey });
         
         const answerSchema = {
             type: Type.OBJECT,
@@ -82,15 +70,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             required: ["is_correct"],
         };
 
-        const ai = new GoogleGenAI({ apiKey: apiKey });
-        const response = await ai.models.generateContent({
+        const promptText = `
+            CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève (qui peut provenir d'une transcription d'image).
+            MISSION: Détermine si la réponse de l'élève est correcte. La réponse n'a pas besoin d'être parfaitement formulée, mais elle doit être conceptuellement juste. Sois flexible avec la formulation.
+            
+            QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
+            
+            CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
+            
+            RÉPONSE DE L'ÉLÈVE: "${studentAnswer}"
+
+            FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
+            { "is_correct": boolean }
+        `;
+        
+        const requestPayload = {
             model: 'gemini-2.5-flash',
-            contents,
-            config: { 
-                responseMimeType: "application/json",
-                responseSchema: answerSchema
-            }
-        });
+            contents: promptText,
+            config: { responseMimeType: "application/json", responseSchema: answerSchema }
+        };
+        
+
+        const response = await ai.models.generateContent(requestPayload);
         
         await logAiCall(supabase, user.id, 'SOCRATIC_VALIDATION');
         

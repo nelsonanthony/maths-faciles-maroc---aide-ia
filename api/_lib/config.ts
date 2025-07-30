@@ -7,9 +7,6 @@ export const AI_USAGE_LIMITS = {
     // Nombre de fois qu'un élève peut demander une explication par jour.
     EXPLANATION: 20,
     
-    // Nombre de fois qu'un élève peut soumettre une copie manuscrite par jour.
-    HANDWRITING_CORRECTION: 10,
-
     // Nombre de fois qu'un élève peut faire valider sa réponse à un exercice.
     ANSWER_VALIDATION: 30,
 

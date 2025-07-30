@@ -57,9 +57,18 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
     const aiInteractionRef = useRef<HTMLDivElement>(null);
     const officialCorrectionRef = useRef<HTMLDivElement>(null);
     const [showOfficialCorrection, setShowOfficialCorrection] = useState(false);
+    const [aiQuestion, setAiQuestion] = useState('');
 
     const handleShowCorrectionRequest = () => {
         officialCorrectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    const handleTextFromPhoto = (text: string) => {
+        setAiQuestion(text);
+        // Scroll to the AI component after a short delay to ensure the state has propagated
+        setTimeout(() => {
+            aiInteractionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
     };
     
     return (
@@ -135,7 +144,10 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
             )}
             
             {user && (
-                 <HandwrittenCorrection exerciseId={exercise.id} />
+                 <HandwrittenCorrection 
+                    exerciseId={exercise.id}
+                    onTextReady={handleTextFromPhoto}
+                 />
             )}
 
             <div ref={aiInteractionRef}>
@@ -143,6 +155,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                     exerciseId={exercise.id}
                     exerciseStatement={exercise.statement}
                     correctionSnippet={exercise.correctionSnippet}
+                    initialQuestion={aiQuestion}
                     chapterId={chapter.id}
                     levelId={levelId}
                     onNavigateToTimestamp={onNavigateToTimestamp}

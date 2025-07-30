@@ -141,20 +141,6 @@ export interface ChatMessage {
     content: string;
 }
 
-// Types for Handwritten Correction
-export interface HandwrittenCorrectionLine {
-    line: number;
-    student_text: string;
-    status: 'correct' | 'error';
-    explanation?: string;
-}
-
-export interface HandwrittenCorrectionResponse {
-    score: number;
-    lines: HandwrittenCorrectionLine[];
-    global_feedback: string;
-}
-
 export type ExerciseContext = {
     levelId: string;
     chapterId: string;

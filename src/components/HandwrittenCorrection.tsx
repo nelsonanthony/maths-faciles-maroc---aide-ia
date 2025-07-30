@@ -1,13 +1,14 @@
 
+
 import React, { useState, useRef } from 'react';
 import { CameraIcon, CheckCircleIcon, XCircleIcon, SpinnerIcon, TrashIcon, PlusCircleIcon, PencilIcon } from '@/components/icons';
-import { HandwrittenCorrectionResponse } from '@/types';
 import imageCompression from 'browser-image-compression';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabase } from '@/services/authService';
 
 interface HandwrittenCorrectionProps {
     exerciseId: string;
+    onTextReady: (text: string) => void;
 }
 
 type UploadedImage = {
@@ -18,7 +19,7 @@ type UploadedImage = {
     ocrStatus: 'pending' | 'processing' | 'done' | 'error';
 };
 
-type Step = 'upload' | 'review' | 'result';
+type Step = 'upload' | 'review';
 
 const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -41,15 +42,13 @@ const UploadPlaceholder: React.FC<{ onButtonClick: () => void, disabled: boolean
     </div>
 );
 
-export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ exerciseId }) => {
+export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ exerciseId, onTextReady }) => {
     const { user } = useAuth();
     const [isPanelOpen, setIsPanelOpen] = useState(false);
     const [step, setStep] = useState<Step>('upload');
     const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
     const [editableOcrText, setEditableOcrText] = useState<string>('');
-    const [correction, setCorrection] = useState<HandwrittenCorrectionResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [loadingMessage, setLoadingMessage] = useState('');
     const [error, setError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,9 +57,7 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         setStep('upload');
         setUploadedImages([]);
         setEditableOcrText('');
-        setCorrection(null);
         setIsLoading(false);
-        setLoadingMessage('');
         setError(null);
     };
 
@@ -103,8 +100,7 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
             }
 
             setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'processing' } : img));
-            setLoadingMessage(`Analyse de la page ${index + 1} par l'IA...`);
-
+            
             try {
                 const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
                 const compressedFile = await imageCompression(image.file, options);
@@ -134,7 +130,6 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
                 const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
                 setError(errorMessage);
                 setIsLoading(false);
-                setLoadingMessage('');
                 return;
             }
         }
@@ -143,49 +138,15 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         setEditableOcrText(fullText);
         setStep('review');
         setIsLoading(false);
-        setLoadingMessage('');
     };
     
-    const handleSubmitForCorrection = async () => {
+    const handleSubmitForAssistant = async () => {
         if (!editableOcrText.trim()) {
-            setError("Le texte extrait est vide. Impossible de lancer la correction.");
+            setError("Le texte extrait est vide.");
             return;
         }
-
-        setIsLoading(true);
-        setError(null);
-        setLoadingMessage('Correction par l\'IA...');
-        
-        try {
-            const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
-             if (!session) {
-                throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
-            }
-            
-            const response = await fetch(`/api/correct-handwriting`, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({ ocrText: editableOcrText, exerciseId })
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'La correction a échoué.');
-            }
-            const correctionData = await response.json();
-            setCorrection(correctionData);
-            setStep('result');
-
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Une erreur inconnue est survenue');
-        } finally {
-            setIsLoading(false);
-            setLoadingMessage('');
-        }
+        onTextReady(editableOcrText);
+        resetAllState();
     };
 
     const renderContent = () => {
@@ -200,21 +161,28 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
                              <div className="space-y-4">
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                     {uploadedImages.map((image) => (
-                                        <div key={image.id} className="relative group">
-                                            <img src={image.src} alt="Copie de l'élève" className="rounded-lg w-full aspect-[3/4] object-cover" />
-                                            <button onClick={() => handleRemoveImage(image.id)} className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div key={image.id} className="relative group aspect-[3/4]">
+                                            <img src={image.src} alt="Copie de l'élève" className="rounded-lg w-full h-full object-cover" />
+                                            <button onClick={() => handleRemoveImage(image.id)} className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
                                                 <TrashIcon className="w-4 h-4" />
                                             </button>
+                                             {image.ocrStatus !== 'pending' && (
+                                                <div className="absolute inset-0 bg-black/70 flex items-center justify-center rounded-lg">
+                                                    {image.ocrStatus === 'processing' && <SpinnerIcon className="w-8 h-8 text-white animate-spin" />}
+                                                    {image.ocrStatus === 'done' && <CheckCircleIcon className="w-10 h-10 text-green-400" />}
+                                                    {image.ocrStatus === 'error' && <XCircleIcon className="w-10 h-10 text-red-400" />}
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
-                                    <button onClick={() => fileInputRef.current?.click()} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors">
+                                    <button onClick={() => fileInputRef.current?.click()} disabled={isLoading} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
                                         <PlusCircleIcon className="w-8 h-8"/>
                                         <span className="text-sm mt-1">Ajouter</span>
                                     </button>
                                 </div>
                                 <button onClick={handleStartOcr} disabled={isLoading || uploadedImages.length === 0} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
                                     {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <PencilIcon className="w-5 h-5" />}
-                                    {isLoading ? loadingMessage : "Analyser le texte des images"}
+                                    {isLoading ? "Analyse en cours..." : "Analyser le texte des images"}
                                 </button>
                              </div>
                         )}
@@ -224,47 +192,19 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
                 return (
                     <div className="space-y-4">
                         <h4 className="font-semibold text-gray-300">Vérifiez et corrigez le texte extrait</h4>
-                         <p className="text-sm text-gray-400">L'IA se basera sur ce texte pour la correction. Modifiez-le si nécessaire pour qu'il corresponde parfaitement à votre copie.</p>
+                         <p className="text-sm text-gray-400">L'IA se basera sur ce texte. Modifiez-le si nécessaire pour qu'il corresponde parfaitement à votre copie.</p>
                          <textarea
                             value={editableOcrText}
                             onChange={(e) => setEditableOcrText(e.target.value)}
                             rows={15}
                             className="w-full p-3 font-mono text-sm bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500"
                          />
-                        <button onClick={handleSubmitForCorrection} disabled={isLoading} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 disabled:opacity-70">
+                        <button onClick={handleSubmitForAssistant} disabled={isLoading} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-green-600 rounded-lg shadow-md hover:bg-green-700 disabled:opacity-70">
                              {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <CheckCircleIcon className="w-5 h-5" />}
-                             {isLoading ? loadingMessage : "Valider et Lancer la Correction"}
+                             {isLoading ? "Chargement..." : "Utiliser ce texte pour l'assistant IA"}
                         </button>
                     </div>
                 );
-            case 'result':
-                return correction ? (
-                     <div className="space-y-4">
-                        <h4 className="font-semibold text-gray-300">Résultats de la correction</h4>
-                        <div className="text-center p-4 bg-gray-900/50 rounded-lg">
-                            <p className="text-sm text-gray-400">Score</p>
-                            <p className="text-4xl font-bold text-brand-blue-300">{correction.score}/100</p>
-                        </div>
-                        <div className="p-4 bg-gray-900/50 rounded-lg">
-                            <p className="text-sm font-semibold text-gray-400 mb-2">Commentaire global :</p>
-                            <p className="text-sm text-gray-300 italic">"{correction.global_feedback}"</p>
-                        </div>
-                        <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                            {correction.lines.map((line, index) => (
-                                <div key={index} className="p-2 bg-gray-900/30 rounded-md">
-                                    <div className="flex items-start gap-2">
-                                        {line.status === 'correct' ? <CheckCircleIcon className="w-5 h-5 text-green-400 shrink-0 mt-0.5" /> : <XCircleIcon className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />}
-                                        <p className="text-sm text-gray-300 font-mono">{line.student_text}</p>
-                                    </div>
-                                    {line.status === 'error' && line.explanation && <p className="text-xs text-red-300 pl-7 mt-1">{line.explanation}</p>}
-                                </div>
-                            ))}
-                        </div>
-                        <button onClick={() => { setStep('upload'); setUploadedImages([]); setCorrection(null); }} className="w-full mt-4 text-center px-4 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">
-                           Corriger une autre copie
-                        </button>
-                    </div>
-                ) : null;
             default: return null;
         }
     };
@@ -275,10 +215,10 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         return (
             <div className="bg-gray-800/30 rounded-xl p-6 border-2 border-dashed border-gray-700/30 text-center">
                 <CameraIcon className="w-10 h-10 mx-auto text-brand-blue-400" />
-                <h3 className="text-xl font-semibold text-brand-blue-300 mt-4">Faites corriger votre copie !</h3>
-                <p className="text-gray-400 mt-2 text-sm">Prenez en photo votre résolution manuscrite et laissez notre IA vous donner un feedback détaillé.</p>
+                <h3 className="text-xl font-semibold text-brand-blue-300 mt-4">Analyser votre copie par photo</h3>
+                <p className="text-gray-400 mt-2 text-sm">Prenez une photo de votre brouillon. L'IA la transcrira pour que vous puissiez l'utiliser avec l'assistant interactif.</p>
                 <button onClick={() => setIsPanelOpen(true)} className="mt-4 px-6 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">
-                    Commencer la correction
+                    Analyser une photo
                 </button>
             </div>
         );
@@ -286,7 +226,7 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
     
     return (
          <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700/50">
-            <h3 className="text-xl font-semibold text-brand-blue-300 mb-4">Correction de copie manuscrite</h3>
+            <h3 className="text-xl font-semibold text-brand-blue-300 mb-4">Analyse de copie par photo</h3>
              {error && <p className="mb-4 p-3 text-center bg-red-900/30 text-red-300 rounded-lg">{error}</p>}
              {renderContent()}
              <div className="flex justify-between items-center mt-4">

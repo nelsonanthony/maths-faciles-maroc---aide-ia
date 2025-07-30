@@ -82,6 +82,13 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
     const videoChunk = aiResponse?.videoChunk;
+
+    // Sync internal state with the `initialQuestion` prop from parent
+    useEffect(() => {
+        if (initialQuestion) {
+            setMainQuestion(initialQuestion);
+        }
+    }, [initialQuestion]);
     
     /**
      * Récupère le corrigé détaillé depuis Supabase quand le composant se charge
@@ -203,7 +210,11 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         if (!mainQuestion.trim() || isLoading || !user) return;
         resetState();
         const basePrompt = buildBasePrompt(mainQuestion);
-        const socraticPrompt = `${basePrompt}\n\nMISSION: Crée un parcours de tutorat socratique pour guider l'élève vers la solution, sans la donner directement.`;
+        const socraticMission = mainQuestion.includes('--- PAGE ')
+            ? "La question de l'élève est une transcription de sa résolution sur plusieurs pages (séparées par '--- PAGE X ---'). Évalue l'ensemble de son travail et crée un parcours de tutorat socratique pour le guider."
+            : "Crée un parcours de tutorat socratique pour guider l'élève vers la solution, sans la donner directement.";
+
+        const socraticPrompt = `${basePrompt}\n\nMISSION: ${socraticMission}`;
         explain(socraticPrompt, chapterId, 'socratic');
     };
 
@@ -211,7 +222,11 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
          if (!mainQuestion.trim() || isLoading || !user) return;
         resetState();
         const basePrompt = buildBasePrompt(mainQuestion);
-        const directAnswerPrompt = `${basePrompt}\n\nMISSION: Réponds directement et complètement à la question de l'élève.`;
+        const directMission = mainQuestion.includes('--- PAGE ')
+            ? "La question de l'élève est une transcription de sa résolution sur plusieurs pages (séparées par '--- PAGE X ---'). Évalue l'ensemble de son travail et réponds directement et complètement à sa demande."
+            : "Réponds directement et complètement à la question de l'élève.";
+
+        const directAnswerPrompt = `${basePrompt}\n\nMISSION: ${directMission}`;
         explain(directAnswerPrompt, chapterId, 'direct');
     }
 

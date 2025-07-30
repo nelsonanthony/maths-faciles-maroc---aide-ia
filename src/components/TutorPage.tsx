@@ -4,7 +4,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import imageCompression from 'browser-image-compression';
 import { useAIExplain } from '@/hooks/useAIExplain';
-import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon } from '@/components/icons';
+import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, PencilIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
@@ -52,6 +52,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [isOcrLoading, setIsOcrLoading] = useState(false);
     const [submissionError, setSubmissionError] = useState<string|null>(null);
 
+    // New states for OCR verification step
+    const [ocrResultText, setOcrResultText] = useState<string>('');
+    const [isVerificationStep, setIsVerificationStep] = useState(false);
+
+
     const dialogueEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const videoChunk = aiResponse?.videoChunk;
@@ -68,6 +73,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         setIsStuck(false);
         setIsKeyboardOpen(false);
         setSubmissionError(null);
+        setOcrResultText('');
+        setIsVerificationStep(false);
     }, [reset]);
 
     const buildBasePrompt = useCallback((studentQuestion: string) => {
@@ -194,9 +201,10 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
             
             const combinedText = ocrTexts.join('\n\n');
-            const newQuestion = `${mainQuestion ? mainQuestion + '\n\n' : ''}${combinedText}`.trim();
-            setMainQuestion(newQuestion);
-            startSocraticTutor(newQuestion);
+            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${combinedText}`.trim();
+            
+            setOcrResultText(newOcrText);
+            setIsVerificationStep(true);
 
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
@@ -205,6 +213,21 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             setIsOcrLoading(false);
             if (event.target) event.target.value = ''; // Reset file input
         }
+    };
+    
+    const handleConfirmOcr = () => {
+        if (!ocrResultText.trim()) {
+            setSubmissionError("Le texte ne peut pas être vide.");
+            return;
+        }
+        setMainQuestion(ocrResultText);
+        startSocraticTutor(ocrResultText);
+        setIsVerificationStep(false);
+    };
+
+    const handleCancelOcr = () => {
+        setOcrResultText('');
+        setIsVerificationStep(false);
     };
 
 
@@ -303,28 +326,58 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             <div className="bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-lg p-6 space-y-6">
                 <div>
                     {!user && <div className="p-4 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm">Vous devez être connecté pour utiliser l'IA.</div>}
-                    <div className="space-y-4 mt-4">
-                        <div className="p-4 bg-slate-800 border-2 border-slate-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
-                            {mainQuestion ? <MathJaxRenderer content={`$$${mainQuestion}$$`} /> : <span className="text-slate-500">Posez votre question ou joignez une photo de votre travail ici...</span>}
+                    
+                    {isVerificationStep ? (
+                        <div className="space-y-4 animate-fade-in">
+                            <h3 className="text-xl font-semibold text-yellow-300">Vérifiez la transcription</h3>
+                            <p className="text-sm text-slate-400">L'IA a transcrit le texte de vos photos. Veuillez le vérifier et le corriger si nécessaire avant de continuer.</p>
+                            <textarea
+                                value={ocrResultText}
+                                onChange={(e) => setOcrResultText(e.target.value)}
+                                rows={10}
+                                className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
+                            />
+                            {submissionError && <p className="text-sm text-red-400">{submissionError}</p>}
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={handleConfirmOcr}
+                                    className="flex-1 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700"
+                                >
+                                    Confirmer et démarrer le tutorat
+                                </button>
+                                <button
+                                    onClick={handleCancelOcr}
+                                    className="px-5 py-3 font-semibold text-slate-300 bg-slate-700 rounded-lg shadow-md hover:bg-slate-600"
+                                >
+                                    Annuler
+                                </button>
+                            </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                             <button type="button" onClick={() => setIsKeyboardOpen(true)} disabled={!isReadyForUser || isLoading || isTutorActive} className="w-full px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                                {mainQuestion ? "Modifier ma question" : "Saisir ma question"}
-                            </button>
-                            <input type="file" ref={fileInputRef} onChange={handleFileSelectAndOcr} className="hidden" accept="image/*" multiple />
-                            <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isReadyForUser || isProcessing || isTutorActive} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                                 {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <PaperClipIcon className="w-5 h-5" />}
-                                Joindre une photo
-                            </button>
-                        </div>
+                    ) : (
+                        <div className="space-y-4 mt-4">
+                            <div className="p-4 bg-slate-800 border-2 border-slate-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
+                                {mainQuestion ? <MathJaxRenderer content={`$$${mainQuestion}$$`} /> : <span className="text-slate-500">Posez votre question ou joignez une photo de votre travail ici...</span>}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <button type="button" onClick={() => setIsKeyboardOpen(true)} disabled={!isReadyForUser || isLoading || isTutorActive} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+                                    <PencilIcon className="w-5 h-5" />
+                                    {mainQuestion ? "Modifier ma question" : "Saisir ma question"}
+                                </button>
+                                <input type="file" ref={fileInputRef} onChange={handleFileSelectAndOcr} className="hidden" accept="image/*" multiple />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isReadyForUser || isProcessing || isTutorActive} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
+                                    {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <PaperClipIcon className="w-5 h-5" />}
+                                    Joindre une photo
+                                </button>
+                            </div>
 
-                        {isKeyboardOpen && <MathKeyboard initialValue={mainQuestion} onConfirm={(latex) => { setMainQuestion(latex); setIsKeyboardOpen(false); }} onClose={() => setIsKeyboardOpen(false)} />}
-                        
-                        <div className="flex flex-wrap gap-2">
-                            <button type="button" onClick={() => startSocraticTutor(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">Démarrer le tutorat interactif</button>
-                            <button type="button" onClick={() => askForDirectAnswer(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-slate-200 bg-slate-600 rounded-lg hover:bg-slate-700 disabled:opacity-70 disabled:cursor-not-allowed">Voir la réponse directe</button>
+                            {isKeyboardOpen && <MathKeyboard initialValue={mainQuestion} onConfirm={(latex) => { setMainQuestion(latex); setIsKeyboardOpen(false); }} onClose={() => setIsKeyboardOpen(false)} />}
+                            
+                            <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => startSocraticTutor(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">Démarrer le tutorat interactif</button>
+                                <button type="button" onClick={() => askForDirectAnswer(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-slate-200 bg-slate-600 rounded-lg hover:bg-slate-700 disabled:opacity-70 disabled:cursor-not-allowed">Voir la réponse directe</button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
                 
                 <div className="min-h-[24rem] bg-slate-900/50 p-4 sm:p-6 rounded-lg border border-slate-700/50 flex flex-col justify-between">
@@ -352,7 +405,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             </div>
                         )}
                         {(aiError || submissionError) && <div className="text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {aiError || submissionError}</p></div>}
-                        {dialogue.length === 0 && !isProcessing && !aiError && <div className="flex items-center justify-center h-full text-slate-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>}
+                        {dialogue.length === 0 && !isProcessing && !aiError && !isVerificationStep && <div className="flex items-center justify-center h-full text-slate-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>}
                     </div>
 
                     {isTutorActive && !isTutorFinished && !isLoading && (

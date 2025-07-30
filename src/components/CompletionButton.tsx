@@ -5,7 +5,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useAuth } from '../contexts/AuthContext';
 import * as userService from '../services/userService';
-import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon, TrashIcon, PlusCircleIcon } from './icons';
+import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon, TrashIcon, PlusCircleIcon, PencilIcon } from './icons';
 import { Exercise } from '../types';
 import { getSupabase } from '../services/authService';
 import imageCompression from 'browser-image-compression';
@@ -13,9 +13,16 @@ import { MathKeyboard } from './MathKeyboard';
 import { MathJaxRenderer } from './MathJaxRenderer';
 
 
+interface FeedbackPart {
+    part_title: string;
+    evaluation: 'correct' | 'incorrect' | 'partial';
+    explanation: string;
+}
+
 interface CheckAnswerResponse {
-    is_correct: boolean;
-    feedback: string;
+    is_globally_correct: boolean;
+    summary: string;
+    detailed_feedback: FeedbackPart[];
 }
 
 interface CompletionButtonProps {
@@ -49,6 +56,10 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
     const [studentAnswer, setStudentAnswer] = useState<string>('');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadedImages, setUploadedImages] = useState<UploadedImage[]>([]);
+    
+    const [ocrText, setOcrText] = useState<string>('');
+    const [isVerificationStep, setIsVerificationStep] = useState(false);
+    const [isOcrLoading, setIsOcrLoading] = useState(false);
 
     const [isChecking, setIsChecking] = useState(false);
     const [checkResult, setCheckResult] = useState<CheckAnswerResponse | null>(null);
@@ -95,13 +106,14 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 throw new Error(errorMessage);
             }
 
-            const result = JSON.parse(responseBody);
+            const result: CheckAnswerResponse = JSON.parse(responseBody);
             setCheckResult(result);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : "Une erreur inconnue est survenue.");
         } finally {
             setIsChecking(false);
+            setIsVerificationStep(false);
         }
     };
     
@@ -124,10 +136,10 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
         setUploadedImages(prev => prev.filter(img => img.id !== idToRemove));
     };
 
-    const handleCheckMultipageAnswer = async () => {
+    const handleExtractTextFromImages = async () => {
         if (uploadedImages.length === 0 || !user) return;
         
-        setIsChecking(true);
+        setIsOcrLoading(true);
         setError(null);
         setCheckResult(null);
         
@@ -145,16 +157,13 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 })
             );
 
-            const response = await fetch('/api/check-multipage-answer', {
+            const response = await fetch('/api/ocr-multipage', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`,
                 },
-                body: JSON.stringify({
-                    images: imagePayloads,
-                    exerciseId: exercise.id
-                }),
+                body: JSON.stringify({ images: imagePayloads }),
             });
 
             const responseBody = await response.text();
@@ -169,16 +178,18 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 }
                 throw new Error(errorMessage);
             }
-
+            
             const result = JSON.parse(responseBody);
-            setCheckResult(result);
+            setOcrText(result.text);
+            setIsVerificationStep(true);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement des images.');
         } finally {
-            setIsChecking(false);
+            setIsOcrLoading(false);
         }
     };
+
     
     const handleCompleteExercise = async () => {
         if (!user) return;
@@ -256,59 +267,113 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 </div>
             )}
 
-             {inputMode === 'photo' && (
-                <div className="space-y-4">
-                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFilesSelected} className="hidden" multiple />
-                     {uploadedImages.length > 0 && (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                            {uploadedImages.map((image) => (
-                                <div key={image.id} className="relative group aspect-[3/4]">
-                                    <img src={image.src} alt="Copie de l'élève" className="rounded-lg w-full h-full object-cover" />
-                                    <button onClick={() => handleRemoveImage(image.id)} className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                        <TrashIcon className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                            <button onClick={() => fileInputRef.current?.click()} disabled={isChecking} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
-                                <PlusCircleIcon className="w-8 h-8"/>
-                                <span className="text-sm mt-1">Ajouter</span>
+            {inputMode === 'photo' && (
+                isVerificationStep ? (
+                     <div className="space-y-4 animate-fade-in">
+                        <h4 className="font-semibold text-yellow-300">Vérifiez la transcription de vos photos</h4>
+                        <p className="text-sm text-slate-400">Corrigez le texte ci-dessous si nécessaire, puis soumettez-le pour vérification.</p>
+                        <textarea
+                            value={ocrText}
+                            onChange={(e) => setOcrText(e.target.value)}
+                            rows={10}
+                            className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
+                        />
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <button
+                                onClick={() => handleCheckAnswer(ocrText)}
+                                disabled={isChecking || !ocrText.trim()}
+                                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70"
+                            >
+                                {isChecking && <SpinnerIcon className="w-5 h-5 animate-spin" />}
+                                Confirmer et Vérifier la Réponse
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setIsVerificationStep(false);
+                                    setOcrText('');
+                                    setUploadedImages([]);
+                                }}
+                                disabled={isChecking}
+                                className="px-5 py-3 font-semibold text-slate-300 bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 disabled:opacity-70"
+                            >
+                                Annuler
                             </button>
                         </div>
-                     )}
-
-                     <button
-                        onClick={uploadedImages.length === 0 ? () => fileInputRef.current?.click() : handleCheckMultipageAnswer}
-                        disabled={isChecking}
-                        className="w-full flex items-center justify-center gap-3 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-70"
-                    >
-                        {isChecking ? (
-                            <SpinnerIcon className="w-6 h-6 animate-spin" />
-                        ) : (
-                           <CameraIcon className="w-6 h-6" />
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFilesSelected} className="hidden" multiple />
+                        {uploadedImages.length > 0 && (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                {uploadedImages.map((image) => (
+                                    <div key={image.id} className="relative group aspect-[3/4]">
+                                        <img src={image.src} alt="Copie de l'élève" className="rounded-lg w-full h-full object-cover" />
+                                        <button onClick={() => handleRemoveImage(image.id)} className="absolute top-1 right-1 p-1.5 bg-black/60 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                ))}
+                                <button onClick={() => fileInputRef.current?.click()} disabled={isOcrLoading} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
+                                    <PlusCircleIcon className="w-8 h-8"/>
+                                    <span className="text-sm mt-1">Ajouter</span>
+                                </button>
+                            </div>
                         )}
-                        {uploadedImages.length === 0 ? "Prendre / Choisir des photos" : "Vérifier les photos"}
-                    </button>
-                </div>
+
+                        <button
+                            onClick={uploadedImages.length === 0 ? () => fileInputRef.current?.click() : handleExtractTextFromImages}
+                            disabled={isOcrLoading}
+                            className="w-full flex items-center justify-center gap-3 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-70"
+                        >
+                            {isOcrLoading ? (
+                                <SpinnerIcon className="w-6 h-6 animate-spin" />
+                            ) : (
+                            <CameraIcon className="w-6 h-6" />
+                            )}
+                            {uploadedImages.length === 0 ? "Prendre / Choisir des photos" : "Extraire le texte des photos"}
+                        </button>
+                    </div>
+                )
              )}
 
             {error && <p className="mt-4 text-sm text-red-400 text-center">{error}</p>}
 
             {checkResult && (
-                <div className={`mt-4 p-4 rounded-lg border ${checkResult.is_correct ? 'bg-green-900/20 border-green-500/50' : 'bg-red-900/20 border-red-500/50'}`}>
-                    <div className="flex items-start gap-3">
-                        {checkResult.is_correct
-                            ? <CheckCircleIcon className="w-6 h-6 text-green-400 shrink-0" />
-                            : <XCircleIcon className="w-6 h-6 text-red-400 shrink-0" />}
+                 <div className={`mt-4 p-4 rounded-lg border ${checkResult.is_globally_correct ? 'border-green-500/30' : 'border-red-500/30'} bg-slate-800/20`}>
+                    {/* Bilan global */}
+                    <div className="flex items-start gap-3 mb-4 pb-4 border-b border-slate-700/50">
+                        {checkResult.is_globally_correct
+                            ? <CheckCircleIcon className="w-7 h-7 text-green-400 shrink-0" />
+                            : <XCircleIcon className="w-7 h-7 text-red-400 shrink-0" />}
                         <div className="flex-grow">
-                             <div className="text-sm text-gray-300 mt-1 prose prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
-                                <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(checkResult.feedback) as string)} />
-                             </div>
+                            <h4 className="font-bold text-slate-100 text-lg">Bilan</h4>
+                            <p className="text-sm text-slate-300">{checkResult.summary}</p>
                         </div>
+                    </div>
+
+                    {/* Feedback détaillé */}
+                    <div className="space-y-4">
+                        <h4 className="font-bold text-slate-100 text-lg">Explication détaillée</h4>
+                        {checkResult.detailed_feedback.map((part, index) => (
+                            <div key={index} className="flex items-start gap-3">
+                                <div className="mt-1 shrink-0">
+                                    {part.evaluation === 'correct' && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
+                                    {part.evaluation === 'incorrect' && <XCircleIcon className="w-5 h-5 text-red-500" />}
+                                    {part.evaluation === 'partial' && <PencilIcon className="w-5 h-5 text-yellow-500" />}
+                                </div>
+                                <div className="flex-grow">
+                                    <h5 className="font-semibold text-slate-200">{part.part_title}</h5>
+                                    <div className="text-sm text-slate-400 prose prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5">
+                                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(part.explanation) as string)} />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
             
-             {(checkResult?.is_correct || isAlreadyCompleted) && !isCompleting && (
+             {(checkResult?.is_globally_correct || isAlreadyCompleted) && !isCompleting && (
                 <button
                     onClick={handleCompleteExercise}
                     disabled={isCompleting}

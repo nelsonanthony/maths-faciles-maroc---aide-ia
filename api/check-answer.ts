@@ -1,8 +1,5 @@
 
 
-
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -73,21 +70,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const prompt = `
             CONTEXTE: Tu es un professeur de mathématiques bienveillant. Tu t'adresses à des lycéens marocains pour qui le français est une deuxième langue.
-            MISSION: Évalue la réponse d'un élève.
-            1.  Compare la "Réponse de l'élève" à la "Correction" de référence.
-            2.  Détermine si la réponse de l'élève est correcte. Le raisonnement mathématique et le résultat final doivent être justes. Les petites fautes de frappe ou de formulation sont acceptables.
-            3.  Rédige un feedback en **français très simple et clair**.
-            4.  Structure le feedback avec des titres Markdown (###) et des listes à puces (*) pour le rendre facile à lire. Commence TOUJOURS par "### Bilan" pour dire si c'est correct ou non, puis "### Explication" pour les détails.
+            MISSION: Évalue la réponse d'un élève en la décomposant par question ou par étape de raisonnement.
+            1.  Rédige un bilan global (summary) de la réponse.
+            2.  Pour chaque partie de l'exercice (ou chaque étape logique majeure), crée un objet séparé dans un tableau 'detailed_feedback'.
+            3.  Dans chaque objet, donne un titre clair à la partie ('part_title', ex: "Question 1a", "Factorisation").
+            4.  Évalue cette partie comme 'correct', 'incorrect', ou 'partial' ('evaluation'). 'partial' signifie qu'il y a du bon mais aussi une erreur à corriger.
+            5.  Rédige une explication ('explanation') claire et simple pour chaque partie, en utilisant Markdown.
+            6.  Utilise un français très simple et des listes pour la clarté.
+            7.  Définis 'is_globally_correct' à true seulement si toutes les parties sont 'correct'.
 
             RÈGLES DE FORMATAGE STRICTES:
-            -   Réponds UNIQUEMENT avec un objet JSON valide.
-            -   Toutes les expressions mathématiques doivent être en LaTeX, en utilisant \\(...\\) pour les formules en ligne et $$...$$ pour les blocs. N'utilise JAMAIS de $ seuls.
-
-            FORMAT DE SORTIE JSON:
-            {
-              "is_correct": boolean,
-              "feedback": "string (Le feedback structuré en Markdown avec un français simple. Par exemple : '### Bilan\\nTa réponse est correcte !\\n\\n### Explication\\n* Ton calcul de \\\\(f'(x)\\\\) est parfait.\\n* Tu as bien utilisé la bonne formule.')"
-            }
+            -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé.
+            -   Toutes les expressions mathématiques DOIVENT être en LaTeX, en utilisant \\(...\\) pour les formules en ligne et $$...$$ pour les blocs. N'utilise JAMAIS de $ seuls.
 
             ---
             ÉNONCÉ DE L'EXERCICE:
@@ -99,23 +93,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             RÉPONSE DE L'ÉLÈVE:
             ${studentAnswer}
             ---
-            MAINTENANT, FOURNIS L'ÉVALUATION EN JSON:
+            MAINTENANT, FOURNIS L'ÉVALUATION DÉCOMPOSÉE EN JSON:
         `;
         
         const answerSchema = {
             type: Type.OBJECT,
             properties: {
-                is_correct: {
+                is_globally_correct: {
                     type: Type.BOOLEAN,
-                    description: "True si la réponse de l'élève est correcte, false sinon."
+                    description: "True si la réponse globale de l'élève est majoritairement correcte."
                 },
-                feedback: {
+                summary: {
                     type: Type.STRING,
-                    description: "Le feedback pour l'élève. DOIT être en français simple, structuré avec Markdown (###, *), et utiliser LaTeX (\\(...\\) ou $$...$$) pour les maths. Commencer par '### Bilan'."
+                    description: "Un court bilan général de la réponse de l'élève."
+                },
+                detailed_feedback: {
+                    type: Type.ARRAY,
+                    description: "Une liste de feedbacks détaillés pour chaque partie de la réponse.",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            part_title: {
+                                type: Type.STRING,
+                                description: "Le titre de la partie évaluée (ex: 'Question 1a', 'Factorisation')."
+                            },
+                            evaluation: {
+                                type: Type.STRING,
+                                description: "L'évaluation de cette partie. Doit être une de ces valeurs : 'correct', 'incorrect', 'partial'."
+                            },
+                            explanation: {
+                                type: Type.STRING,
+                                description: "L'explication détaillée pour cette partie, en Markdown et LaTeX."
+                            }
+                        },
+                        required: ["part_title", "evaluation", "explanation"]
+                    }
                 }
             },
-            required: ["is_correct", "feedback"],
+            required: ["is_globally_correct", "summary", "detailed_feedback"]
         };
+
 
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const response = await ai.models.generateContent({

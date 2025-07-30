@@ -1,5 +1,4 @@
 
-
 import { Level, Exercise } from '../src/types.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 

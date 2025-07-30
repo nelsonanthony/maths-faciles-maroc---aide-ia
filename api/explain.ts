@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
-import { checkUsageLimit, logAiCall } from "./ai-usage-limiter.js";
+import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {

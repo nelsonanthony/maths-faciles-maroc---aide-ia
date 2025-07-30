@@ -1,3 +1,4 @@
+
 /**
  * Fichier de configuration central pour les limites d'utilisation de l'IA.
  * MODIFIEZ CES VALEURS pour ajuster le nombre d'appels quotidiens par utilisateur.

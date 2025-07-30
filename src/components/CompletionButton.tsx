@@ -5,7 +5,6 @@ import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon } from './icons';
 import { Exercise } from '../types';
 import { getSupabase } from '../services/authService';
 import imageCompression from 'browser-image-compression';
-import { recognize } from 'tesseract.js';
 import { MathKeyboard } from './MathKeyboard';
 import { MathJaxRenderer } from './MathJaxRenderer';
 
@@ -18,6 +17,17 @@ interface CheckAnswerResponse {
 interface CompletionButtonProps {
     exercise: Exercise;
 }
+
+const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = (error) => reject(error);
+    });
 
 export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) => {
     const { user, updateUser } = useAuth();
@@ -97,30 +107,56 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
 
     const handleProcessImage = async (file: File) => {
         setIsProcessingPhoto(true);
+        setPhotoProcessingMessage('Compression de l\'image...');
         setError(null);
         setCheckResult(null);
         setImageSrc(URL.createObjectURL(file));
 
         try {
-            setPhotoProcessingMessage('Compression de l\'image...');
-            const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
+            const supabase = getSupabase();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
+
+            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
             const compressedFile = await imageCompression(file, options);
-            
-            setPhotoProcessingMessage('Analyse de l\'écriture...');
-            const { data: { text } } = await recognize(compressedFile, 'fra', {
-                logger: m => {
-                    if (m.status === 'recognizing text') {
-                        setPhotoProcessingMessage(`Analyse de l'écriture... ${Math.round(m.progress * 100)}%`);
-                    }
-                }
+            const base64Image = await fileToBase64(compressedFile);
+
+            setPhotoProcessingMessage('Envoi à l\'IA pour analyse et vérification...');
+
+            const response = await fetch('/api/check-photo-answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    image: base64Image,
+                    mimeType: compressedFile.type,
+                    exerciseId: exercise.id
+                }),
             });
-            
-            setPhotoProcessingMessage('Vérification par l\'IA...');
-            await handleCheckAnswer(text);
+
+            const responseBody = await response.text();
+
+            if (!response.ok) {
+                let errorMessage;
+                try {
+                    const errorData = JSON.parse(responseBody);
+                    errorMessage = errorData.error || `Une erreur est survenue (${response.status})`;
+                } catch (e) {
+                    errorMessage = responseBody || `Une erreur est survenue (${response.status})`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const result = JSON.parse(responseBody);
+            setCheckResult(result);
 
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement de l\'image.');
+        } finally {
             setIsProcessingPhoto(false);
+            setPhotoProcessingMessage('');
         }
     };
 

@@ -65,13 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
         };
         
-        const promptText = `Tu es un expert en reconnaissance optique de caractères (OCR) spécialisé en mathématiques. Transcris le texte manuscrit visible dans l'image.
+        const promptText = `Tu es un expert en reconnaissance optique de caractères (OCR) spécialisé en mathématiques. Transcris le texte manuscrit de l'image.
 
-**RÈGLES DE FORMATAGE STRICTES :**
-1.  **Toutes** les expressions mathématiques doivent être formatées en LaTeX.
-    *   Utilise \`$$...$$\` pour les équations en bloc (display style). Exemple : \`$$\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$$\`.
-    *   Utilise \`\\(...\\)\` pour les formules en ligne (inline style). Exemple : "La fonction \\(f(x) = x^2\\) est continue."
-2.  Ne renvoie **que** le texte transcrit, sans aucun commentaire, en-tête ou introduction. Respecte les sauts de ligne de l'image.`;
+**RÈGLES DE FORMATAGE IMPÉRATIVES :**
+1.  **Format LaTeX OBLIGATOIRE** pour toutes les expressions mathématiques.
+    *   **Équations en bloc** (sur leur propre ligne) : utilise \`$$...$$\`. Exemple : \`$$\\frac{a}{b}$$\`
+    *   **Formules en ligne** (dans le texte) : utilise \`\\(...\\)\`. Exemple : \`Soit \\(x \\in \\mathbb{R}\\)\`
+2.  **NE JAMAIS** ajouter de parenthèses supplémentaires autour des expressions LaTeX.
+    *   CORRECT : \`\\(x > 0\\)\`
+    *   INCORRECT : \`(\\(x > 0\\))\`
+3.  **AUCUN COMMENTAIRE** : Ne renvoie que le texte transcrit. Pas d'en-tête, pas d'introduction, rien d'autre.
+4.  Respecte les sauts de ligne du texte original.`;
 
         const textPart = { text: promptText };
 

@@ -68,15 +68,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const truncatedCorrection = correctionContext.length > 2500 ? (correctionContext.substring(0, 2500) + "\n...") : correctionContext;
 
         const prompt = `
-            CONTEXTE: Tu es un professeur de mathématiques bienveillant. Tu t'adresses à des lycéens marocains pour qui le français est une deuxième langue.
-            MISSION: Évalue la réponse d'un élève en la décomposant par question ou par étape de raisonnement.
-            1.  Rédige un bilan global (summary) de la réponse.
-            2.  Pour chaque partie de l'exercice (ou chaque étape logique majeure), crée un objet séparé dans un tableau 'detailed_feedback'.
-            3.  Dans chaque objet, donne un titre clair à la partie ('part_title', ex: "Question 1a", "Factorisation").
-            4.  Évalue cette partie comme 'correct', 'incorrect', ou 'partial' ('evaluation'). 'partial' signifie qu'il y a du bon mais aussi une erreur à corriger.
-            5.  Rédige une explication ('explanation') claire et simple pour chaque partie, en utilisant Markdown.
-            6.  Utilise un français très simple et des listes pour la clarté.
-            7.  Définis 'is_globally_correct' à true seulement si toutes les parties sont 'correct'.
+            CONTEXTE: Tu es un correcteur de mathématiques pour des lycéens. Sois précis et bienveillant.
+            MISSION: Évalue la réponse d'un élève en te basant sur l'énoncé et la correction de référence.
+            1.  Décompose la réponse de l'élève en parties logiques (par question, ou par étape de calcul).
+            2.  Pour chaque partie, crée un objet de feedback.
+            3.  Rédige un bilan global (summary) court et clair.
+            4.  Définis 'is_globally_correct' à true seulement si toutes les parties sont 'correct'.
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.

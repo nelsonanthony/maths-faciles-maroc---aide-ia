@@ -11,6 +11,9 @@ export const AI_USAGE_LIMITS = {
 
     // Nombre de fois qu'un élève peut faire valider sa réponse à un exercice.
     ANSWER_VALIDATION: 30,
+
+    // Nombre de vérifications d'étape dans le tuteur socratique.
+    SOCRATIC_VALIDATION: 60,
 };
 
 export type AiCallType = keyof typeof AI_USAGE_LIMITS;

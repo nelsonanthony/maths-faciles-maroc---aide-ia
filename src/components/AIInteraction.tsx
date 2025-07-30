@@ -55,9 +55,10 @@ interface AIInteractionProps {
     chapterId: string;
     levelId: string;
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
+    onShowCorrectionRequest?: () => void;
 }
 
-export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp }) => {
+export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp, onShowCorrectionRequest }) => {
     const { user } = useAuth();
     const [mainQuestion, setMainQuestion] = useState(initialQuestion || '');
     const { data: aiResponse, isLoading, error, explain, reset } = useAIExplain();
@@ -76,6 +77,7 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const [isTutorFinished, setIsTutorFinished] = useState(false);
     const [isStuck, setIsStuck] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+    const [isCheckingAnswer, setIsCheckingAnswer] = useState(false);
 
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
@@ -209,40 +211,92 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         explain(directAnswerPrompt, chapterId, 'direct');
     }
 
-    const handleStudentResponse = (e: React.FormEvent) => {
+    const handleStudentResponse = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!studentInput.trim() || !socraticPath || isTutorFinished) return;
+        if (!studentInput.trim() || !socraticPath || isTutorFinished || isCheckingAnswer) return;
         
-        setIsStuck(false); // Hide button as soon as user tries again
-        const newDialogue: DialogueMessage[] = [...dialogue, { role: 'user', content: studentInput }];
-
-        const currentSocraticStep = socraticPath[currentStep];
-        const isAnswerCorrect = currentSocraticStep.expected_answer_keywords.some(keyword => 
-            studentInput.toLowerCase().includes(keyword.toLowerCase())
-        );
-
-        if (isAnswerCorrect) {
-            newDialogue.push({ role: 'ai', content: currentSocraticStep.positive_feedback });
-            const nextStep = currentStep + 1;
-            if (nextStep < socraticPath.length) {
-                newDialogue.push({ role: 'ai', content: socraticPath[nextStep].ia_question });
-                setCurrentStep(nextStep);
-            } else {
-                newDialogue.push({ role: 'system', content: 'Félicitations, vous avez terminé ce parcours !' });
-                setIsTutorFinished(true);
-            }
-        } else {
-            newDialogue.push({ role: 'ai', content: currentSocraticStep.hint_for_wrong_answer });
-            setIsStuck(true); // Show the "I'm stuck" button
-        }
-        
-        setDialogue(newDialogue);
+        const currentStudentInput = studentInput;
+        setIsStuck(false);
+        setDialogue(prev => [...prev, { role: 'user', content: currentStudentInput }]);
         setStudentInput('');
+        setIsCheckingAnswer(true);
+
+        try {
+            const supabase = getSupabase();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Vous devez être connecté pour valider votre réponse.");
+
+            const currentSocraticStep = socraticPath[currentStep];
+
+            const response = await fetch('/api/validate-socratic-answer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`
+                },
+                body: JSON.stringify({
+                    studentAnswer: currentStudentInput,
+                    currentIaQuestion: currentSocraticStep.ia_question,
+                    expectedAnswerKeywords: currentSocraticStep.expected_answer_keywords
+                })
+            });
+            
+            const responseBody = await response.text();
+            if (!response.ok) {
+                 let errorMessage;
+                try {
+                    const errorData = JSON.parse(responseBody);
+                    errorMessage = errorData.error || `Erreur du serveur (${response.status})`;
+                } catch (jsonError) {
+                    errorMessage = responseBody || `Erreur du serveur (${response.status})`;
+                }
+                throw new Error(errorMessage);
+            }
+
+            const { is_correct } = JSON.parse(responseBody);
+            
+            if (is_correct) {
+                const newDialogue: DialogueMessage[] = [{ role: 'ai', content: currentSocraticStep.positive_feedback }];
+                const nextStep = currentStep + 1;
+
+                if (nextStep < socraticPath.length) {
+                    newDialogue.push({ role: 'ai', content: socraticPath[nextStep].ia_question });
+                    setCurrentStep(nextStep);
+                } else {
+                    newDialogue.push({ role: 'system', content: 'Félicitations, vous avez terminé ce parcours !' });
+                    setIsTutorFinished(true);
+                }
+                setDialogue(prev => [...prev, ...newDialogue]);
+
+            } else {
+                setDialogue(prev => [...prev, { role: 'ai', content: currentSocraticStep.hint_for_wrong_answer }]);
+                setIsStuck(true);
+            }
+
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
+            setDialogue(prev => [...prev, { role: 'system', content: `Erreur : ${errorMessage}` }]);
+        } finally {
+            setIsCheckingAnswer(false);
+        }
     }
     
     const handleImStuck = () => {
         if (!socraticPath || isTutorFinished) return;
 
+        // If a handler is provided by the parent, use it to scroll to the official correction.
+        if (onShowCorrectionRequest) {
+            const newDialogue: DialogueMessage[] = [
+                ...dialogue,
+                { role: 'system', content: "Pas de problème. Je vous redirige vers la section de correction détaillée pour vous aider." }
+            ];
+            setDialogue(newDialogue);
+            onShowCorrectionRequest();
+            resetState(); // Reset the AI interaction
+            return;
+        }
+
+        // Fallback to old behavior: give the answer for the current step.
         const currentSocraticStep = socraticPath[currentStep];
         const expected = currentSocraticStep.expected_answer_keywords.join('" ou "');
         const newDialogue: DialogueMessage[] = [
@@ -352,8 +406,16 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                             </p>
                         </div>
                     ) : null}
+                    {isCheckingAnswer && (
+                        <div className="flex items-start">
+                            <div className="chat-bubble ai-bubble flex items-center gap-2">
+                                <SpinnerIcon className="w-5 h-5 animate-spin"/>
+                                <span>Vérification...</span>
+                            </div>
+                        </div>
+                    )}
                     {error && (<div className="flex items-center justify-center h-full text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {error}</p></div>)}
-                    {dialogue.length === 0 && !isLoading && !isFetchingCorrection && !error && (<div className="flex items-center justify-center h-full text-gray-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
+                    {dialogue.length === 0 && !isLoading && !isFetchingCorrection && !error && !isCheckingAnswer && (<div className="flex items-center justify-center h-full text-gray-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
                 </div>
 
                 {isTutorActive && !isTutorFinished && !isLoading && (
@@ -363,10 +425,11 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                             value={studentInput}
                             onChange={(e) => setStudentInput(e.target.value)}
                             placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                            className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500"
+                            disabled={isCheckingAnswer}
+                            className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
                         />
                         <div className="flex gap-2 self-end sm:self-auto">
-                            <button type="submit" disabled={!studentInput.trim()} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                            <button type="submit" disabled={!studentInput.trim() || isCheckingAnswer} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
                                 Envoyer
                             </button>
                             {isStuck && (

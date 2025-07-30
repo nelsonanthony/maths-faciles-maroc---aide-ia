@@ -55,7 +55,12 @@ interface ExercisePageProps {
 export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, seriesId, levelId, onBack, onEdit, onNavigateToTimestamp, onSelectExercise, onNavigateToChat }) => {
     const { isAdmin } = useAuth();
     const aiInteractionRef = useRef<HTMLDivElement>(null);
+    const officialCorrectionRef = useRef<HTMLDivElement>(null);
     const [showOfficialCorrection, setShowOfficialCorrection] = useState(false);
+
+    const handleShowCorrectionRequest = () => {
+        officialCorrectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
     
     return (
         <div className="max-w-4xl mx-auto space-y-8">
@@ -111,7 +116,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
 
             {/* Official Correction Section */}
             {exercise.fullCorrection && (
-                 <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
+                 <div ref={officialCorrectionRef} className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
                      <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3 mb-4">
                         <BookOpenIcon className="w-6 h-6" />
                          Correction Officielle
@@ -137,6 +142,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                     chapterId={chapter.id}
                     levelId={levelId}
                     onNavigateToTimestamp={onNavigateToTimestamp}
+                    onShowCorrectionRequest={exercise.fullCorrection ? handleShowCorrectionRequest : undefined}
                 />
             </div>
 

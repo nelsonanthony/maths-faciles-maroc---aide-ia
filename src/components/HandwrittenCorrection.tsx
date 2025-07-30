@@ -3,7 +3,6 @@ import React, { useState, useRef } from 'react';
 import { CameraIcon, CheckCircleIcon, XCircleIcon, SpinnerIcon, TrashIcon, PlusCircleIcon, PencilIcon } from '@/components/icons';
 import { HandwrittenCorrectionResponse } from '@/types';
 import imageCompression from 'browser-image-compression';
-import { recognize } from 'tesseract.js';
 import { useAuth } from '@/contexts/AuthContext';
 import { getSupabase } from '@/services/authService';
 
@@ -20,6 +19,17 @@ type UploadedImage = {
 };
 
 type Step = 'upload' | 'review' | 'result';
+
+const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = (error) => reject(error);
+    });
 
 const UploadPlaceholder: React.FC<{ onButtonClick: () => void, disabled: boolean }> = ({ onButtonClick, disabled }) => (
     <div className="h-full flex flex-col items-center justify-center bg-gray-900/50 rounded-lg border-2 border-dashed border-gray-600 p-8 text-center">
@@ -76,45 +86,59 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         setIsLoading(true);
         setError(null);
 
+        const supabase = getSupabase();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            setError("Vous devez être connecté pour analyser des images.");
+            setIsLoading(false);
+            return;
+        }
+
         const ocrResults: string[] = [];
-        // Use a for...of loop for sequential processing to avoid race conditions with Tesseract workers.
+        // Use a for...of loop for sequential processing.
         for (const [index, image] of uploadedImages.entries()) {
             if (image.ocrStatus === 'done' && image.ocrText) {
                 ocrResults.push(image.ocrText);
-                continue; // Skip already processed images
+                continue;
             }
 
             setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'processing' } : img));
-            setLoadingMessage(`Analyse de la page ${index + 1}...`);
+            setLoadingMessage(`Analyse de la page ${index + 1} par l'IA...`);
 
             try {
-                const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
+                const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
                 const compressedFile = await imageCompression(image.file, options);
+                const base64Image = await fileToBase64(compressedFile);
 
-                const { data: { text } } = await recognize(compressedFile, 'fra', {
-                    logger: m => {
-                        if (m.status === 'recognizing text') {
-                            setLoadingMessage(`Analyse de la page ${index + 1} (${Math.round(m.progress * 100)}%)...`);
-                        }
-                    }
+                const response = await fetch('/api/ocr-with-gemini', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session.access_token}`
+                    },
+                    body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type })
                 });
 
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `L'analyse de la page ${index + 1} a échoué.`);
+                }
+                
+                const { text } = await response.json();
+                
                 setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'done', ocrText: text } : img));
                 ocrResults.push(text);
+
             } catch (err) {
                 setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'error' } : img));
-                console.error(`OCR failed for image ${index + 1}`, err);
-                const errorText = `[Erreur d'analyse pour la page ${index + 1}]`;
-                ocrResults.push(errorText);
-                setError(`L'analyse de la page ${index + 1} a échoué. Veuillez réessayer avec une meilleure image.`);
-                // Stop processing on the first error.
+                const errorMessage = err instanceof Error ? err.message : "Erreur inconnue";
+                setError(errorMessage);
                 setIsLoading(false);
                 setLoadingMessage('');
                 return;
             }
         }
 
-        // This part runs only if all images were processed successfully
         const fullText = ocrResults.map((text, index) => `--- PAGE ${index + 1} ---\n${text}`).join('\n\n');
         setEditableOcrText(fullText);
         setStep('review');

@@ -15,6 +15,9 @@ export const AI_USAGE_LIMITS = {
 
     // Nombre de vérifications d'étape dans le tuteur socratique.
     SOCRATIC_VALIDATION: 60,
+
+    // Nombre de reconnaissances d'écriture par image.
+    OCR: 30,
 };
 
 export type AiCallType = keyof typeof AI_USAGE_LIMITS;

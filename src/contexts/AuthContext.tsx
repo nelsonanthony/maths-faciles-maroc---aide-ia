@@ -37,8 +37,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAdminEmailForDebug(config.adminEmail);
 
                 const supabase = authService.getSupabase();
-                // v1: session() is synchronous
-                const session = supabase.auth.session();
+                // v2: getSession() is asynchronous
+                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+                if (sessionError) {
+                    throw sessionError;
+                }
                 if (isMounted) {
                     const userProfile = await authService.getUserFromSession(session);
                     setUser(userProfile);

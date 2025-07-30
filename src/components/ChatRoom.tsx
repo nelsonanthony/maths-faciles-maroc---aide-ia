@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -28,7 +30,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             setIsLoading(true);
             setError(null);
             try {
-                const session = supabase.auth.session();
+                const { data: { session } } = await supabase.auth.getSession();
                 if (!session) throw new Error("User not authenticated to fetch messages");
 
                 const response = await fetch(`/api/chat/get-messages?room_id=${room.id}`, {
@@ -76,7 +78,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
         setError(null);
 
         try {
-            const session = supabase.auth.session();
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("User not authenticated");
 
             const response = await fetch(`/api/chat/send-message`, {

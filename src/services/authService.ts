@@ -1,5 +1,6 @@
 
 
+
 import { createClient, SupabaseClient, type Session, type User as SupabaseUser } from '@supabase/supabase-js';
 import { User, UserQuizAttempt } from '@/types';
 import { calculateLevel } from '@/services/userService';
@@ -176,15 +177,16 @@ export const register = async (email: string, password: string): Promise<void> =
 };
 
 export const login = async (email: string, password: string): Promise<void> => {
-    const { error } = await getSupabase().auth.signIn({ email, password });
+    const { error } = await getSupabase().auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
 };
 
 export const loginWithGoogle = async (): Promise<void> => {
-    const { error } = await getSupabase().auth.signIn({
+    const { error } = await getSupabase().auth.signInWithOAuth({
         provider: 'google',
-    }, {
-        redirectTo: window.location.origin
+        options: {
+            redirectTo: window.location.origin,
+        },
     });
     if (error) throw new Error(error.message);
 };
@@ -195,7 +197,7 @@ export const logout = async (): Promise<void> => {
 };
 
 export const requestPasswordReset = async (email: string): Promise<void> => {
-    const { error } = await (getSupabase().auth.api as any).resetPasswordForEmail(email, {
+    const { error } = await getSupabase().auth.resetPasswordForEmail(email, {
         redirectTo: window.location.origin,
     });
     if (error) throw new Error(error.message);
@@ -203,7 +205,7 @@ export const requestPasswordReset = async (email: string): Promise<void> => {
 
 export const resetPassword = async (newPassword: string): Promise<void> => {
     // The access token is handled by the client library after the user clicks the magic link.
-    // .update() will use the session's access token.
-    const { error } = await getSupabase().auth.update({ password: newPassword });
+    // .updateUser() will use the session's access token.
+    const { error } = await getSupabase().auth.updateUser({ password: newPassword });
     if (error) throw new Error(error.message);
 };

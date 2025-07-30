@@ -265,7 +265,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
 
         try {
             const supabase = getSupabase();
-            const session = supabase.auth.session();
+            const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("Vous devez être connecté pour valider votre réponse.");
 
             const currentSocraticStep = socraticPath[currentStep];
@@ -399,7 +399,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
     const isReadyForUser = !!user && isAIFeatureEnabled && !isFetchingCorrection;
 
     return (
-        <div className="bg-gray-800/50 backdrop-blur-md rounded-xl border border-gray-700/50 shadow-lg p-6 space-y-6">
+        <div className="bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-lg p-6 space-y-6">
             <div>
                 <h3 className="text-lg font-semibold text-brand-blue-300 mb-2">
                     Besoin d'un coup de pouce ? Demandez à l'IA
@@ -410,11 +410,11 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     </div>
                 )}
                  <div className="space-y-4 mt-4">
-                    <div className="p-4 bg-gray-900 border-2 border-gray-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
+                    <div className="p-4 bg-slate-800 border-2 border-slate-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
                         {mainQuestion ? (
                             <MathJaxRenderer content={`$$${mainQuestion}$$`} />
                         ) : (
-                            <span className="text-gray-500">Posez votre question principale ici...</span>
+                            <span className="text-slate-500">Posez votre question principale ici...</span>
                         )}
                     </div>
 
@@ -422,7 +422,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                         type="button"
                         onClick={() => setIsKeyboardOpen(true)}
                         disabled={!isReadyForUser || isLoading || isTutorActive}
-                        className="w-full px-5 py-3 font-semibold text-white bg-gray-600 rounded-lg shadow-md hover:bg-gray-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="w-full px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {mainQuestion ? "Modifier ma question" : "Saisir ma question"}
                     </button>
@@ -439,14 +439,14 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                         <button type="button" onClick={handleStartSocraticTutor} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
                              Démarrer le tutorat interactif
                         </button>
-                        <button type="button" onClick={handleAskForDirectAnswer} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-gray-200 bg-gray-600 rounded-lg hover:bg-gray-700 disabled:opacity-70 disabled:cursor-not-allowed">
+                        <button type="button" onClick={handleAskForDirectAnswer} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-slate-200 bg-slate-600 rounded-lg hover:bg-slate-700 disabled:opacity-70 disabled:cursor-not-allowed">
                             Voir la réponse directe
                         </button>
                     </div>
                 </div>
             </div>
             
-             <div className="min-h-[24rem] bg-gray-900/50 p-4 sm:p-6 rounded-lg border border-gray-700/50 flex flex-col justify-between">
+             <div className="min-h-[24rem] bg-slate-900/50 p-4 sm:p-6 rounded-lg border border-slate-700/50 flex flex-col justify-between">
                 <div className="flex-grow space-y-4 overflow-y-auto pr-2">
                     {dialogue.map((msg, index) => (
                         <div key={index} className={`flex flex-col animate-fade-in ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
@@ -457,7 +457,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     ))}
                      <div ref={dialogueEndRef} />
                      {isLoading || isFetchingCorrection ? (
-                        <div className="flex flex-col items-center justify-center text-gray-400 p-8">
+                        <div className="flex flex-col items-center justify-center text-slate-400 p-8">
                             <SpinnerIcon className="w-10 h-10 animate-spin text-brand-blue-500" />
                             <p className="mt-3 text-md">
                                 {isFetchingCorrection ? "Recherche d'un corrigé existant..." : "L'IA prépare votre tutorat..."}
@@ -473,19 +473,19 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                         </div>
                     )}
                     {error && (<div className="flex items-center justify-center h-full text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {error}</p></div>)}
-                    {dialogue.length === 0 && !isLoading && !isFetchingCorrection && !error && !isCheckingAnswer && (<div className="flex items-center justify-center h-full text-gray-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
+                    {dialogue.length === 0 && !isLoading && !isFetchingCorrection && !error && !isCheckingAnswer && (<div className="flex items-center justify-center h-full text-slate-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>)}
                 </div>
 
                 {isTutorActive && !isTutorFinished && !isLoading && (
-                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-gray-700 space-y-2">
+                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-slate-700 space-y-2">
                         {attachedFile && (
-                            <div className="flex items-center gap-2 p-2 bg-gray-900/50 rounded-lg text-sm">
-                                <PaperClipIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-300 truncate flex-grow">{attachedFile.name}</span>
+                            <div className="flex items-center gap-2 p-2 bg-slate-900/50 rounded-lg text-sm">
+                                <PaperClipIcon className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                                <span className="text-slate-300 truncate flex-grow">{attachedFile.name}</span>
                                 <button
                                     type="button"
                                     onClick={() => setAttachedFile(null)}
-                                    className="ml-auto text-gray-500 hover:text-white flex-shrink-0"
+                                    className="ml-auto text-slate-500 hover:text-white flex-shrink-0"
                                     aria-label="Remove attachment"
                                 >
                                     <XCircleIcon className="w-5 h-5" />
@@ -499,9 +499,9 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                                 onChange={(e) => setStudentInput(e.target.value)}
                                 placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse... (ou joignez une photo)"}
                                 disabled={isCheckingAnswer}
-                                className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
+                                className="flex-grow p-2 bg-slate-800 border-2 border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
                             />
-                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                            <div className="flex items-center gap-2 self-start sm:self-auto">
                                 <input
                                     type="file"
                                     ref={fileInputRef}
@@ -513,7 +513,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
                                     disabled={isCheckingAnswer}
-                                    className="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                                    className="p-3 bg-slate-600 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
                                     aria-label="Attach file"
                                 >
                                     <PaperClipIcon className="w-5 h-5" />
@@ -537,8 +537,8 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     </form>
                 )}
                  {(dialogue.length > 0) && !isLoading && (
-                    <div className="mt-4 pt-2 border-t border-gray-700/50 flex justify-between items-center gap-3">
-                         <button onClick={resetForNewQuestion} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-700/50 text-gray-300 hover:bg-gray-700">
+                    <div className="mt-4 pt-2 border-t border-slate-700/50 flex justify-between items-center gap-3">
+                         <button onClick={resetForNewQuestion} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-700">
                             Recommencer
                         </button>
                     </div>
@@ -546,7 +546,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                  {videoChunk && (
                     <div className="mt-6 p-4 bg-brand-blue-900/20 border-l-4 border-brand-blue-500 rounded-r-lg">
                         <h4 className="text-sm font-semibold text-brand-blue-300 mb-2">💡 Passage pertinent dans la vidéo du cours :</h4>
-                        <p className="text-sm italic text-gray-300/90 mb-3">"{videoChunk.chunk_text}"</p>
+                        <p className="text-sm italic text-slate-300/90 mb-3">"{videoChunk.chunk_text}"</p>
                         <button onClick={() => onNavigateToTimestamp(levelId, chapterId, videoChunk.video_id, videoChunk.start_time_seconds)} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-500">
                             <PlayCircleIcon className="w-5 h-5"/>Regarder ce passage
                         </button>

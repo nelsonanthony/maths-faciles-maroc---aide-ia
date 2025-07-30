@@ -1,6 +1,6 @@
 
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { HandwrittenCorrectionResponse } from "../src/types.js";
@@ -66,13 +66,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(404).json({ error: "Exercise not found." });
         }
 
+        const correctionSchema = {
+            type: Type.OBJECT,
+            properties: {
+                score: {
+                    type: Type.NUMBER,
+                    description: "A score from 0 to 100 for the student's answer."
+                },
+                lines: {
+                    type: Type.ARRAY,
+                    description: "An array of objects, one for each line of the student's answer.",
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            line: {
+                                type: Type.INTEGER,
+                                description: "The line number, starting from 1."
+                            },
+                            student_text: {
+                                type: Type.STRING,
+                                description: "The original text from the student for this line."
+                            },
+                            status: {
+                                type: Type.STRING,
+                                enum: ["correct", "error"],
+                                description: "The status of the line: 'correct' or 'error'."
+                            },
+                            explanation: {
+                                type: Type.STRING,
+                                description: "A brief explanation if the status is 'error'."
+                            }
+                        },
+                        required: ["line", "student_text", "status"]
+                    }
+                },
+                global_feedback: {
+                    type: Type.STRING,
+                    description: "A global, encouraging feedback summary for the student."
+                }
+            },
+            required: ["score", "lines", "global_feedback"]
+        };
+
         const prompt = `
             CONTEXTE : Tu es un professeur de mathématiques expert et bienveillant qui corrige la copie d'un élève marocain.
             MISSION : Analyse la réponse de l'élève ligne par ligne, compare-la à l'énoncé et à l'extrait de la correction, et fournis un feedback structuré.
-            FORMAT DE SORTIE OBLIGATOIRE : Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après. L'objet JSON doit suivre cette structure :
-            {
-              "score": number, "lines": [ { "line": number, "student_text": string, "status": "correct" | "error", "explanation"?: string } ], "global_feedback": string
-            }
+            FORMAT DE SORTIE OBLIGATOIRE : Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après. Ton JSON doit impérativement respecter le schéma fourni.
             ÉNONCÉ : ${exercise.statement}
             CORRECTION ATTENDUE : ${exercise.correctionSnippet}
             RÉPONSE DE L'ÉLÈVE (OCR) : ${ocrText}
@@ -83,7 +122,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+                responseMimeType: "application/json",
+                responseSchema: correctionSchema
+            }
         });
 
         // Log successful AI call

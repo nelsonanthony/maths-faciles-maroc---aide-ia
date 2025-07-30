@@ -1,5 +1,6 @@
 
 
+
 import React, { useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -12,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { RelatedExercises } from '@/components/RelatedExercises';
 import { ChatLauncher } from '@/components/ChatLauncher';
 import { CompletionButton } from '@/components/CompletionButton';
+import { HandwrittenCorrection } from '@/components/HandwrittenCorrection';
 
 interface PreCorrectionGuideProps {
     onConfirm: () => void;
@@ -53,7 +55,7 @@ interface ExercisePageProps {
 }
 
 export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, seriesId, levelId, onBack, onEdit, onNavigateToTimestamp, onSelectExercise, onNavigateToChat }) => {
-    const { isAdmin } = useAuth();
+    const { isAdmin, user } = useAuth();
     const aiInteractionRef = useRef<HTMLDivElement>(null);
     const officialCorrectionRef = useRef<HTMLDivElement>(null);
     const [showOfficialCorrection, setShowOfficialCorrection] = useState(false);
@@ -132,6 +134,10 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                         <PreCorrectionGuide onConfirm={() => setShowOfficialCorrection(true)} />
                     )}
                  </div>
+            )}
+            
+            {user && (
+                 <HandwrittenCorrection exerciseId={exercise.id} />
             )}
 
             <div ref={aiInteractionRef}>

@@ -64,6 +64,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(404).json({ error: "Exercice non trouvé." });
         }
 
+        // Truncate the correction context to avoid overly long prompts
+        const correctionContext = exercise.fullCorrection || exercise.correctionSnippet;
+        const truncatedCorrection = correctionContext.length > 2500 ? (correctionContext.substring(0, 2500) + "\n...") : correctionContext;
+
         const prompt = `
             CONTEXTE: Tu es un professeur de mathématiques expert et exigeant qui évalue la réponse d'un élève à un exercice.
             MISSION: Compare la "Réponse de l'élève" à l' "Énoncé de l'exercice" et à la "Correction". Détermine si la réponse de l'élève est substantiellement correcte. Une petite faute de frappe ou une formulation légèrement différente est acceptable, mais le raisonnement mathématique et le résultat final doivent être justes.
@@ -78,7 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             ${exercise.statement}
             ---
             CORRECTION (sert de référence pour la validité):
-            ${exercise.fullCorrection || exercise.correctionSnippet}
+            ${truncatedCorrection}
             ---
             RÉPONSE DE L'ÉLÈVE:
             ${studentAnswer}

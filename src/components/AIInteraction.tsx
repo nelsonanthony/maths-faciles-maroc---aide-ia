@@ -9,6 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '@/services/authService';
+import { MathKeyboard } from './MathKeyboard';
 
 // =================================================================
 // == INSTRUCTIONS SQL POUR LA BASE DE DONNÉES (SUPABASE) ==
@@ -74,6 +75,8 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const [isTutorActive, setIsTutorActive] = useState(false);
     const [isTutorFinished, setIsTutorFinished] = useState(false);
     const [isStuck, setIsStuck] = useState(false);
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
     const videoChunk = aiResponse?.videoChunk;
@@ -271,6 +274,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         setIsTutorActive(false);
         setIsTutorFinished(false);
         setIsStuck(false);
+        setIsKeyboardOpen(false);
     };
     
     const resetForNewQuestion = () => {
@@ -292,7 +296,31 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     </div>
                 )}
                  <div className="space-y-4 mt-4">
-                    <textarea value={mainQuestion} onChange={(e) => setMainQuestion(e.target.value)} placeholder="Posez votre question principale ici..." className="w-full h-24 p-4 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition disabled:opacity-50" disabled={!isReadyForUser || isLoading || isTutorActive} />
+                    <div className="p-4 bg-gray-900 border-2 border-gray-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
+                        {mainQuestion ? (
+                            <MathJaxRenderer content={`$$${mainQuestion}$$`} />
+                        ) : (
+                            <span className="text-gray-500">Posez votre question principale ici...</span>
+                        )}
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsKeyboardOpen(true)}
+                        disabled={!isReadyForUser || isLoading || isTutorActive}
+                        className="w-full px-5 py-3 font-semibold text-white bg-gray-600 rounded-lg shadow-md hover:bg-gray-500 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                        {mainQuestion ? "Modifier ma question" : "Saisir ma question"}
+                    </button>
+                    
+                    {isKeyboardOpen && (
+                        <MathKeyboard
+                            initialValue={mainQuestion}
+                            onConfirm={(latex) => { setMainQuestion(latex); setIsKeyboardOpen(false); }}
+                            onClose={() => setIsKeyboardOpen(false)}
+                        />
+                    )}
+
                     <div className="flex flex-wrap gap-2">
                         <button type="button" onClick={handleStartSocraticTutor} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">
                              Démarrer le tutorat interactif

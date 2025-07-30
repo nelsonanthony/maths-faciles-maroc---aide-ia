@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -69,7 +70,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             FORMAT DE SORTIE OBLIGATOIRE: Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après. L'objet JSON doit suivre cette structure :
             {
               "is_correct": boolean,
-              "feedback": "string (Fournis un court feedback à l'élève, expliquant pourquoi sa réponse est correcte ou ce qui ne va pas s'il y a une erreur. Sois encourageant.)"
+              "feedback": "string (RÈGLE DE FORMATAGE: Utilise LaTeX avec \\(...\\) ou $$...$$. N'utilise jamais de $ seuls. Fournis un court feedback à l'élève, expliquant pourquoi sa réponse est correcte ou ce qui ne va pas s'il y a une erreur. Sois encourageant.)"
             }
 
             ---
@@ -94,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 },
                 feedback: {
                     type: Type.STRING,
-                    description: "A short, encouraging feedback message for the student, explaining why their answer is correct or what is wrong."
+                    description: "A short, encouraging feedback message for the student, explaining why their answer is correct or what is wrong. IMPORTANT: All math expressions must be in LaTeX format using \\(...\\) for inline and $$...$$ for blocks. Never use single dollar signs."
                 }
             },
             required: ["is_correct", "feedback"],

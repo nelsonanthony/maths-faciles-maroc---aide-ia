@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -88,7 +89,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         
         // --- System instruction ---
-        const systemInstruction = "CONTEXTE: Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains. Tu dois toujours te conformer au format JSON demandé. Si la question de l'élève est hors-sujet ou inappropriée, tu DOIS le signaler en mettant 'is_on_topic' à false.";
+        const systemInstruction = "CONTEXTE: Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains. RÈGLE DE FORMATAGE STRICTE: TOUTES les expressions mathématiques DOIVENT être formatées en LaTeX. Utilise \\(...\\) pour les maths en ligne (inline) et $$...$$ pour les blocs d'équations. N'utilise JAMAIS un seul signe dollar ($). Tu dois toujours te conformer au format JSON demandé. Si la question de l'élève est hors-sujet ou inappropriée, tu DOIS le signaler en mettant 'is_on_topic' à false.";
 
         // --- Main AI Generation Logic ---
         const generateResponse = async () => {

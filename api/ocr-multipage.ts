@@ -9,6 +9,13 @@ interface ImagePayload {
     mimeType: string;
 }
 
+const cleanLatex = (text: string): string => {
+  if (!text) return '';
+  return text
+    .replace(/\\\(/g, '$').replace(/\\\)/g, '$')
+    .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -64,16 +71,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const ai = new GoogleGenAI({ apiKey });
 
-        const ocrPromptText = `Tu es un expert en reconnaissance optique de caractères (OCR) spécialisé en mathématiques. Transcris le texte manuscrit de l'image.
+        const ocrPromptText = `Tu es un système de transcription mathématique. Transforme EXACTEMENT ce qui est écrit en suivant ces règles :
 
-**RÈGLES DE FORMATAGE IMPÉRATIVES :**
-1.  **Format LaTeX OBLIGATOIRE** pour toutes les expressions mathématiques.
-    *   **Équations en bloc** (sur leur propre ligne) : utilise \`$$...$$\`. Exemple : \`$$\\frac{a}{b}$$\`
-    *   **Formules en ligne** (dans le texte) : utilise \`$...$\`. Exemple : \`Soit $x \\in \\mathbb{R}$\`
-2.  **NE JAMAIS** utiliser les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
-3.  **NE JAMAIS** ajouter de parenthèses supplémentaires autour des expressions LaTeX.
-4.  **AUCUN COMMENTAIRE** : Ne renvoie que le texte transcrit. Pas d'en-tête, pas d'introduction, rien d'autre.
-5.  Respecte les sauts de ligne du texte original.`;
+FORMATAGE IMPÉRATIF :
+1. TOUTES les expressions mathématiques doivent utiliser :
+   - $...$ pour les formules en ligne (ex: $x^2$)
+   - $$...$$ pour les équations centrées
+2. INTERDICTION d'utiliser :
+   - \\(...\\) ou \\[...\\] (MathJax)
+   - Tout autre format
+3. Structure :
+   - Conserve les sauts de ligne originaux
+   - Ne pas ajouter de commentaires
+   - Ne pas reformuler
+
+EXEMPLES :
+[Manuscrit] → [Transcription]
+f(x) = \\(x^2\\) → f(x) = $x^2$
+\\[x \\in \\mathbb{R}\\] → $$x \\in \\mathbb{R}$$
+`;
 
         // --- STEP 1: OCR on all images in parallel ---
         const ocrPromises = images.map(imagePayload => {
@@ -95,7 +111,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // --- Combine results ---
         const combinedOcrText = ocrResults.map((ocrResponse, index) => {
             const ocrText = ocrResponse.text?.trim() ?? '';
-            return `--- Photo ${index + 1} ---\n${ocrText}`;
+            const cleanedText = cleanLatex(ocrText);
+            return `--- Photo ${index + 1} ---\n${cleanedText}`;
         }).join('\n\n');
         
         if (!combinedOcrText.trim()) {

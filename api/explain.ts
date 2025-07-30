@@ -102,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             -   Dans toutes les chaînes de caractères que tu génères ('ia_question', 'positive_feedback', 'hint_for_wrong_answer', 'explanation'), toutes les expressions mathématiques DOIVENT être en LaTeX standard.
                 -   **Équations en bloc**: Utilise $$...$$. Exemple : "$$f'(x) = 2x - 4$$"
                 -   **Formules en ligne**: Utilise $...$. Exemple : "La solution est $x=2$."
-                -   **N'utilise JAMAIS** les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
+                -   **INTERDICTION D'UTILISER** les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
         `;
 
         // --- Main AI Generation Logic ---

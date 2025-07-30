@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
@@ -86,7 +87,7 @@ export const App: React.FC = () => {
                 }
             } else {
                 // If user is not logged in and on a protected page, redirect to home.
-                const protectedViews: View[] = ['dashboard', 'chat', 'courses', 'chapters', 'chapterHome', 'seriesList', 'exerciseList', 'exercise', 'quiz'];
+                const protectedViews: View[] = ['dashboard', 'chat', 'courses', 'chapters', 'chapterHome', 'seriesList', 'exerciseList', 'exercise', 'quiz', 'tutor'];
                 if (protectedViews.includes(view)) {
                     setView('home');
                 }
@@ -172,6 +173,11 @@ export const App: React.FC = () => {
     const handleNavigateToChat = (context: ExerciseContext) => {
         setSelectedExerciseContext(context);
         setView('chat');
+    };
+
+    const handleNavigateToTutor = (context: ExerciseContext) => {
+        setSelectedExerciseContext(context);
+        setView('tutor');
     };
 
     const handleNavigateToTimestamp = (levelId: string, chapterId: string, videoId: string, time: number) => {
@@ -287,6 +293,7 @@ export const App: React.FC = () => {
                         onSelectExercise={handleSelectExercise}
                         onSelectQuiz={handleSelectQuiz}
                         onNavigateToChat={handleNavigateToChat}
+                        onNavigateToTutor={handleNavigateToTutor}
                         onNavigateToTimestamp={handleNavigateToTimestamp}
                         onBackToDefault={handleBackToDefault}
                         resetSelections={resetSelections}

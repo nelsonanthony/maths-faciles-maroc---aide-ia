@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { HomePage } from '@/components/HomePage';
 import { ChapterListPage } from '@/components/ChapterListPage';
@@ -13,6 +15,7 @@ import { DashboardPage } from '@/components/DashboardPage';
 import { ForgotPasswordPage } from '@/components/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/components/ResetPasswordPage';
 import { ChatPage } from '@/components/ChatPage';
+import { TutorPage } from '@/components/TutorPage';
 import { Level, Chapter, Exercise, Series, Quiz, QuizQuestion, User, ExerciseContext, ModalState, View } from '@/types';
 
 interface MainContentProps {
@@ -35,6 +38,7 @@ interface MainContentProps {
     onSelectExercise: (exerciseId: string) => void;
     onSelectQuiz: (quizId: string) => void;
     onNavigateToChat: (context: ExerciseContext) => void;
+    onNavigateToTutor: (context: ExerciseContext) => void;
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
     onBackToDefault: () => void;
     resetSelections: (level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => void;
@@ -46,7 +50,7 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
         view, user, curriculum, passwordResetToken, selectedLevelId, selectedChapterId,
         selectedSeriesId, selectedExerciseId, selectedQuizId, selectedExerciseContext, videoNavigation,
         onNavigate, onSelectLevel, onSelectChapter, onSelectSeries, onSelectSeriesList,
-        onSelectExercise, onSelectQuiz, onNavigateToChat, onNavigateToTimestamp,
+        onSelectExercise, onSelectQuiz, onNavigateToChat, onNavigateToTutor, onNavigateToTimestamp,
         onBackToDefault, resetSelections, openModal
     } = props;
     
@@ -60,6 +64,8 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
     const handleBackToChapterHome = () => { onNavigate('chapterHome'); resetSelections('chapter'); };
     const handleBackToSeries = () => { onNavigate('seriesList'); resetSelections('series'); };
     const handleBackToExercises = () => { onNavigate('exerciseList'); resetSelections('exercise'); };
+    const handleBackToExercise = () => { onNavigate('exercise'); };
+
 
     switch (view) {
         case 'login': return <LoginPage onNavigate={onNavigate} />;
@@ -70,6 +76,9 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
             break;
         case 'dashboard':
             return <DashboardPage onNavigateToCourses={() => onNavigate('courses')} />;
+        case 'tutor':
+            if (selectedExerciseContext && exercise && chapter && level) return <TutorPage exercise={exercise} chapter={chapter} levelId={level.id} onBack={handleBackToExercise} onNavigateToTimestamp={onNavigateToTimestamp} />;
+            break;
         case 'chat':
             if (selectedExerciseContext && user) return <ChatPage exerciseContext={selectedExerciseContext} onBack={() => onNavigate('exercise')} />;
             break;
@@ -99,7 +108,7 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
             }
             break;
         case 'exercise':
-            if (exercise && series && chapter && level) return <ExercisePage exercise={exercise} chapter={chapter} seriesId={series.id} levelId={level.id} onBack={handleBackToExercises} onEdit={() => openModal({ type: 'editExercise', payload: { exercise, seriesId: series.id }})} onNavigateToTimestamp={onNavigateToTimestamp} onSelectExercise={onSelectExercise} onNavigateToChat={onNavigateToChat} />;
+            if (exercise && series && chapter && level) return <ExercisePage exercise={exercise} chapter={chapter} seriesId={series.id} levelId={level.id} onBack={handleBackToExercises} onEdit={() => openModal({ type: 'editExercise', payload: { exercise, seriesId: series.id }})} onNavigateToTimestamp={onNavigateToTimestamp} onSelectExercise={onSelectExercise} onNavigateToChat={onNavigateToChat} onNavigateToTutor={onNavigateToTutor} />;
             break;
         case 'exerciseList':
             if (series && chapter && level) return <ExerciseListPage series={series} chapterTitle={chapter.title} onSelectExercise={onSelectExercise} onBack={handleBackToSeries} onAddExercise={() => openModal({ type: 'editExercise', payload: { exercise: null, seriesId: series.id }})} onEditExercise={(exercise) => openModal({ type: 'editExercise', payload: { exercise, seriesId: series.id }})} onDeleteExercise={(exerciseId, exerciseStatement) => openModal({ type: 'delete', payload: { type: 'exercise', ids: { levelId: level.id, chapterId: chapter.id, seriesId: series.id, exerciseId }, name: exerciseStatement }})} />;

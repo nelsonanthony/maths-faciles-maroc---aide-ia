@@ -1,6 +1,8 @@
 
 
 import React, { useState, useRef } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { useAuth } from '../contexts/AuthContext';
 import * as userService from '../services/userService';
 import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon, TrashIcon, PlusCircleIcon } from './icons';
@@ -297,11 +299,10 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                         {checkResult.is_correct
                             ? <CheckCircleIcon className="w-6 h-6 text-green-400 shrink-0" />
                             : <XCircleIcon className="w-6 h-6 text-red-400 shrink-0" />}
-                        <div>
-                             <p className={`font-semibold ${checkResult.is_correct ? 'text-green-300' : 'text-red-300'}`}>
-                                {checkResult.is_correct ? "Correct !" : "Incorrect"}
-                             </p>
-                             <p className="text-sm text-gray-300 mt-1">{checkResult.feedback}</p>
+                        <div className="flex-grow">
+                             <div className="text-sm text-gray-300 mt-1 prose prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0.5">
+                                <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(checkResult.feedback) as string)} />
+                             </div>
                         </div>
                     </div>
                 </div>

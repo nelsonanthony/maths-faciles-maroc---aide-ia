@@ -2,6 +2,7 @@
 
 
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -91,7 +92,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         
         // --- System instruction ---
-        const systemInstruction = "CONTEXTE: Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains. RÈGLE DE FORMATAGE STRICTE: TOUTES les expressions mathématiques DOIVENT être formatées en LaTeX. Utilise \\(...\\) pour les maths en ligne (inline) et $$...$$ pour les blocs d'équations. N'utilise JAMAIS un seul signe dollar ($). Tu dois toujours te conformer au format JSON demandé. Si la question de l'élève est hors-sujet ou inappropriée, tu DOIS le signaler en mettant 'is_on_topic' à false.";
+        const systemInstruction = `
+            CONTEXTE: Tu es un tuteur de mathématiques expert et bienveillant. Tu t'adresses à des lycéens marocains pour qui le français est une deuxième langue. Ton langage doit être **très simple, clair et encourageant**.
+
+            MISSION:
+            1.  Si la demande est pour un tutorat socratique, crée un parcours pédagogique pas à pas. Chaque étape doit poser une question simple qui guide l'élève.
+            2.  Si la demande est pour une réponse directe, fournis une explication complète.
+            3.  Structure toutes tes longues explications avec des titres Markdown (###) et des listes à puces (*) pour une lecture facile.
+            4.  Si la question de l'élève est hors-sujet ou inappropriée, signale-le en mettant 'is_on_topic' à false.
+
+            RÈGLES DE FORMATAGE STRICTES:
+            -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé.
+            -   Toutes les expressions mathématiques DOIVENT être en LaTeX. Utilise \\(...\\) pour les formules en ligne (inline) et $$...$$ pour les blocs d'équations. N'utilise JAMAIS de $ seuls.
+        `;
 
         // --- Main AI Generation Logic ---
         const generateResponse = async () => {
@@ -102,18 +115,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 responseSchema = {
                     type: Type.OBJECT,
                     properties: {
-                        is_on_topic: { type: Type.BOOLEAN, description: "True if the student's question is about the math exercise." },
+                        is_on_topic: { type: Type.BOOLEAN, description: "True si la question de l'élève concerne l'exercice de maths." },
                         path: {
                             type: Type.ARRAY,
-                            description: "The Socratic path to guide the student.",
+                            description: "Le parcours socratique pour guider l'élève.",
                             items: {
                                 type: Type.OBJECT,
                                 properties: {
-                                    ia_question: { type: Type.STRING, description: "The guiding question you ask the student." },
-                                    student_response_prompt: { type: Type.STRING, description: "A short prompt for the student's input field." },
-                                    expected_answer_keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Keywords to check in the student's answer." },
-                                    positive_feedback: { type: Type.STRING, description: "Encouraging feedback if the answer is correct." },
-                                    hint_for_wrong_answer: { type: Type.STRING, description: "A hint if the student's answer is incorrect." },
+                                    ia_question: { type: Type.STRING, description: "La question qui guide l'élève. Doit être en français simple." },
+                                    student_response_prompt: { type: Type.STRING, description: "Un court message pour la zone de saisie de l'élève (ex: 'Ta réponse...')." },
+                                    expected_answer_keywords: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Mots-clés pour vérifier la réponse de l'élève." },
+                                    positive_feedback: { type: Type.STRING, description: "Feedback encourageant si la réponse est juste. Doit être en français simple." },
+                                    hint_for_wrong_answer: { type: Type.STRING, description: "Indice si la réponse est fausse. Doit être en français simple et ne pas donner la solution." },
                                 },
                                 required: ["ia_question", "student_response_prompt", "expected_answer_keywords", "positive_feedback", "hint_for_wrong_answer"]
                             }
@@ -125,8 +138,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  responseSchema = {
                     type: Type.OBJECT,
                     properties: {
-                         is_on_topic: { type: Type.BOOLEAN, description: "True if the student's question is about the math exercise." },
-                         explanation: { type: Type.STRING, description: "The direct, full explanation for the student's question." }
+                         is_on_topic: { type: Type.BOOLEAN, description: "True si la question de l'élève concerne l'exercice de maths." },
+                         explanation: { type: Type.STRING, description: "L'explication directe et complète. Doit être en français simple, structurée avec Markdown (###, *)." }
                     },
                     required: ["is_on_topic"]
                 };

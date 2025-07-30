@@ -1,17 +1,17 @@
 
+
+
 import React, { useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { AIInteraction } from '@/components/AIInteraction';
 import { ArrowLeftIcon, PencilIcon, BookOpenIcon, QuestionMarkCircleIcon } from '@/components/icons';
-import { Exercise, Chapter, ExerciseContext } from '@/types';
+import { Exercise, Chapter, ExerciseContext, User } from '@/types';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 import { DesmosGraph } from '@/components/DesmosGraph';
 import { useAuth } from '@/contexts/AuthContext';
 import { RelatedExercises } from '@/components/RelatedExercises';
 import { ChatLauncher } from '@/components/ChatLauncher';
 import { CompletionButton } from '@/components/CompletionButton';
-import { HandwrittenCorrection } from '@/components/HandwrittenCorrection';
 
 interface PreCorrectionGuideProps {
     onConfirm: () => void;
@@ -39,6 +39,26 @@ const PreCorrectionGuide: React.FC<PreCorrectionGuideProps> = ({ onConfirm }) =>
     </div>
 );
 
+const TutorLauncher: React.FC<{user: User | null, onClick: () => void}> = ({ user, onClick }) => (
+     <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
+        <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3 mb-4">
+            <QuestionMarkCircleIcon className="w-6 h-6" />
+            Besoin d'un coup de pouce ?
+        </h3>
+        <p className="text-gray-400 text-sm mb-4">
+            Démarrez une session de tutorat interactif avec l'IA pour obtenir de l'aide pas à pas sur cet exercice.
+        </p>
+        <button 
+            onClick={onClick}
+            disabled={!user}
+            className="w-full text-center px-4 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+           Démarrer le tutorat interactif
+        </button>
+        {!user && <p className="text-xs text-yellow-400 text-center mt-2">Vous devez être connecté pour utiliser le tuteur.</p>}
+    </div>
+);
+
 
 interface ExercisePageProps {
     exercise: Exercise;
@@ -50,26 +70,12 @@ interface ExercisePageProps {
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
     onSelectExercise: (exerciseId: string) => void;
     onNavigateToChat: (context: ExerciseContext) => void;
+    onNavigateToTutor: (context: ExerciseContext) => void;
 }
 
-export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, seriesId, levelId, onBack, onEdit, onNavigateToTimestamp, onSelectExercise, onNavigateToChat }) => {
+export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, seriesId, levelId, onBack, onEdit, onNavigateToTimestamp, onSelectExercise, onNavigateToChat, onNavigateToTutor }) => {
     const { isAdmin, user } = useAuth();
-    const aiInteractionRef = useRef<HTMLDivElement>(null);
-    const officialCorrectionRef = useRef<HTMLDivElement>(null);
     const [showOfficialCorrection, setShowOfficialCorrection] = useState(false);
-    const [aiQuestion, setAiQuestion] = useState('');
-
-    const handleShowCorrectionRequest = () => {
-        officialCorrectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-
-    const handleTextFromPhoto = (text: string) => {
-        setAiQuestion(text);
-        // Scroll to the AI component after a short delay to ensure the state has propagated
-        setTimeout(() => {
-            aiInteractionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    };
     
     return (
         <div className="max-w-4xl mx-auto space-y-8">
@@ -119,13 +125,18 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                     </div>
                 </div>
 
-
                 <CompletionButton exercise={exercise} />
             </div>
 
+            {/* AI Tutor Launcher */}
+            <TutorLauncher 
+                user={user}
+                onClick={() => onNavigateToTutor({ levelId, chapterId: chapter.id, seriesId, exerciseId: exercise.id })} 
+            />
+            
             {/* Official Correction Section */}
             {exercise.fullCorrection && (
-                 <div ref={officialCorrectionRef} className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
+                 <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/30">
                      <h3 className="text-xl font-semibold text-brand-blue-300 flex items-center gap-3 mb-4">
                         <BookOpenIcon className="w-6 h-6" />
                          Correction Officielle
@@ -143,26 +154,6 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                  </div>
             )}
             
-            {user && (
-                 <HandwrittenCorrection 
-                    exerciseId={exercise.id}
-                    onTextReady={handleTextFromPhoto}
-                 />
-            )}
-
-            <div ref={aiInteractionRef}>
-                <AIInteraction 
-                    exerciseId={exercise.id}
-                    exerciseStatement={exercise.statement}
-                    correctionSnippet={exercise.correctionSnippet}
-                    initialQuestion={aiQuestion}
-                    chapterId={chapter.id}
-                    levelId={levelId}
-                    onNavigateToTimestamp={onNavigateToTimestamp}
-                    onShowCorrectionRequest={exercise.fullCorrection ? handleShowCorrectionRequest : undefined}
-                />
-            </div>
-
             <ChatLauncher onClick={() => onNavigateToChat({ levelId, chapterId: chapter.id, seriesId, exerciseId: exercise.id })} />
 
             <RelatedExercises 

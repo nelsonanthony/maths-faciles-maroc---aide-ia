@@ -1,4 +1,5 @@
 
+
 export interface Exercise {
     id: string;
     statement: string;
@@ -167,7 +168,7 @@ export type ModalState =
   | { type: 'editQuizQuestion'; payload: { question: QuizQuestion | null; quizId: string; chapterId: string } }
   | { type: 'delete'; payload: DeletionInfo };
 
-export type View = 'home' | 'courses' | 'chapters' | 'chapterHome' | 'seriesList' | 'exerciseList' | 'exercise' | 'quiz' | 'login' | 'register' | 'dashboard' | 'forgotPassword' | 'resetPassword' | 'chat';
+export type View = 'home' | 'courses' | 'chapters' | 'chapterHome' | 'seriesList' | 'exerciseList' | 'exercise' | 'quiz' | 'login' | 'register' | 'dashboard' | 'forgotPassword' | 'resetPassword' | 'chat' | 'tutor';
 
 // Type for User Progress
 export interface UserQuizAttempt {

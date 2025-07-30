@@ -2,6 +2,7 @@
 
 
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -71,12 +72,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const truncatedCorrection = correctionContext.length > 2500 ? (correctionContext.substring(0, 2500) + "\n...") : correctionContext;
 
         const prompt = `
-            CONTEXTE: Tu es un professeur de mathématiques expert et exigeant qui évalue la réponse d'un élève à un exercice.
-            MISSION: Compare la "Réponse de l'élève" à l' "Énoncé de l'exercice" et à la "Correction". Détermine si la réponse de l'élève est substantiellement correcte. Une petite faute de frappe ou une formulation légèrement différente est acceptable, mais le raisonnement mathématique et le résultat final doivent être justes.
-            FORMAT DE SORTIE OBLIGATOIRE: Réponds UNIQUEMENT avec un objet JSON valide, sans aucun texte avant ou après. L'objet JSON doit suivre cette structure :
+            CONTEXTE: Tu es un professeur de mathématiques bienveillant. Tu t'adresses à des lycéens marocains pour qui le français est une deuxième langue.
+            MISSION: Évalue la réponse d'un élève.
+            1.  Compare la "Réponse de l'élève" à la "Correction" de référence.
+            2.  Détermine si la réponse de l'élève est correcte. Le raisonnement mathématique et le résultat final doivent être justes. Les petites fautes de frappe ou de formulation sont acceptables.
+            3.  Rédige un feedback en **français très simple et clair**.
+            4.  Structure le feedback avec des titres Markdown (###) et des listes à puces (*) pour le rendre facile à lire. Commence TOUJOURS par "### Bilan" pour dire si c'est correct ou non, puis "### Explication" pour les détails.
+
+            RÈGLES DE FORMATAGE STRICTES:
+            -   Réponds UNIQUEMENT avec un objet JSON valide.
+            -   Toutes les expressions mathématiques doivent être en LaTeX, en utilisant \\(...\\) pour les formules en ligne et $$...$$ pour les blocs. N'utilise JAMAIS de $ seuls.
+
+            FORMAT DE SORTIE JSON:
             {
               "is_correct": boolean,
-              "feedback": "string (RÈGLE DE FORMATAGE: Utilise LaTeX avec \\(...\\) ou $$...$$. N'utilise jamais de $ seuls. Fournis un court feedback à l'élève, expliquant pourquoi sa réponse est correcte ou ce qui ne va pas s'il y a une erreur. Sois encourageant.)"
+              "feedback": "string (Le feedback structuré en Markdown avec un français simple. Par exemple : '### Bilan\\nTa réponse est correcte !\\n\\n### Explication\\n* Ton calcul de \\\\(f'(x)\\\\) est parfait.\\n* Tu as bien utilisé la bonne formule.')"
             }
 
             ---
@@ -97,11 +107,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             properties: {
                 is_correct: {
                     type: Type.BOOLEAN,
-                    description: "True if the student's answer is correct, false otherwise."
+                    description: "True si la réponse de l'élève est correcte, false sinon."
                 },
                 feedback: {
                     type: Type.STRING,
-                    description: "A short, encouraging feedback message for the student, explaining why their answer is correct or what is wrong. IMPORTANT: All math expressions must be in LaTeX format using \\(...\\) for inline and $$...$$ for blocks. Never use single dollar signs."
+                    description: "Le feedback pour l'élève. DOIT être en français simple, structuré avec Markdown (###, *), et utiliser LaTeX (\\(...\\) ou $$...$$) pour les maths. Commencer par '### Bilan'."
                 }
             },
             required: ["is_correct", "feedback"],

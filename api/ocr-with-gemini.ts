@@ -1,6 +1,4 @@
 
-
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -67,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             },
         };
         const textPart = {
-            text: "Tu es un expert en reconnaissance optique de caractères (OCR). Transcris le texte manuscrit visible dans l'image fournie. Ne renvoie rien d'autre que le texte transcrit. Ne fais aucun commentaire, aucune explication, juste la transcription brute."
+            text: "Tu es un expert en reconnaissance optique de caractères (OCR). Transcris le texte mathématique manuscrit visible dans l'image fournie. Règle stricte : Toutes les formules mathématiques doivent être formatées en LaTeX. Utilise $$...$$ pour les équations en bloc (sur leur propre ligne) et \\(...\\) pour les formules en ligne (inline). Ne renvoie que le texte transcrit, sans aucun commentaire."
         };
 
         const response = await ai.models.generateContent({

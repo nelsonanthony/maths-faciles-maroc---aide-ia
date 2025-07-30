@@ -124,7 +124,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
         setCheckResult(null);
         setError(null);
 
-        const newImages: UploadedImage[] = Array.from(files).map(file => ({
+        const newImages: UploadedImage[] = Array.from(files).map((file: File) => ({
             id: `${file.name}-${file.lastModified}-${Math.random()}`,
             src: URL.createObjectURL(file),
             file,

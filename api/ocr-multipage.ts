@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -69,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         let combinedOcrText = "";
         for (const [index, imagePayload] of images.entries()) {
              const ocrImagePart = { inlineData: { data: imagePayload.image, mimeType: imagePayload.mimeType } };
-             const ocrTextPart = { text: "Tu es un expert en reconnaissance optique de caractères (OCR). Transcris le texte mathématique manuscrit visible dans l'image fournie. Ne renvoie rien d'autre que le texte transcrit. Ne fais aucun commentaire, aucune explication, juste la transcription brute." };
+             const ocrTextPart = { text: "Tu es un expert en reconnaissance optique de caractères (OCR). Transcris le texte mathématique manuscrit visible dans l'image fournie. Règle stricte : Toutes les formules mathématiques doivent être formatées en LaTeX. Utilise $$...$$ pour les équations en bloc (sur leur propre ligne) et \\(...\\) pour les formules en ligne (inline). Ne renvoie que le texte transcrit, sans aucun commentaire." };
             
              const ocrResponse = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',

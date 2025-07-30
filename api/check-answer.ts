@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -81,7 +80,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé.
-            -   Toutes les expressions mathématiques DOIVENT être en LaTeX, en utilisant \\(...\\) pour les formules en ligne et $$...$$ pour les blocs. N'utilise JAMAIS de $ seuls.
+            -   Toutes les expressions mathématiques DOIVENT être en LaTeX. Utilise $$...$$ pour les équations en bloc qui doivent apparaître sur leur propre ligne (display style). Utilise \\(...\\) pour les formules courtes intégrées dans une phrase (inline style). Par exemple : "La dérivée de \\(x^2\\) est \\(2x\\)." ou "$$ f'(x) = 2x $$".
 
             ---
             ÉNONCÉ DE L'EXERCICE:

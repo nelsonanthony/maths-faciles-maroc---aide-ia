@@ -76,44 +76,50 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         setIsLoading(true);
         setError(null);
 
-        const ocrPromises = uploadedImages.map(async (image, index) => {
-            if (image.ocrStatus === 'done') return image.ocrText || '';
+        const ocrResults: string[] = [];
+        // Use a for...of loop for sequential processing to avoid race conditions with Tesseract workers.
+        for (const [index, image] of uploadedImages.entries()) {
+            if (image.ocrStatus === 'done' && image.ocrText) {
+                ocrResults.push(image.ocrText);
+                continue; // Skip already processed images
+            }
 
             setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'processing' } : img));
             setLoadingMessage(`Analyse de la page ${index + 1}...`);
-            
+
             try {
                 const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
                 const compressedFile = await imageCompression(image.file, options);
-                
+
                 const { data: { text } } = await recognize(compressedFile, 'fra', {
                     logger: m => {
-                         if (m.status === 'recognizing text') {
+                        if (m.status === 'recognizing text') {
                             setLoadingMessage(`Analyse de la page ${index + 1} (${Math.round(m.progress * 100)}%)...`);
                         }
                     }
                 });
-                
-                setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'done', ocrText: text } : img));
-                return text;
-            } catch (err) {
-                 setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'error' } : img));
-                console.error(`OCR failed for image ${index + 1}`, err);
-                return `[Erreur d'analyse pour la page ${index + 1}]`;
-            }
-        });
 
-        try {
-            const ocrResults = await Promise.all(ocrPromises);
-            const fullText = ocrResults.map((text, index) => `--- PAGE ${index + 1} ---\n${text}`).join('\n\n');
-            setEditableOcrText(fullText);
-            setStep('review');
-        } catch (err) {
-            setError('Une erreur est survenue lors de l\'analyse des images.');
-        } finally {
-            setIsLoading(false);
-            setLoadingMessage('');
+                setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'done', ocrText: text } : img));
+                ocrResults.push(text);
+            } catch (err) {
+                setUploadedImages(prev => prev.map(img => img.id === image.id ? { ...img, ocrStatus: 'error' } : img));
+                console.error(`OCR failed for image ${index + 1}`, err);
+                const errorText = `[Erreur d'analyse pour la page ${index + 1}]`;
+                ocrResults.push(errorText);
+                setError(`L'analyse de la page ${index + 1} a échoué. Veuillez réessayer avec une meilleure image.`);
+                // Stop processing on the first error.
+                setIsLoading(false);
+                setLoadingMessage('');
+                return;
+            }
         }
+
+        // This part runs only if all images were processed successfully
+        const fullText = ocrResults.map((text, index) => `--- PAGE ${index + 1} ---\n${text}`).join('\n\n');
+        setEditableOcrText(fullText);
+        setStep('review');
+        setIsLoading(false);
+        setLoadingMessage('');
     };
     
     const handleSubmitForCorrection = async () => {

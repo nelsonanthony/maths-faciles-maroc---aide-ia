@@ -169,7 +169,11 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
 
 
     useEffect(() => {
-        dialogueEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        // Only scroll into view if there is content in the dialogue.
+        // This prevents the page from scrolling down on initial load.
+        if (dialogue.length > 0) {
+            dialogueEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
     }, [dialogue]);
 
     useEffect(() => {

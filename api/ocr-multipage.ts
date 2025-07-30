@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -70,12 +69,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 **RÈGLES DE FORMATAGE IMPÉRATIVES :**
 1.  **Format LaTeX OBLIGATOIRE** pour toutes les expressions mathématiques.
     *   **Équations en bloc** (sur leur propre ligne) : utilise \`$$...$$\`. Exemple : \`$$\\frac{a}{b}$$\`
-    *   **Formules en ligne** (dans le texte) : utilise \`\\(...\\)\`. Exemple : \`Soit \\(x \\in \\mathbb{R}\\)\`
-2.  **NE JAMAIS** ajouter de parenthèses supplémentaires autour des expressions LaTeX.
-    *   CORRECT : \`\\(x > 0\\)\`
-    *   INCORRECT : \`(\\(x > 0\\))\`
-3.  **AUCUN COMMENTAIRE** : Ne renvoie que le texte transcrit. Pas d'en-tête, pas d'introduction, rien d'autre.
-4.  Respecte les sauts de ligne du texte original.`;
+    *   **Formules en ligne** (dans le texte) : utilise \`$...$\`. Exemple : \`Soit $x \\in \\mathbb{R}$\`
+2.  **NE JAMAIS** utiliser les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
+3.  **NE JAMAIS** ajouter de parenthèses supplémentaires autour des expressions LaTeX.
+4.  **AUCUN COMMENTAIRE** : Ne renvoie que le texte transcrit. Pas d'en-tête, pas d'introduction, rien d'autre.
+5.  Respecte les sauts de ligne du texte original.`;
 
         // --- STEP 1: OCR on all images in parallel ---
         const ocrPromises = images.map(imagePayload => {

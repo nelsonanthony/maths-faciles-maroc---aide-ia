@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -31,6 +30,15 @@ const fileToBase64 = (file: File): Promise<string> =>
         };
         reader.onerror = (error) => reject(error);
     });
+
+const convertMathJaxToLatex = (text: string): string => {
+    if (!text) return '';
+    // Remplace les délimiteurs MathJax inline \(...\) par $...$
+    let converted = text.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+    // Remplace les délimiteurs MathJax display \[...\] par $$...$$
+    converted = converted.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+    return converted;
+};
 
 export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId, onBack, onNavigateToTimestamp }) => {
     const { user } = useAuth();
@@ -205,7 +213,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
             const { text } = await response.json();
             
-            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${text}`.trim();
+            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${convertMathJaxToLatex(text)}`.trim();
             
             setOcrResultText(newOcrText);
             setIsVerificationStep(true);

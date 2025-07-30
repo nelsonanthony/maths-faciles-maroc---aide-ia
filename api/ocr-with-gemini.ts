@@ -64,9 +64,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 mimeType: mimeType
             },
         };
-        const textPart = {
-            text: "Tu es un expert en reconnaissance optique de caractères (OCR). Transcris le texte mathématique manuscrit visible dans l'image fournie. Règle stricte : Toutes les formules mathématiques doivent être formatées en LaTeX. Utilise $$...$$ pour les équations en bloc (sur leur propre ligne) et \\(...\\) pour les formules en ligne (inline). Ne renvoie que le texte transcrit, sans aucun commentaire."
-        };
+        
+        const promptText = `Tu es un expert en reconnaissance optique de caractères (OCR) spécialisé en mathématiques. Transcris le texte manuscrit visible dans l'image.
+
+**RÈGLES DE FORMATAGE STRICTES :**
+1.  **Toutes** les expressions mathématiques doivent être formatées en LaTeX.
+    *   Utilise \`$$...$$\` pour les équations en bloc (display style). Exemple : \`$$\\sum_{k=1}^{n} k = \\frac{n(n+1)}{2}$$\`.
+    *   Utilise \`\\(...\\)\` pour les formules en ligne (inline style). Exemple : "La fonction \\(f(x) = x^2\\) est continue."
+2.  Ne renvoie **que** le texte transcrit, sans aucun commentaire, en-tête ou introduction. Respecte les sauts de ligne de l'image.`;
+
+        const textPart = { text: promptText };
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',

@@ -79,8 +79,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             7.  Définis 'is_globally_correct' à true seulement si toutes les parties sont 'correct'.
 
             RÈGLES DE FORMATAGE STRICTES:
-            -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé.
-            -   Toutes les expressions mathématiques DOIVENT être en LaTeX. Utilise $$...$$ pour les équations en bloc qui doivent apparaître sur leur propre ligne (display style). Utilise \\(...\\) pour les formules courtes intégrées dans une phrase (inline style). Par exemple : "La dérivée de \\(x^2\\) est \\(2x\\)." ou "$$ f'(x) = 2x $$".
+            -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.
+            -   Dans les champs 'summary' et 'explanation', toutes les expressions mathématiques DOIVENT être en LaTeX.
+                -   **Équations en bloc**: Utilise $$...$$. Exemple : "$$f'(x) = 2x - 4$$"
+                -   **Formules en ligne**: Utilise \\(...\\). Exemple : "La solution est \\(x=2\\)."
+                -   **N'utilise JAMAIS** de simples parenthèses comme \`(x=2)\` pour les mathématiques. Toujours utiliser les délimiteurs LaTeX.
 
             ---
             ÉNONCÉ DE L'EXERCICE:

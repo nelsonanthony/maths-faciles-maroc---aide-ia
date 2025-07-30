@@ -1,5 +1,6 @@
 
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -42,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const token = authHeader.split(' ')[1];
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        const { user, error: userError } = await supabase.auth.api.getUser(token);
 
         if (userError || !user) {
             return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });

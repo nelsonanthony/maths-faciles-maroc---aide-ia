@@ -66,7 +66,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
 
         try {
             const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = supabase.auth.session();
             if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
 
             const response = await fetch('/api/check-answer', {
@@ -129,7 +129,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
         
         try {
             const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = supabase.auth.session();
             if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
 
             const imagePayloads = await Promise.all(

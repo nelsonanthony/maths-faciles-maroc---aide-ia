@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef } from 'react';
 import { CameraIcon, CheckCircleIcon, XCircleIcon, SpinnerIcon, TrashIcon, PlusCircleIcon, PencilIcon } from '@/components/icons';
 import imageCompression from 'browser-image-compression';
@@ -84,7 +85,7 @@ export const HandwrittenCorrection: React.FC<HandwrittenCorrectionProps> = ({ ex
         setError(null);
 
         const supabase = getSupabase();
-        const { data: { session } } = await supabase.auth.getSession();
+        const session = supabase.auth.session();
         if (!session) {
             setError("Vous devez être connecté pour analyser des images.");
             setIsLoading(false);

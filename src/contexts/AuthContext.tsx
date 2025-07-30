@@ -1,5 +1,6 @@
 
 
+
 import React, { createContext, useState, useContext, useEffect, useMemo, useCallback } from 'react';
 import { User, AuthContextType } from '@/types';
 import * as authService from '@/services/authService';
@@ -36,7 +37,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAdminEmailForDebug(config.adminEmail);
 
                 const supabase = authService.getSupabase();
-                const { data: { session } } = await supabase.auth.getSession();
+                // v1: session() is synchronous
+                const session = supabase.auth.session();
                 if (isMounted) {
                     const userProfile = await authService.getUserFromSession(session);
                     setUser(userProfile);

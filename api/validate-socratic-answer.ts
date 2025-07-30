@@ -1,8 +1,15 @@
 
+
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
+
+interface ImageAttachment {
+    base64: string;
+    mimeType: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -37,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         const token = authHeader.split(' ')[1];
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+        const { user, error: userError } = await supabase.auth.api.getUser(token);
 
         if (userError || !user) {
             return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });
@@ -48,24 +55,49 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(429).json({ error: `Vous avez atteint votre limite de ${limit} vérifications par jour.` });
         }
         
-        const { studentAnswer, currentIaQuestion, expectedAnswerKeywords } = req.body;
-        if (!studentAnswer || !currentIaQuestion || !Array.isArray(expectedAnswerKeywords)) {
-            return res.status(400).json({ error: "Les champs 'studentAnswer', 'currentIaQuestion', et 'expectedAnswerKeywords' sont requis." });
+        const { studentAnswer, currentIaQuestion, expectedAnswerKeywords, imageAttachment } = req.body as { studentAnswer?: string, currentIaQuestion?: string, expectedAnswerKeywords?: string[], imageAttachment?: ImageAttachment };
+        if (!studentAnswer && !imageAttachment) {
+            return res.status(400).json({ error: "Les champs 'studentAnswer' ou 'imageAttachment' sont requis." });
+        }
+        if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords)) {
+            return res.status(400).json({ error: "Les champs 'currentIaQuestion' et 'expectedAnswerKeywords' sont requis." });
         }
         
-        const prompt = `
-            CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève.
-            MISSION: Détermine si la réponse de l'élève est correcte. La réponse de l'élève n'a pas besoin d'être une phrase complète, mais elle doit être conceptuellement juste. Sois flexible avec la formulation.
-            
-            QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
-            
-            CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
-            
-            RÉPONSE DE L'ÉLÈVE: "${studentAnswer}"
+        let contents: any;
 
-            FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
-            { "is_correct": boolean }
-        `;
+        if (imageAttachment) {
+            const imagePart = { inlineData: { data: imageAttachment.base64, mimeType: imageAttachment.mimeType } };
+            const textPart = { text: `
+                CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève. La réponse de l'élève peut être composée de texte et/ou d'une image de son travail manuscrit.
+                MISSION: Détermine si la réponse de l'élève est correcte. La réponse n'a pas besoin d'être une phrase complète, mais elle doit être conceptuellement juste. Sois flexible.
+                
+                QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
+                
+                CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
+                
+                RÉPONSE TEXTUELLE DE L'ÉLÈVE (peut être vide si seule une image est fournie): "${studentAnswer || '(aucun texte fourni)'}"
+                
+                IMAGE FOURNIE PAR L'ÉLÈVE: [ci-jointe]
+
+                FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
+                { "is_correct": boolean }
+            `};
+            contents = { parts: [textPart, imagePart] };
+        } else {
+            contents = `
+                CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève.
+                MISSION: Détermine si la réponse de l'élève est correcte. La réponse de l'élève n'a pas besoin d'être une phrase complète, mais elle doit être conceptuellement juste. Sois flexible avec la formulation.
+                
+                QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
+                
+                CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
+                
+                RÉPONSE DE L'ÉLÈVE: "${studentAnswer}"
+
+                FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
+                { "is_correct": boolean }
+            `;
+        }
         
         const answerSchema = {
             type: Type.OBJECT,
@@ -81,7 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
+            contents,
             config: { 
                 responseMimeType: "application/json",
                 responseSchema: answerSchema

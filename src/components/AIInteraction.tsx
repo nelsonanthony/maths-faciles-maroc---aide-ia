@@ -1,10 +1,12 @@
 
 
+
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import imageCompression from 'browser-image-compression';
 import { useAIExplain } from '@/hooks/useAIExplain';
-import { SpinnerIcon, PlayCircleIcon } from '@/components/icons';
+import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, XCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
@@ -58,6 +60,17 @@ interface AIInteractionProps {
     onShowCorrectionRequest?: () => void;
 }
 
+const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const base64String = (reader.result as string).split(',')[1];
+            resolve(base64String);
+        };
+        reader.onerror = (error) => reject(error);
+    });
+
 export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerciseStatement, correctionSnippet, initialQuestion, chapterId, levelId, onNavigateToTimestamp, onShowCorrectionRequest }) => {
     const { user } = useAuth();
     const [mainQuestion, setMainQuestion] = useState(initialQuestion || '');
@@ -78,9 +91,11 @@ export const AIInteraction: React.FC<AIInteractionProps> = ({ exerciseId, exerci
     const [isStuck, setIsStuck] = useState(false);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [isCheckingAnswer, setIsCheckingAnswer] = useState(false);
+    const [attachedFile, setAttachedFile] = useState<File | null>(null);
 
 
     const dialogueEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const videoChunk = aiResponse?.videoChunk;
 
     // Sync internal state with the `initialQuestion` prop from parent
@@ -232,20 +247,47 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
 
     const handleStudentResponse = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!studentInput.trim() || !socraticPath || isTutorFinished || isCheckingAnswer) return;
+        if ((!studentInput.trim() && !attachedFile) || !socraticPath || isTutorFinished || isCheckingAnswer) return;
         
         const currentStudentInput = studentInput;
+        const currentAttachedFile = attachedFile;
         setIsStuck(false);
-        setDialogue(prev => [...prev, { role: 'user', content: currentStudentInput }]);
+
+        let userMessageContent = currentStudentInput;
+        if (currentAttachedFile) {
+            userMessageContent += `\n\n*Image jointe : ${currentAttachedFile.name}*`;
+        }
+
+        setDialogue(prev => [...prev, { role: 'user', content: userMessageContent }]);
         setStudentInput('');
+        setAttachedFile(null);
         setIsCheckingAnswer(true);
 
         try {
             const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
+            const session = supabase.auth.session();
             if (!session) throw new Error("Vous devez être connecté pour valider votre réponse.");
 
             const currentSocraticStep = socraticPath[currentStep];
+
+            let requestBody: any = {
+                studentAnswer: currentStudentInput,
+                currentIaQuestion: currentSocraticStep.ia_question,
+                expectedAnswerKeywords: currentSocraticStep.expected_answer_keywords
+            };
+
+            if (currentAttachedFile) {
+                const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+                const compressedFile = await imageCompression(currentAttachedFile, options);
+                const base64Image = await fileToBase64(compressedFile);
+                requestBody = {
+                    ...requestBody,
+                    imageAttachment: {
+                        base64: base64Image,
+                        mimeType: compressedFile.type,
+                    },
+                };
+            }
 
             const response = await fetch('/api/validate-socratic-answer', {
                 method: 'POST',
@@ -253,11 +295,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`
                 },
-                body: JSON.stringify({
-                    studentAnswer: currentStudentInput,
-                    currentIaQuestion: currentSocraticStep.ia_question,
-                    expectedAnswerKeywords: currentSocraticStep.expected_answer_keywords
-                })
+                body: JSON.stringify(requestBody)
             });
             
             const responseBody = await response.text();
@@ -350,6 +388,7 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
         setIsTutorFinished(false);
         setIsStuck(false);
         setIsKeyboardOpen(false);
+        setAttachedFile(null);
     };
     
     const resetForNewQuestion = () => {
@@ -438,20 +477,54 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                 </div>
 
                 {isTutorActive && !isTutorFinished && !isLoading && (
-                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-gray-700 flex flex-col sm:flex-row gap-2">
-                        <input 
-                            type="text"
-                            value={studentInput}
-                            onChange={(e) => setStudentInput(e.target.value)}
-                            placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                            disabled={isCheckingAnswer}
-                            className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
-                        />
-                        <div className="flex gap-2 self-end sm:self-auto">
-                            <button type="submit" disabled={!studentInput.trim() || isCheckingAnswer} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
-                                Envoyer
-                            </button>
-                            {isStuck && (
+                    <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-gray-700 space-y-2">
+                        {attachedFile && (
+                            <div className="flex items-center gap-2 p-2 bg-gray-900/50 rounded-lg text-sm">
+                                <PaperClipIcon className="w-5 h-5 text-gray-400 flex-shrink-0" />
+                                <span className="text-gray-300 truncate flex-grow">{attachedFile.name}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => setAttachedFile(null)}
+                                    className="ml-auto text-gray-500 hover:text-white flex-shrink-0"
+                                    aria-label="Remove attachment"
+                                >
+                                    <XCircleIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        )}
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <input 
+                                type="text"
+                                value={studentInput}
+                                onChange={(e) => setStudentInput(e.target.value)}
+                                placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse... (ou joignez une photo)"}
+                                disabled={isCheckingAnswer}
+                                className="flex-grow p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
+                            />
+                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    onChange={(e) => setAttachedFile(e.target.files ? e.target.files[0] : null)}
+                                    className="hidden"
+                                    accept="image/*"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isCheckingAnswer}
+                                    className="p-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+                                    aria-label="Attach file"
+                                >
+                                    <PaperClipIcon className="w-5 h-5" />
+                                </button>
+                                <button type="submit" disabled={(!studentInput.trim() && !attachedFile) || isCheckingAnswer} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                                    Envoyer
+                                </button>
+                            </div>
+                        </div>
+                        {isStuck && (
+                             <div className="flex justify-end pt-2">
                                 <button 
                                     type="button" 
                                     onClick={handleImStuck}
@@ -459,8 +532,8 @@ Tes explications doivent être claires, pédagogiques et en français. Utilise l
                                 >
                                     Je suis bloqué
                                 </button>
-                            )}
-                        </div>
+                            </div>
+                        )}
                     </form>
                 )}
                  {(dialogue.length > 0) && !isLoading && (

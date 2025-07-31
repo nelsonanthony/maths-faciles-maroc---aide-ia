@@ -1,6 +1,5 @@
 
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useAuth } from '../contexts/AuthContext';
@@ -64,8 +63,15 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
     const [isChecking, setIsChecking] = useState(false);
     const [checkResult, setCheckResult] = useState<CheckAnswerResponse | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [isRateLimited, setIsRateLimited] = useState(false);
 
     const [isCompleting, setIsCompleting] = useState(false);
+
+    useEffect(() => {
+        if (error && (error.includes("limite") || error.includes("limit") || error.includes("429"))) {
+            setIsRateLimited(true);
+        }
+    }, [error]);
 
     if (!user || user.is_admin) return null;
 
@@ -234,6 +240,12 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 </div>
             </div>
             
+            {isRateLimited && (
+                 <div className="my-4 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
+                    {error || "Vous avez atteint la limite quotidienne pour cette action. Réessayez demain."}
+                </div>
+            )}
+
             {inputMode === 'text' && (
                 <div className="space-y-4">
                     {studentAnswer && !isKeyboardOpen && (
@@ -244,6 +256,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                     <button
                         onClick={() => setIsKeyboardOpen(true)}
                         className="w-full px-5 py-3 font-semibold text-white bg-gray-600 rounded-lg shadow-md hover:bg-gray-500 transition-colors"
+                        disabled={isRateLimited}
                     >
                         {studentAnswer ? "Modifier ma réponse" : "Saisir ma réponse"}
                     </button>
@@ -258,7 +271,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
 
                     <button
                         onClick={() => handleCheckAnswer(studentAnswer)}
-                        disabled={isChecking || !studentAnswer.trim()}
+                        disabled={isChecking || !studentAnswer.trim() || isRateLimited}
                         className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {isChecking && <SpinnerIcon className="w-5 h-5 animate-spin" />}
@@ -281,7 +294,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                         <div className="flex flex-col sm:flex-row gap-4">
                             <button
                                 onClick={() => handleCheckAnswer(ocrText)}
-                                disabled={isChecking || !ocrText.trim()}
+                                disabled={isChecking || !ocrText.trim() || isRateLimited}
                                 className="flex-1 flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70"
                             >
                                 {isChecking && <SpinnerIcon className="w-5 h-5 animate-spin" />}
@@ -313,7 +326,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                                         </button>
                                     </div>
                                 ))}
-                                <button onClick={() => fileInputRef.current?.click()} disabled={isOcrLoading} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
+                                <button onClick={() => fileInputRef.current?.click()} disabled={isOcrLoading || isRateLimited} className="flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-600 rounded-lg hover:bg-gray-900/50 hover:border-brand-blue-500 transition-colors disabled:opacity-50">
                                     <PlusCircleIcon className="w-8 h-8"/>
                                     <span className="text-sm mt-1">Ajouter</span>
                                 </button>
@@ -322,7 +335,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
 
                         <button
                             onClick={uploadedImages.length === 0 ? () => fileInputRef.current?.click() : handleExtractTextFromImages}
-                            disabled={isOcrLoading}
+                            disabled={isOcrLoading || isRateLimited}
                             className="w-full flex items-center justify-center gap-3 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-70"
                         >
                             {isOcrLoading ? (
@@ -336,7 +349,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                 )
              )}
 
-            {error && <p className="mt-4 text-sm text-red-400 text-center">{error}</p>}
+            {error && !isRateLimited && <p className="mt-4 text-sm text-red-400 text-center">{error}</p>}
 
             {checkResult && (
                  <div className={`mt-4 p-4 rounded-lg border ${checkResult.is_globally_correct ? 'border-green-500/30' : 'border-red-500/30'} bg-slate-800/20`}>

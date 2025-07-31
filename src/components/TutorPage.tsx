@@ -4,13 +4,12 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import imageCompression from 'browser-image-compression';
 import { useAIExplain } from '@/hooks/useAIExplain';
-import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, PencilIcon } from '@/components/icons';
+import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, PencilIcon, XCircleIcon, CheckCircleIcon, CameraIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '@/services/authService';
 import { MathKeyboard } from './MathKeyboard';
-
 
 interface TutorPageProps {
     exercise: Exercise;
@@ -31,14 +30,35 @@ const fileToBase64 = (file: File): Promise<string> =>
         reader.onerror = (error) => reject(error);
     });
 
+const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | null; onNavigate: () => void; }> = ({ message, response, onNavigate }) => {
+    const safeContent = DOMPurify.sanitize(marked.parse(message.content, { breaks: true }) as string);
+    const videoChunk = response?.videoChunk;
+    return (
+        <div className="chat-bubble ai-bubble self-start animate-fade-in">
+            <div className="prose prose-invert max-w-none text-sm">
+                <MathJaxRenderer content={safeContent} />
+            </div>
+            {videoChunk && (
+                <button
+                    onClick={onNavigate}
+                    className="mt-3 p-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-lg w-full text-left"
+                >
+                    <div className="flex items-center gap-3">
+                        <PlayCircleIcon className="w-8 h-8 text-rose-400 flex-shrink-0" />
+                        <div>
+                            <p className="font-semibold text-rose-300 text-xs">Vidéo pertinente trouvée</p>
+                            <p className="text-slate-300 text-xs line-clamp-2">"{videoChunk.chunk_text}"</p>
+                        </div>
+                    </div>
+                </button>
+            )}
+        </div>
+    );
+};
+
 export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId, onBack, onNavigateToTimestamp }) => {
     const { user } = useAuth();
-    const [mainQuestion, setMainQuestion] = useState('');
-    const { data: aiResponse, isLoading, error: aiError, explain, reset } = useAIExplain();
-    const [isAIFeatureEnabled, setIsAIFeatureEnabled] = useState(true);
-
-    const [fullCorrection, setFullCorrection] = useState<string | null>(null);
-    const [isFetchingCorrection, setIsFetchingCorrection] = useState(true);
+    const { data: aiResponse, isLoading: isAIExplainLoading, error: aiError, explain, reset: resetAIExplain } = useAIExplain();
     
     const [dialogue, setDialogue] = useState<DialogueMessage[]>([]);
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
@@ -46,409 +66,280 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [studentInput, setStudentInput] = useState('');
     const [isTutorActive, setIsTutorActive] = useState(false);
     const [isTutorFinished, setIsTutorFinished] = useState(false);
-    const [isStuck, setIsStuck] = useState(false);
+
+    const [isVerifying, setIsVerifying] = useState(false);
+    const [verificationResult, setVerificationResult] = useState<'correct' | 'incorrect' | null>(null);
+
+    const [error, setError] = useState<string | null>(null);
+    const [isRateLimited, setIsRateLimited] = useState(false);
+
+    const [inputMode, setInputMode] = useState<'text' | 'photo'>('text');
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isOcrLoading, setIsOcrLoading] = useState(false);
-    const [submissionError, setSubmissionError] = useState<string|null>(null);
-
-    // New states for OCR verification step
-    const [ocrResultText, setOcrResultText] = useState<string>('');
-    const [isVerificationStep, setIsVerificationStep] = useState(false);
-
-
-    const dialogueEndRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const videoChunk = aiResponse?.videoChunk;
-    
-    // --- Logic Functions (hoisted) ---
-    const resetState = useCallback(() => {
-        reset();
-        setDialogue([]);
-        setSocraticPath(null);
-        setCurrentStep(0);
-        setStudentInput('');
-        setIsTutorActive(false);
-        setIsTutorFinished(false);
-        setIsStuck(false);
-        setIsKeyboardOpen(false);
-        setSubmissionError(null);
-        setOcrResultText('');
-        setIsVerificationStep(false);
-    }, [reset]);
+    const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+    const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
+    const [isOcrLoading, setIsLoadingOcr] = useState(false);
 
-    const buildBasePrompt = useCallback((studentQuestion: string) => {
-        const systemPromptHeader = `CONTEXTE : Tu es un tuteur de mathématiques expert et bienveillant pour des lycéens marocains...`;
-        const contextPrompt = fullCorrection ? `...BASE IMPÉRATIVEMENT TON EXPLICATION SUR CETTE CORRECTION...\n${fullCorrection}` : `...Tu dois donc raisonner par toi-même...\n${exercise.correctionSnippet}`;
-        return `${systemPromptHeader}\n---CONTEXTE EXERCICE---\n${exercise.statement}\n${contextPrompt}\n---QUESTION ÉLÈVE---\n${studentQuestion}`;
-    }, [fullCorrection, exercise.statement, exercise.correctionSnippet]);
-
-    const startSocraticTutor = useCallback((question: string) => {
-        if (!question.trim() || isLoading || !user) return;
-        resetState();
-        const basePrompt = buildBasePrompt(question);
-        const socraticMission = question.includes('--- Photo ') ? "Évalue l'ensemble de son travail (transcrit depuis des photos) et crée un parcours de tutorat socratique pour le guider." : "Crée un parcours de tutorat socratique pour guider l'élève à travers cette question.";
-        explain(`${basePrompt}\n\nMISSION: ${socraticMission}`, chapter.id, 'socratic');
-    }, [isLoading, user, resetState, buildBasePrompt, explain, chapter.id]);
-
-    const askForDirectAnswer = useCallback((question: string) => {
-        if (!question.trim() || isLoading || !user) return;
-        resetState();
-        const basePrompt = buildBasePrompt(question);
-        const directMission = question.includes('--- Photo ') ? "Évalue l'ensemble de son travail (transcrit depuis des photos) et réponds directement à sa demande d'aide." : "Réponds directement à la question de l'élève.";
-        explain(`${basePrompt}\n\nMISSION: ${directMission}`, chapter.id, 'direct');
-    }, [isLoading, user, resetState, buildBasePrompt, explain, chapter.id]);
-
-    const resetForNewQuestion = useCallback(() => {
-        resetState();
-        setMainQuestion('');
-    }, [resetState]);
-
-    const logGeneratedCorrection = useCallback(async (response: AIResponse) => {
-        if (fullCorrection === null && response) {
-            const supabase = getSupabase();
-            try {
-                await supabase.from('corrections_proposees').insert({ exercise_id: exercise.id, proposed_correction: response.socraticPath || { explanation: response.explanation } });
-            } catch (err) {
-                if (!(err instanceof Error && (err as any).code === '23505')) {
-                    console.error("Exception dans logGeneratedCorrection:", err);
-                }
-            }
-        }
-    }, [fullCorrection, exercise.id]);
-    
-    // --- Effects ---
-    useEffect(() => {
-        const fetchCorrection = async () => {
-            if (!exercise.id) return;
-            setIsFetchingCorrection(true);
-            setFullCorrection(null);
-            const supabase = getSupabase();
-            try {
-                const { data, error } = await supabase.from('corrections').select('correction').eq('exercise_id', exercise.id).limit(1);
-                if (error) console.error("Erreur lors de la recherche du corrigé:", error);
-                if (data && data.length > 0) setFullCorrection(data[0].correction);
-                else setFullCorrection(exercise.fullCorrection || null);
-            } catch (err) {
-                console.error("Exception dans fetchCorrection:", err);
-            } finally {
-                setIsFetchingCorrection(false);
-            }
-        };
-        fetchCorrection();
-    }, [exercise.id, exercise.fullCorrection]);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (aiResponse) {
-            if (aiResponse.socraticPath) {
-                setSocraticPath(aiResponse.socraticPath);
-                setDialogue([{ role: 'ai', content: aiResponse.socraticPath[0].ia_question }]);
-                setCurrentStep(0);
-                setIsTutorActive(true);
-                setIsTutorFinished(false);
-            }
-            if (aiResponse.explanation) {
-                 setDialogue([{ role: 'ai', content: aiResponse.explanation }]);
-                 setIsTutorActive(false);
-            }
-            logGeneratedCorrection(aiResponse);
-        }
-    }, [aiResponse, logGeneratedCorrection]);
-
-    useEffect(() => {
-        if (dialogue.length > 0) {
-            dialogueEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [dialogue]);
 
     useEffect(() => {
-        if (aiError && (aiError.includes("configurée") || aiError.includes("valide"))) {
-            setIsAIFeatureEnabled(false);
-        }
-    }, [aiError]);
-
-    // --- Event Handlers ---
-    const handleFileSelectAndOcr = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = event.target.files;
-        if (!files || files.length === 0) return;
-        
-        setIsOcrLoading(true);
-        setSubmissionError(null);
-    
-        try {
-            const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Vous devez être connecté pour analyser des images.");
-    
-            const imagePayloads = await Promise.all(
-                Array.from(files).map(async (file) => {
-                    const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-                    const compressedFile = await imageCompression(file, options);
-                    const base64Image = await fileToBase64(compressedFile);
-                    return { image: base64Image, mimeType: compressedFile.type };
-                })
-            );
-            
-            const response = await fetch('/api/ocr-multipage', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`
-                },
-                body: JSON.stringify({ images: imagePayloads }),
-            });
-    
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `L'analyse des photos a échoué.`);
+        const combinedError = aiError || error;
+        if (combinedError) {
+             setError(combinedError);
+             if (combinedError.includes("limite") || combinedError.includes("limit") || combinedError.includes("429")) {
+                setIsRateLimited(true);
             }
-            const { text } = await response.json();
-            
-            const newOcrText = `${mainQuestion ? mainQuestion + '\n\n' : ''}${text}`.trim();
-            
-            setOcrResultText(newOcrText);
-            setIsVerificationStep(true);
-    
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
-            setSubmissionError(errorMessage);
-        } finally {
-            setIsOcrLoading(false);
-            if (event.target) event.target.value = ''; // Reset file input
         }
-    };
-    
-    const handleConfirmOcr = () => {
-        if (!ocrResultText.trim()) {
-            setSubmissionError("Le texte ne peut pas être vide.");
-            return;
+    }, [aiError, error]);
+
+    useEffect(() => {
+        if (aiResponse?.socraticPath) {
+            setSocraticPath(aiResponse.socraticPath);
+            setIsTutorActive(true);
+            setDialogue([{ role: 'system', content: 'Le tuteur a été initialisé. Répondez à la première question.' }]);
+            setCurrentStep(0);
         }
-        setMainQuestion(ocrResultText);
-        startSocraticTutor(ocrResultText);
-        setIsVerificationStep(false);
+        if (aiResponse?.explanation) {
+            addMessageToDialogue('ai', aiResponse.explanation);
+        }
+    }, [aiResponse]);
+
+    useEffect(() => {
+        if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
+            const currentQuestion = socraticPath[currentStep].ia_question;
+            addMessageToDialogue('ai', currentQuestion);
+        } else if (isTutorActive && socraticPath && currentStep === socraticPath.length) {
+            addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
+            setIsTutorFinished(true);
+        }
+    }, [currentStep, socraticPath, isTutorActive]);
+
+    const addMessageToDialogue = (role: DialogueMessage['role'], content: string) => {
+        setDialogue(prev => [...prev, { role, content }]);
     };
 
-    const handleCancelOcr = () => {
-        setOcrResultText('');
-        setIsVerificationStep(false);
+    const handleStartTutor = () => {
+        resetAIExplain();
+        setError(null);
+        setDialogue([]);
+        const prompt = `---CONTEXTE EXERCICE---
+        ${exercise.statement}
+        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
+        ${exercise.correctionSnippet}` : ''}
+        
+        ---DEMANDE ÉLÈVE---
+        J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique).`;
+        explain(prompt, chapter.id, 'socratic');
     };
 
+    const handleGetDirectHelp = () => {
+        const lastAiMessage = dialogue.filter(d => d.role === 'ai').pop();
+        const prompt = `---CONTEXTE EXERCICE---
+        ${exercise.statement}
+        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
+        ${exercise.correctionSnippet}` : ''}
 
-    const handleStudentResponse = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!studentInput.trim() || !socraticPath || isTutorFinished || isSubmitting) return;
+        ---HISTORIQUE DISCUSSION---
+        ${dialogue.map(d => `${d.role}: ${d.content}`).join('\n')}
+        
+        ---DEMANDE ÉLÈVE---
+        Je suis bloqué. Donne-moi une explication directe pour l'étape actuelle : "${lastAiMessage?.content || "l'exercice"}"`;
+        explain(prompt, chapter.id, 'direct');
+    };
 
-        setIsStuck(false);
-        setDialogue(prev => [...prev, { role: 'user', content: studentInput }]);
-        const currentInput = studentInput;
+    const handleSubmitAnswer = async (answer: string) => {
+        if (!socraticPath || isVerifying) return;
+        addMessageToDialogue('user', answer);
         setStudentInput('');
-        setIsSubmitting(true);
-        setSubmissionError(null);
+        setIsVerifying(true);
+        setVerificationResult(null);
+        setError(null);
 
         try {
             const supabase = getSupabase();
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Vous devez être connecté pour valider votre réponse.");
-
-            const requestBody = {
-                studentAnswer: currentInput,
-                currentIaQuestion: socraticPath[currentStep].ia_question,
-                expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
-            };
+            if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
 
             const response = await fetch('/api/validate-socratic-answer', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                body: JSON.stringify(requestBody)
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                body: JSON.stringify({
+                    studentAnswer: answer,
+                    currentIaQuestion: socraticPath[currentStep].ia_question,
+                    expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
+                })
             });
-            
+            const bodyText = await response.text();
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Erreur du serveur (${response.status})`);
+                const errData = JSON.parse(bodyText);
+                throw new Error(errData.error);
             }
 
-            const { is_correct } = await response.json();
-            
-            const newDialogue: DialogueMessage[] = [];
-            if (is_correct) {
-                newDialogue.push({ role: 'ai', content: socraticPath[currentStep].positive_feedback });
-                const nextStep = currentStep + 1;
-                if (nextStep < socraticPath.length) {
-                    newDialogue.push({ role: 'ai', content: socraticPath[nextStep].ia_question });
-                    setCurrentStep(nextStep);
-                } else {
-                    newDialogue.push({ role: 'system', content: 'Félicitations, vous avez terminé ce parcours !' });
-                    setIsTutorFinished(true);
-                }
+            const data = JSON.parse(bodyText);
+            if (data.is_correct) {
+                setVerificationResult('correct');
+                addMessageToDialogue('ai', socraticPath[currentStep].positive_feedback);
+                setTimeout(() => {
+                    setCurrentStep(prev => prev + 1);
+                    setVerificationResult(null);
+                }, 2000);
             } else {
-                newDialogue.push({ role: 'ai', content: socraticPath[currentStep].hint_for_wrong_answer });
-                setIsStuck(true);
+                setVerificationResult('incorrect');
+                addMessageToDialogue('ai', socraticPath[currentStep].hint_for_wrong_answer);
             }
-            setDialogue(prev => [...prev, ...newDialogue]);
-
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : "Une erreur inconnue est survenue.";
-            setSubmissionError(errorMessage);
+        } catch (e: any) {
+            setError(e.message);
         } finally {
-            setIsSubmitting(false);
+            setIsVerifying(false);
         }
     };
     
-    const handleImStuck = () => {
-        if (!socraticPath || isTutorFinished) return;
-        const currentSocraticStep = socraticPath[currentStep];
-        const expected = currentSocraticStep.expected_answer_keywords.join('" ou "');
-        const newDialogue: DialogueMessage[] = [{ role: 'system', content: `Voici la réponse attendue : **"${expected}"**. Continuons.` }];
-        setIsStuck(false);
-        const nextStep = currentStep + 1;
-        if (nextStep < socraticPath.length) {
-            newDialogue.push({ role: 'ai', content: socraticPath[nextStep].ia_question });
-            setCurrentStep(nextStep);
-        } else {
-            newDialogue.push({ role: 'system', content: 'Félicitations, vous avez terminé ce parcours !' });
-            setIsTutorFinished(true);
+    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setUploadedFile(file);
+            setUploadedFileSrc(URL.createObjectURL(file));
+            setError(null);
         }
-        setDialogue(prev => [...prev, ...newDialogue]);
     };
 
-    const isReadyForUser = !!user && isAIFeatureEnabled && !isFetchingCorrection;
-    const isProcessing = isLoading || isFetchingCorrection || isSubmitting || isOcrLoading;
+    const handleOcrAndSubmit = async () => {
+        if (!uploadedFile) return;
+        setIsLoadingOcr(true);
+        setError(null);
+        try {
+            const supabase = getSupabase();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Auth required");
+
+            const compressedFile = await imageCompression(uploadedFile, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+            const base64Image = await fileToBase64(compressedFile);
+            const response = await fetch('/api/ocr-with-gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type }),
+            });
+            const bodyText = await response.text();
+            if (!response.ok) {
+                const errData = JSON.parse(bodyText);
+                throw new Error(errData.error);
+            }
+
+            const data = JSON.parse(bodyText);
+            await handleSubmitAnswer(data.text);
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setIsLoadingOcr(false);
+            setUploadedFile(null);
+            setUploadedFileSrc(null);
+        }
+    };
+
+    const isLoadingAction = isAIExplainLoading || isVerifying || isOcrLoading;
+    const isDisabled = isLoadingAction || isTutorFinished || isRateLimited;
 
     return (
-        <div className="max-w-4xl mx-auto space-y-8">
-            <button onClick={onBack} className="flex items-center gap-2 text-brand-blue-400 hover:text-brand-blue-300 transition-colors">
-                <ArrowLeftIcon className="w-5 h-5" />
-                Retour à l'exercice
-            </button>
-            <div className="bg-slate-800/30 rounded-xl p-6 border border-gray-700/30">
-                <h2 className="text-2xl font-bold text-brand-blue-300 mb-2">Tutorat IA : {chapter.title}</h2>
-                 <div className="prose prose-invert max-w-none text-sm text-slate-400 line-clamp-3">
-                    <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement) as string)} />
+        <div className="max-w-4xl mx-auto flex flex-col h-[90vh]">
+            <header className="p-4 flex items-center gap-4 flex-shrink-0">
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700">
+                    <ArrowLeftIcon className="w-5 h-5" />
+                </button>
+                <div className="flex-grow">
+                    <h2 className="text-xl font-bold text-brand-blue-300">Tuteur IA</h2>
+                    <p className="text-xs text-slate-400 truncate">{exercise.statement}</p>
                 </div>
-            </div>
-            <div className="bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700/50 shadow-lg p-6 space-y-6">
-                <div>
-                    {!user && <div className="p-4 bg-yellow-900/30 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm">Vous devez être connecté pour utiliser l'IA.</div>}
-                    
-                    {isVerificationStep ? (
-                        <div className="space-y-4 animate-fade-in">
-                            <h3 className="text-xl font-semibold text-yellow-300">Vérifiez la transcription</h3>
-                            <p className="text-sm text-slate-400">L'IA a transcrit le texte de vos photos. Veuillez le vérifier et le corriger si nécessaire avant de continuer.</p>
-                            <textarea
-                                value={ocrResultText}
-                                onChange={(e) => setOcrResultText(e.target.value)}
-                                rows={10}
-                                className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
-                            />
-                            {submissionError && <p className="text-sm text-red-400">{submissionError}</p>}
-                            <div className="flex gap-4">
-                                <button
-                                    onClick={handleConfirmOcr}
-                                    className="flex-1 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700"
-                                >
-                                    Confirmer et démarrer le tutorat
-                                </button>
-                                <button
-                                    onClick={handleCancelOcr}
-                                    className="px-5 py-3 font-semibold text-slate-300 bg-slate-700 rounded-lg shadow-md hover:bg-slate-600"
-                                >
-                                    Annuler
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-4 mt-4">
-                            <div className="p-4 bg-slate-800 border-2 border-slate-700 rounded-lg min-h-[6rem] flex flex-col justify-center">
-                                {mainQuestion ? <MathJaxRenderer content={`$$${mainQuestion}$$`} /> : <span className="text-slate-500">Posez votre question ou joignez une photo de votre travail ici...</span>}
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <button type="button" onClick={() => setIsKeyboardOpen(true)} disabled={!isReadyForUser || isLoading || isTutorActive} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                                    <PencilIcon className="w-5 h-5" />
-                                    {mainQuestion ? "Modifier ma question" : "Saisir ma question"}
-                                </button>
-                                <input type="file" ref={fileInputRef} onChange={handleFileSelectAndOcr} className="hidden" accept="image/*" multiple />
-                                <button type="button" onClick={() => fileInputRef.current?.click()} disabled={!isReadyForUser || isProcessing || isTutorActive} className="w-full flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 transition-colors disabled:opacity-70 disabled:cursor-not-allowed">
-                                    {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : <PaperClipIcon className="w-5 h-5" />}
-                                    Joindre une photo
-                                </button>
-                            </div>
-
-                            {isKeyboardOpen && <MathKeyboard initialValue={mainQuestion} onConfirm={(latex) => { setMainQuestion(latex); setIsKeyboardOpen(false); }} onClose={() => setIsKeyboardOpen(false)} />}
-                            
-                            <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => startSocraticTutor(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70 disabled:cursor-not-allowed">Démarrer le tutorat interactif</button>
-                                <button type="button" onClick={() => askForDirectAnswer(mainQuestion)} disabled={!isReadyForUser || isLoading || !mainQuestion.trim() || isTutorActive} className="inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold text-slate-200 bg-slate-600 rounded-lg hover:bg-slate-700 disabled:opacity-70 disabled:cursor-not-allowed">Voir la réponse directe</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
+            </header>
+            
+            <main className="flex-grow p-4 overflow-y-auto space-y-4 bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800">
+                 {dialogue.map((msg, index) => (
+                    msg.role === 'ai'
+                        ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
+                        : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
+                            <MathJaxRenderer content={msg.content} />
+                          </div>
+                ))}
+                {isLoadingAction && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
                 
-                <div className="min-h-[24rem] bg-slate-900/50 p-4 sm:p-6 rounded-lg border border-slate-700/50 flex flex-col justify-between">
-                    <div className="flex-grow space-y-4 overflow-y-auto pr-2">
-                        {dialogue.map((msg, index) => (
-                            <div key={index} className={`flex flex-col animate-fade-in ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : msg.role === 'ai' ? 'ai-bubble' : 'system-bubble'}`}>
-                                    <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content) as string)} />
-                                </div>
-                            </div>
-                        ))}
-                        <div ref={dialogueEndRef} />
-                        {isProcessing && (
-                            <div className="flex flex-col items-center justify-center text-slate-400 p-8">
-                                <SpinnerIcon className="w-10 h-10 animate-spin text-brand-blue-500" />
-                                <p className="mt-3 text-md">{isFetchingCorrection ? "Recherche d'un corrigé..." : isOcrLoading ? "Analyse de l'image..." : "L'IA prépare votre tutorat..."}</p>
-                            </div>
-                        )}
-                        {isSubmitting && (
-                            <div className="flex items-start">
-                                <div className="chat-bubble ai-bubble flex items-center gap-2">
-                                    <SpinnerIcon className="w-5 h-5 animate-spin"/>
-                                    <span>Analyse en cours...</span>
-                                </div>
-                            </div>
-                        )}
-                        {(aiError || submissionError) && <div className="text-red-400 p-4 text-center"><p><span className="font-bold">Erreur :</span> {aiError || submissionError}</p></div>}
-                        {dialogue.length === 0 && !isProcessing && !aiError && !isVerificationStep && <div className="flex items-center justify-center h-full text-slate-500"><p>La conversation avec l'IA apparaîtra ici.</p></div>}
+                {isTutorActive && verificationResult && (
+                    <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                        {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+                        {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
                     </div>
-
-                    {isTutorActive && !isTutorFinished && !isLoading && (
-                        <form onSubmit={handleStudentResponse} className="mt-4 pt-4 border-t border-slate-700 space-y-2">
-                            <div className="flex flex-col sm:flex-row gap-2">
-                                <textarea
-                                    value={studentInput}
-                                    onChange={(e) => setStudentInput(e.target.value)}
-                                    placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                                    disabled={isSubmitting}
-                                    rows={3}
-                                    className="flex-grow p-2 bg-slate-800 border-2 border-slate-600 rounded-lg text-slate-200 focus:ring-2 focus:ring-brand-blue-500 disabled:opacity-50"
-                                />
-                                <button type="submit" disabled={!studentInput.trim() || isSubmitting} className="px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                )}
+                <div ref={messagesEndRef} />
+            </main>
+            
+             <footer className="p-4 bg-slate-800/80 backdrop-blur-sm rounded-b-xl border-b border-x border-slate-700/50">
+                {isRateLimited ? (
+                     <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
+                        {error}
+                     </div>
+                ) : !isTutorActive ? (
+                     <button onClick={handleStartTutor} disabled={isLoadingAction} className="w-full px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-50">
+                        {isAIExplainLoading ? "Initialisation..." : "Démarrer le tutorat"}
+                     </button>
+                ) : (
+                    <div className="space-y-3">
+                         {inputMode === 'text' && (
+                             <div className="flex items-center gap-2">
+                                 <input
+                                     type="text"
+                                     value={studentInput}
+                                     onChange={(e) => setStudentInput(e.target.value)}
+                                     onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer(studentInput)}
+                                     placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
+                                     className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+                                     disabled={isDisabled}
+                                 />
+                                 <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600" disabled={isDisabled}>
+                                    <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
+                                 </button>
+                                 <button onClick={() => handleSubmitAnswer(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                     Envoyer
                                 </button>
-                            </div>
-                            {isStuck && (
-                                <div className="flex justify-end pt-2">
-                                    <button type="button" onClick={handleImStuck} className="px-4 py-2 bg-yellow-600 text-white text-sm font-semibold rounded-lg hover:bg-yellow-700 animate-pulse">Je suis bloqué</button>
-                                </div>
-                            )}
-                        </form>
-                    )}
-                    {(dialogue.length > 0) && !isLoading && (
-                        <div className="mt-4 pt-2 border-t border-slate-700/50 flex justify-between items-center gap-3">
-                            <button onClick={resetForNewQuestion} className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700/50 text-slate-300 hover:bg-slate-700">Recommencer</button>
-                        </div>
-                    )}
-                    {videoChunk && (
-                        <div className="mt-6 p-4 bg-brand-blue-900/20 border-l-4 border-brand-blue-500 rounded-r-lg">
-                            <h4 className="text-sm font-semibold text-brand-blue-300 mb-2">💡 Passage pertinent dans la vidéo du cours :</h4>
-                            <p className="text-sm italic text-slate-300/90 mb-3">"{videoChunk.chunk_text}"</p>
-                            <button onClick={() => onNavigateToTimestamp(levelId, chapter.id, videoChunk.video_id, videoChunk.start_time_seconds)} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-500">
-                                <PlayCircleIcon className="w-5 h-5"/>Regarder ce passage
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
+                             </div>
+                         )}
+                         {inputMode === 'photo' && (
+                             <div className="flex items-center gap-2">
+                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
+                                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-3 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50" disabled={isDisabled}>
+                                    <PaperClipIcon className="w-5 h-5"/> {uploadedFile ? "Changer" : "Choisir photo"}
+                                </button>
+                                {uploadedFile && (
+                                    <button onClick={handleOcrAndSubmit} className="flex-1 px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled}>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <CameraIcon className="w-5 h-5"/> Envoyer la photo
+                                        </div>
+                                    </button>
+                                )}
+                             </div>
+                         )}
+
+                         <div className="flex items-center justify-between">
+                             <div className="flex items-center gap-2 p-1 bg-gray-900/50 rounded-lg">
+                                 <button onClick={() => setInputMode('text')} className={`px-2 py-1 text-xs rounded ${inputMode === 'text' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Texte</button>
+                                 <button onClick={() => setInputMode('photo')} className={`px-2 py-1 text-xs rounded ${inputMode === 'photo' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Photo</button>
+                             </div>
+                             <button onClick={handleGetDirectHelp} className="text-xs text-slate-400 hover:text-brand-blue-300 disabled:opacity-50" disabled={isDisabled}>
+                                 Je suis bloqué, donne-moi de l'aide
+                             </button>
+                         </div>
+                         {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
+                    </div>
+                )}
+                {isKeyboardOpen && (
+                    <MathKeyboard 
+                        initialValue={studentInput}
+                        onConfirm={(latex) => { setStudentInput(latex); setIsKeyboardOpen(false); }}
+                        onClose={() => setIsKeyboardOpen(false)}
+                    />
+                )}
+            </footer>
         </div>
     );
 };

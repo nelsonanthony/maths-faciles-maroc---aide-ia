@@ -1,8 +1,11 @@
 
 import React from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Series, Exercise } from '@/types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, PlusCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
+import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 interface ExerciseListPageProps {
     series: Series;
@@ -61,9 +64,11 @@ export const ExerciseListPage: React.FC<ExerciseListPageProps> = ({
                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onSelectExercise(exercise.id); }}
                         >
                            <div className="flex justify-between items-start gap-4">
-                                <div className="flex-grow">
+                                <div className="flex-grow overflow-hidden">
                                     <h3 className="text-xl font-semibold text-gray-200">Exercice {index + 1}</h3>
-                                    <p className="text-gray-400 mt-2 truncate">{exercise.statement}</p>
+                                    <div className="text-gray-400 mt-2 line-clamp-2">
+                                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement, { breaks: true }) as string)} />
+                                    </div>
                                 </div>
                                 {isAdmin && (
                                     <div className="flex items-center gap-0" onClick={e => e.stopPropagation()}>

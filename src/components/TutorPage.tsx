@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -61,13 +60,14 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const { user } = useAuth();
     const { data: aiResponse, isLoading: isAIExplainLoading, error: aiError, explain, reset: resetAIExplain } = useAIExplain();
     
-    const [dialogue, setDialogue] = useState<DialogueMessage[]>([]);
+    const [dialogue, setDialogue] = useState<DialogueMessage[]>([
+        { role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }
+    ]);
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [studentInput, setStudentInput] = useState('');
-    const [isTutorActive, setIsTutorActive] = useState(false);
+    const [isTutorActive, setIsTutorActive] = useState(false); // Controls if we are in socratic mode
     const [isTutorFinished, setIsTutorFinished] = useState(false);
-    const [initialWork, setInitialWork] = useState('');
 
     const [isVerifying, setIsVerifying] = useState(false);
     const [verificationResult, setVerificationResult] = useState<'correct' | 'incorrect' | null>(null);
@@ -97,34 +97,34 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
         }
     }, [aiError, error]);
-
+    
+    // Effect to process the initial AI response and start the tutor
     useEffect(() => {
         if (aiResponse?.socraticPath) {
             const path = aiResponse.socraticPath;
             const startIndex = aiResponse.startingStepIndex ?? 0;
 
             setSocraticPath(path);
-            setIsTutorActive(true);
             
             if (startIndex >= path.length) {
-                setDialogue([{ role: 'system', content: 'Le tuteur a analysé votre travail.' }]);
                 addMessageToDialogue('ai', "Il semble que tu aies déjà résolu cet exercice avec succès. Excellent travail ! Si tu as d'autres questions, n'hésite pas.");
                 setIsTutorFinished(true);
             } else {
-                setDialogue([{ role: 'system', content: `Le tuteur a été initialisé et a détecté que vous êtes à l'étape ${startIndex + 1}.` }]);
                 setCurrentStep(startIndex);
             }
+            setIsTutorActive(true);
         }
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
         }
     }, [aiResponse]);
-
+    
+    // Effect to advance the socratic dialogue
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
             addMessageToDialogue('ai', currentQuestion);
-        } else if (isTutorActive && socraticPath && currentStep === socraticPath.length) {
+        } else if (isTutorActive && socraticPath && currentStep >= socraticPath.length) {
             addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
             setIsTutorFinished(true);
         }
@@ -133,39 +133,27 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const addMessageToDialogue = (role: DialogueMessage['role'], content: string) => {
         setDialogue(prev => [...prev, { role, content }]);
     };
-
-    const handleStartTutor = () => {
+    
+    // Called only for the FIRST user message to initialize the tutor
+    const startTutor = (initialWork: string) => {
         resetAIExplain();
         setError(null);
-        setDialogue([]);
-        const studentQuery = initialWork.trim() || "J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique).";
+        addMessageToDialogue('user', initialWork.trim() || "Je n'ai pas encore commencé.");
+        
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
         ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
         ${exercise.correctionSnippet}` : ''}
         
         ---DEMANDE ÉLÈVE---
-        ${studentQuery}`;
+        ${initialWork.trim() || "J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique)."}`;
         explain(prompt, chapter.id, 'socratic');
     };
 
-    const handleGetDirectHelp = () => {
-        const lastAiMessage = dialogue.filter(d => d.role === 'ai').pop();
-        const prompt = `---CONTEXTE EXERCICE---
-        ${exercise.statement}
-        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
-        ${exercise.correctionSnippet}` : ''}
-
-        ---HISTORIQUE DISCUSSION---
-        ${dialogue.map(d => `${d.role}: ${d.content}`).join('\n')}
-        
-        ---DEMANDE ÉLÈVE---
-        Je suis bloqué. Donne-moi une explication directe pour l'étape actuelle : "${lastAiMessage?.content || "l'exercice"}"`;
-        explain(prompt, chapter.id, 'direct');
-    };
-
-    const handleSubmitAnswer = async (answer: string) => {
+    // Called for subsequent answers during the socratic dialogue
+    const validateAnswer = async (answer: string) => {
         if (!socraticPath || isVerifying) return;
+        
         addMessageToDialogue('user', answer);
         setStudentInput('');
         setIsVerifying(true);
@@ -210,7 +198,31 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             setIsVerifying(false);
         }
     };
+
+    const handleGetDirectHelp = () => {
+        const lastAiMessage = dialogue.filter(d => d.role === 'ai').pop();
+        const prompt = `---CONTEXTE EXERCICE---
+        ${exercise.statement}
+        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
+        ${exercise.correctionSnippet}` : ''}
+
+        ---HISTORIQUE DISCUSSION---
+        ${dialogue.map(d => `${d.role}: ${d.content}`).join('\n')}
+        
+        ---DEMANDE ÉLÈVE---
+        Je suis bloqué. Donne-moi une explication directe pour l'étape actuelle : "${lastAiMessage?.content || "l'exercice"}"`;
+        explain(prompt, chapter.id, 'direct');
+    };
     
+    // Central submission handler
+    const handleSubmission = (text: string) => {
+        if (isTutorActive) {
+            validateAnswer(text);
+        } else {
+            startTutor(text);
+        }
+    };
+
     const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
@@ -243,7 +255,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-            await handleSubmitAnswer(data.text);
+            handleSubmission(data.text);
         } catch (e: any) {
             setError(e.message);
         } finally {
@@ -269,41 +281,23 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             </header>
             
             <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
-                {!isTutorActive ? (
-                    <div className="m-auto text-center p-8 space-y-4">
-                        <h3 className="text-xl font-semibold">Prêt à commencer ?</h3>
-                        <p className="text-slate-400 max-w-lg mx-auto">Si vous avez déjà travaillé sur l'exercice, collez votre brouillon ci-dessous pour que l'IA puisse commencer au bon endroit. Sinon, cliquez simplement sur "Démarrer".</p>
-                        <textarea
-                            value={initialWork}
-                            onChange={(e) => setInitialWork(e.target.value)}
-                            placeholder="Collez votre travail ici (optionnel)..."
-                            rows={5}
-                            className="w-full max-w-lg p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-                            disabled={isLoadingAction}
-                        />
-                         <button onClick={handleStartTutor} disabled={isLoadingAction} className="w-full max-w-lg px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-50">
-                            {isAIExplainLoading ? "Analyse en cours..." : "Démarrer le tutorat"}
-                        </button>
-                    </div>
-                ) : (
-                    <div className="flex flex-col flex-grow space-y-4">
-                        {dialogue.map((msg, index) => (
-                           msg.role === 'ai'
-                               ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
-                               : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
-                                   <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
-                                 </div>
-                       ))}
-                       {isLoadingAction && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
-                       
-                       {isTutorActive && verificationResult && (
-                           <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                               {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
-                               {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
-                           </div>
-                       )}
-                    </div>
-                )}
+                <div className="flex flex-col flex-grow space-y-4">
+                    {dialogue.map((msg, index) => (
+                       msg.role === 'ai'
+                           ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
+                           : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
+                               <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
+                             </div>
+                   ))}
+                   {isLoadingAction && <div className="text-center py-2"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
+                   
+                   {isTutorActive && verificationResult && (
+                       <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                           {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+                           {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
+                       </div>
+                   )}
+                </div>
                 <div ref={messagesEndRef} />
             </main>
             
@@ -312,7 +306,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                      <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
                         {error}
                      </div>
-                ) : isTutorActive ? (
+                ) : (
                     <div className="space-y-3">
                          {inputMode === 'text' && (
                              <div className="flex items-center gap-2">
@@ -320,7 +314,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                      type="text"
                                      value={studentInput}
                                      onChange={(e) => setStudentInput(e.target.value)}
-                                     onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer(studentInput)}
+                                     onKeyDown={(e) => e.key === 'Enter' && handleSubmission(studentInput)}
                                      placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
                                      className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
                                      disabled={isDisabled}
@@ -328,7 +322,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                  <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600" disabled={isDisabled}>
                                     <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                                  </button>
-                                 <button onClick={() => handleSubmitAnswer(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
+                                 <button onClick={() => handleSubmission(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                     Envoyer
                                 </button>
                              </div>
@@ -348,19 +342,28 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                 )}
                              </div>
                          )}
+                         {uploadedFileSrc &&
+                            <div className="flex items-center gap-2 p-2 bg-slate-900/50 rounded-md">
+                                <img src={uploadedFileSrc} alt="Preview" className="w-12 h-12 object-cover rounded"/>
+                                <span className="text-xs text-slate-400 flex-1 truncate">{uploadedFile?.name}</span>
+                                <button onClick={() => { setUploadedFile(null); setUploadedFileSrc(null);}} className="p-1 text-slate-500 hover:text-white"><XCircleIcon className="w-5 h-5"/></button>
+                            </div>
+                         }
 
                          <div className="flex items-center justify-between">
                              <div className="flex items-center gap-2 p-1 bg-gray-900/50 rounded-lg">
                                  <button onClick={() => setInputMode('text')} className={`px-2 py-1 text-xs rounded ${inputMode === 'text' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Texte</button>
                                  <button onClick={() => setInputMode('photo')} className={`px-2 py-1 text-xs rounded ${inputMode === 'photo' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Photo</button>
                              </div>
+                             {isTutorActive &&
                              <button onClick={handleGetDirectHelp} className="text-xs text-slate-400 hover:text-brand-blue-300 disabled:opacity-50" disabled={isDisabled}>
-                                 Je suis bloqué, donne-moi de l'aide
+                                 Je suis bloqué, donne-moi un indice
                              </button>
+                             }
                          </div>
                          {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
                     </div>
-                ) : null }
+                )}
                 {isKeyboardOpen && (
                     <MathKeyboard 
                         initialValue={studentInput}

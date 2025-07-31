@@ -73,7 +73,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const moderationResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: moderationPrompt,
-            config: { responseMimeType: "application/json" }
+            config: { 
+                responseMimeType: "application/json",
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
 
         const moderationText = moderationResponse.text;

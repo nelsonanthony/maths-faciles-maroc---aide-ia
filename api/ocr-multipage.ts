@@ -99,6 +99,9 @@ f(x) = \\(x^2\\) → f(x) = $x^2$
             return ai.models.generateContent({
                model: 'gemini-2.5-flash',
                contents: { parts: [ocrImagePart, ocrTextPart] },
+               config: {
+                   thinkingConfig: { thinkingBudget: 0 }
+               }
             });
         });
 

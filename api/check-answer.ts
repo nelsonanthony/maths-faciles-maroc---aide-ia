@@ -139,7 +139,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
-                responseSchema: answerSchema
+                responseSchema: answerSchema,
+                thinkingConfig: { thinkingBudget: 0 }
             }
         });
         

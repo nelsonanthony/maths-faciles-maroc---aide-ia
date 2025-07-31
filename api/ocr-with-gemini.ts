@@ -97,6 +97,9 @@ f(x) = \\(x^2\\) → f(x) = $x^2$
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [imagePart, textPart] },
+            config: {
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
 
         // Log successful AI call

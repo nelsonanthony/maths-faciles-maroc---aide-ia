@@ -87,7 +87,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const requestPayload = {
             model: 'gemini-2.5-flash',
             contents: promptText,
-            config: { responseMimeType: "application/json", responseSchema: answerSchema }
+            config: { 
+                responseMimeType: "application/json", 
+                responseSchema: answerSchema,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         };
         
 

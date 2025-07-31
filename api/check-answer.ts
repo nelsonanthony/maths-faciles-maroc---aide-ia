@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -48,7 +49,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // --- Rate Limiting ---
         const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'ANSWER_VALIDATION');
         if (limitExceeded) {
-            return res.status(429).json({ error: `Vous avez atteint votre limite de ${limit} validations de réponse par jour.` });
+             const error: any = new Error(`Vous avez atteint votre limite de ${limit} validations de réponse par jour.`);
+             error.status = 429;
+             throw error;
         }
         
         // --- Main Logic ---
@@ -144,24 +147,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
         
+        const jsonText = response.text?.trim();
+        if (!jsonText) {
+            throw new Error("L'IA a retourné une réponse vide. Le modèle est peut-être surchargé, veuillez réessayer.");
+        }
+        
+        let parsedJson;
+        try {
+            parsedJson = JSON.parse(jsonText);
+        } catch (e) {
+            console.error("Failed to parse JSON from AI in check-answer. Raw response:", jsonText);
+            throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
+        }
+        
         // Log successful AI call
         await logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         
-        const jsonText = response.text;
-        if (jsonText === undefined) {
-            throw new Error("La réponse de l'IA est vide ou invalide.");
-        }
-        const parsedJson = JSON.parse(jsonText);
         return res.status(200).json(parsedJson);
 
     } catch (error: any) {
         console.error("Error in check-answer:", error);
-        let message = "Une erreur serveur est survenue lors du traitement de la réponse.";
-        if (error.message?.includes("JSON")) {
-            message = "Erreur du serveur : La réponse de l'IA n'était pas dans le format JSON attendu.";
-        } else if (error.message) {
-            message = `Erreur du service IA: ${error.message}`;
-        }
-        return res.status(500).json({ error: message });
+        const status = error.status || 500;
+        const message = error.message || "Une erreur interne est survenue.";
+        return res.status(status).json({ error: message });
     }
 }

@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -49,7 +50,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'EXPLANATION');
         if (limitExceeded) {
-            return res.status(429).json({ error: `Vous avez atteint votre limite de ${limit} demandes d'explication par jour.` });
+             const error: any = new Error(`Vous avez atteint votre limite de ${limit} demandes d'explication par jour.`);
+             error.status = 429;
+             throw error;
         }
         
         // --- Body Validation ---
@@ -64,7 +67,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // --- Find relevant video chunk function (to be run in parallel) ---
         const findRelevantVideoChunk = async (): Promise<VideoChunk | undefined> => {
-            const questionMatch = prompt.match(/---QUESTION ÉLÈVE---\s*([\s\S]*)/);
+            const questionMatch = prompt.match(/---DEMANDE ÉLÈVE---\s*([\s\S]*)/);
             const userQuestion = questionMatch ? questionMatch[1].trim() : '';
             if (!userQuestion) return undefined;
 
@@ -91,11 +94,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const systemInstruction = `
             CONTEXTE: Tu es un tuteur de mathématiques expert et bienveillant. Tu t'adresses à des lycéens marocains pour qui le français est une deuxième langue. Ton langage doit être **très simple, clair et encourageant**.
 
-            MISSION:
-            1.  Si la demande est pour un tutorat socratique, crée un parcours pédagogique pas à pas. Chaque étape doit poser une question simple qui guide l'élève.
-            2.  Si la demande est pour une réponse directe, fournis une explication complète.
-            3.  Structure toutes tes longues explications avec des titres Markdown (###) et des listes à puces (*) pour une lecture facile.
-            4.  Si la question de l'élève est hors-sujet ou inappropriée, signale-le en mettant 'is_on_topic' à false.
+            MISSION: Le prompt de l'utilisateur contient un contexte d'exercice et une demande d'élève.
+            1.  Analyse la "DEMANDE ÉLÈVE".
+            2.  Si la demande est pour un tutorat socratique (l'élève demande de l'aide pas à pas, ou présente son travail pour vérification):
+                a. Crée un parcours pédagogique complet ("path") pour résoudre l'exercice, étape par étape, comme si tu partais de zéro.
+                b. Compare le travail de l'élève (dans "DEMANDE ÉLÈVE") avec ton parcours. Détermine l'index de la PREMIÈRE étape que l'élève n'a PAS ENCORE (correctement) complétée. C'est le 'starting_step_index'.
+                c. Si l'élève n'a rien commencé (ex: demande juste de l'aide), 'starting_step_index' est 0.
+                d. Si l'élève a TOUT résolu, 'starting_step_index' doit être égal à la longueur du 'path'.
+            3.  Si la demande est pour une réponse directe, fournis une explication complète.
+            4.  Structure toutes tes longues explications avec des titres Markdown (###) et des listes à puces (*) pour une lecture facile.
+            5.  Si la question de l'élève est hors-sujet ou inappropriée, signale-le en mettant 'is_on_topic' à false.
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.
@@ -115,6 +123,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     type: Type.OBJECT,
                     properties: {
                         is_on_topic: { type: Type.BOOLEAN, description: "True si la question de l'élève concerne l'exercice de maths." },
+                        starting_step_index: {
+                            type: Type.INTEGER,
+                            description: "Basé sur le travail déjà fourni par l'élève, l'index de la prochaine question à poser. 0 si l'élève n'a rien commencé. Si l'élève a tout fini, renvoyer un nombre égal à la longueur du 'path'."
+                        },
                         path: {
                             type: Type.ARRAY,
                             description: "Le parcours socratique pour guider l'élève.",
@@ -131,7 +143,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             }
                         }
                     },
-                    required: ["is_on_topic"]
+                    required: ["is_on_topic", "starting_step_index", "path"]
                 };
             } else { // 'direct'
                  responseSchema = {
@@ -155,16 +167,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 }
             });
 
-            const parsedJson = JSON.parse(response.text?.trim() ?? '{}');
+            const jsonText = response.text?.trim();
+            if (!jsonText) {
+                throw new Error("L'IA a retourné une réponse vide. Veuillez réessayer.");
+            }
+            
+            let parsedJson;
+            try {
+                parsedJson = JSON.parse(jsonText);
+            } catch (e) {
+                console.error("Failed to parse JSON from AI in explain. Raw response:", jsonText);
+                throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
+            }
             
             if (parsedJson.is_on_topic === false) {
-                 const error = new Error("Je ne peux répondre qu'à des questions concernant cet exercice de mathématiques.");
-                 (error as any).status = 403; // Forbidden
+                 const error: any = new Error("Je ne peux répondre qu'à des questions concernant cet exercice de mathématiques.");
+                 error.status = 403; // Forbidden
                  throw error;
             }
 
             if(requestType === 'socratic') {
                 finalResponse.socraticPath = parsedJson.path;
+                finalResponse.startingStepIndex = parsedJson.starting_step_index;
             } else {
                 finalResponse.explanation = parsedJson.explanation;
             }
@@ -187,13 +211,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     } catch (e: any) {
         console.error("Critical error in 'explain' function:", e);
-        if (e.status === 403) {
-            return res.status(403).json({ error: e.message });
-        }
-        let message = "An internal server error occurred.";
-        if (e.message?.includes("JSON")) {
-            message = "The AI returned an invalid response format.";
-        }
-        return res.status(500).json({ error: message });
+        const status = e.status || 500;
+        const message = e.message || "Une erreur interne est survenue.";
+        return res.status(status).json({ error: message });
     }
 }

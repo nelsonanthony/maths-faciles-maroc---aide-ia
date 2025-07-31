@@ -79,15 +79,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        const moderationText = moderationResponse.text;
+        const moderationText = moderationResponse.text?.trim();
         if (moderationText) {
-            const moderationResult = JSON.parse(moderationText);
-
-            if (!moderationResult.is_safe) {
-                return res.status(403).json({ error: `Message rejeté : ${moderationResult.reason}` });
+            try {
+                const moderationResult = JSON.parse(moderationText);
+                if (moderationResult.is_safe === false) {
+                    return res.status(403).json({ error: "Message rejeté car jugé inapproprié ou hors-sujet." });
+                }
+            } catch (e) {
+                console.error("Failed to parse moderation JSON from AI. Raw response:", moderationText);
+                // Fail closed: if moderation response is unparsable, block the message.
+                return res.status(500).json({ error: "Le service de modération a rencontré un problème. Veuillez réessayer." });
             }
         } else {
-             console.warn("AI moderation returned an empty response. Allowing message to pass as a fail-safe.");
+             // If moderation is completely empty, it could be a model issue. We should still log it, but failing open might be acceptable here.
+             console.warn("AI moderation returned an empty response. Allowing message to pass as a fail-safe measure.");
         }
         
         // --- Insert Message ---

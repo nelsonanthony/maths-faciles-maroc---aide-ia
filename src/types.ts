@@ -122,6 +122,7 @@ export interface AIResponse {
     explanation?: string;
     socraticPath?: SocraticPath;
     videoChunk?: VideoChunk;
+    startingStepIndex?: number;
 }
 
 // Types for Chat

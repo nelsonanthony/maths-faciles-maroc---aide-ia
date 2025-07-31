@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -66,6 +67,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [studentInput, setStudentInput] = useState('');
     const [isTutorActive, setIsTutorActive] = useState(false);
     const [isTutorFinished, setIsTutorFinished] = useState(false);
+    const [initialWork, setInitialWork] = useState('');
 
     const [isVerifying, setIsVerifying] = useState(false);
     const [verificationResult, setVerificationResult] = useState<'correct' | 'incorrect' | null>(null);
@@ -98,10 +100,20 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     useEffect(() => {
         if (aiResponse?.socraticPath) {
-            setSocraticPath(aiResponse.socraticPath);
+            const path = aiResponse.socraticPath;
+            const startIndex = aiResponse.startingStepIndex ?? 0;
+
+            setSocraticPath(path);
             setIsTutorActive(true);
-            setDialogue([{ role: 'system', content: 'Le tuteur a été initialisé. Répondez à la première question.' }]);
-            setCurrentStep(0);
+            
+            if (startIndex >= path.length) {
+                setDialogue([{ role: 'system', content: 'Le tuteur a analysé votre travail.' }]);
+                addMessageToDialogue('ai', "Il semble que tu aies déjà résolu cet exercice avec succès. Excellent travail ! Si tu as d'autres questions, n'hésite pas.");
+                setIsTutorFinished(true);
+            } else {
+                setDialogue([{ role: 'system', content: `Le tuteur a été initialisé et a détecté que vous êtes à l'étape ${startIndex + 1}.` }]);
+                setCurrentStep(startIndex);
+            }
         }
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
@@ -126,13 +138,14 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         resetAIExplain();
         setError(null);
         setDialogue([]);
+        const studentQuery = initialWork.trim() || "J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique).";
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
         ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
         ${exercise.correctionSnippet}` : ''}
         
         ---DEMANDE ÉLÈVE---
-        J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique).`;
+        ${studentQuery}`;
         explain(prompt, chapter.id, 'socratic');
     };
 
@@ -255,20 +268,40 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 </div>
             </header>
             
-            <main className="flex-grow p-4 overflow-y-auto space-y-4 bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800">
-                 {dialogue.map((msg, index) => (
-                    msg.role === 'ai'
-                        ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
-                        : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
-                            <MathJaxRenderer content={msg.content} />
-                          </div>
-                ))}
-                {isLoadingAction && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
-                
-                {isTutorActive && verificationResult && (
-                    <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                        {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
-                        {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
+            <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
+                {!isTutorActive ? (
+                    <div className="m-auto text-center p-8 space-y-4">
+                        <h3 className="text-xl font-semibold">Prêt à commencer ?</h3>
+                        <p className="text-slate-400 max-w-lg mx-auto">Si vous avez déjà travaillé sur l'exercice, collez votre brouillon ci-dessous pour que l'IA puisse commencer au bon endroit. Sinon, cliquez simplement sur "Démarrer".</p>
+                        <textarea
+                            value={initialWork}
+                            onChange={(e) => setInitialWork(e.target.value)}
+                            placeholder="Collez votre travail ici (optionnel)..."
+                            rows={5}
+                            className="w-full max-w-lg p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 placeholder-gray-500 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+                            disabled={isLoadingAction}
+                        />
+                         <button onClick={handleStartTutor} disabled={isLoadingAction} className="w-full max-w-lg px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-50">
+                            {isAIExplainLoading ? "Analyse en cours..." : "Démarrer le tutorat"}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col flex-grow space-y-4">
+                        {dialogue.map((msg, index) => (
+                           msg.role === 'ai'
+                               ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
+                               : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
+                                   <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
+                                 </div>
+                       ))}
+                       {isLoadingAction && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
+                       
+                       {isTutorActive && verificationResult && (
+                           <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                               {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
+                               {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
+                           </div>
+                       )}
                     </div>
                 )}
                 <div ref={messagesEndRef} />
@@ -279,11 +312,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                      <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
                         {error}
                      </div>
-                ) : !isTutorActive ? (
-                     <button onClick={handleStartTutor} disabled={isLoadingAction} className="w-full px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 transition-colors disabled:opacity-50">
-                        {isAIExplainLoading ? "Initialisation..." : "Démarrer le tutorat"}
-                     </button>
-                ) : (
+                ) : isTutorActive ? (
                     <div className="space-y-3">
                          {inputMode === 'text' && (
                              <div className="flex items-center gap-2">
@@ -331,7 +360,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                          </div>
                          {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
                     </div>
-                )}
+                ) : null }
                 {isKeyboardOpen && (
                     <MathKeyboard 
                         initialValue={studentInput}

@@ -1,8 +1,18 @@
 {
-  "devCommand": "npm run dev",
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": "src/types.ts"
+      "includeFiles": [
+        "src/types.ts",
+        "src/utils/**",
+        "api/_lib/**"
+      ]
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    {
+      "source": "/((?!api/|assets/|data.json|favicon.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

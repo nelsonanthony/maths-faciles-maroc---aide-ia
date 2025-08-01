@@ -4,18 +4,13 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
+import { cleanLatex } from '../src/utils/math-format.js';
+
 
 interface ImagePayload {
     image: string; // base64 encoded
     mimeType: string;
 }
-
-const cleanLatex = (text: string): string => {
-  if (!text) return '';
-  return text
-    .replace(/\\\(/g, '$').replace(/\\\)/g, '$')
-    .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
-};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -72,25 +67,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const ai = new GoogleGenAI({ apiKey });
 
-        const ocrPromptText = `Tu es un système de transcription mathématique. Transforme EXACTEMENT ce qui est écrit en suivant ces règles :
+        const ocrPromptText = `Tu es un système de transcription mathématique pour lycéens marocains. 
 
-FORMATAGE IMPÉRATIF :
-1. TOUTES les expressions mathématiques doivent utiliser :
-   - $...$ pour les formules en ligne (ex: $x^2$)
-   - $$...$$ pour les équations centrées
-2. INTERDICTION d'utiliser :
-   - \\(...\\) ou \\[...\\] (MathJax)
-   - Tout autre format
-3. Structure :
-   - Conserve les sauts de ligne originaux
-   - Ne pas ajouter de commentaires
-   - Ne pas reformuler
+RÈGLES ABSOLUES DE FORMATAGE:
+1. MATHÉMATIQUES:
+   - Formules dans le texte: $formule$ (ex: $f(x) = x^2$)
+   - Équations centrées: $$équation$$ (ex: $$\\int_0^1 x dx = \\frac{1}{2}$$)
+   - JAMAIS utiliser: \\(, \\), \\[, \\] (ces formats sont INTERDITS)
 
-EXEMPLES :
-[Manuscrit] → [Transcription]
-f(x) = \\(x^2\\) → f(x) = $x^2$
-\\[x \\in \\mathbb{R}\\] → $$x \\in \\mathbb{R}$$
-`;
+2. TRANSCRIPTION FIDÈLE:
+   - Conserver EXACTEMENT le texte original (français/arabe)
+   - Respecter la numérotation des questions
+   - Préserver les espaces et sauts de ligne
+   - Ne pas corriger les erreurs de l'élève
+
+3. SYMBOLES MATHÉMATIQUES COURANTS AU MAROC:
+   - Ensemble des réels: $\\mathbb{R}$
+   - Dérivée: $f'(x)$ ou $\\frac{df}{dx}$
+   - Limite: $\\lim_{x \\to a}$
+   - Intégrale: $\\int_a^b f(x)dx$
+
+EXEMPLE DE TRANSFORMATION:
+[Manuscrit] "Soit f(x) = \\(2x + 1\\). Calculer \\[f'(x) = 2\\]"
+[Transcription] "Soit f(x) = $2x + 1$. Calculer $$f'(x) = 2$$"
+
+Transcris maintenant le contenu de l'image:`;
 
         // --- STEP 1: OCR on all images in parallel ---
         const ocrPromises = images.map(imagePayload => {

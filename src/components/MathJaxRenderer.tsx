@@ -19,11 +19,21 @@ const initializeMathJax = (): Promise<void> => {
       if (window.MathJax) {
         window.MathJax.config = {
           tex: {
-            inlineMath: [['$', '$'], ['\\(', '\\)']],
-            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            inlineMath: [['$', '$']],
+            displayMath: [['$$', '$$']],
+            processEscapes: false, // Important! Disables \(...\) and \[...\]
+            processEnvironments: true,
+            macros: {
+              'R': '\\mathbb{R}',
+              'N': '\\mathbb{N}',
+              'Z': '\\mathbb{Z}',
+              'Q': '\\mathbb{Q}',
+              'C': '\\mathbb{C}'
+            }
           },
           svg: {
             fontCache: 'global',
+            displayAlign: 'center'
           },
         };
         // This promise resolves when MathJax is ready.

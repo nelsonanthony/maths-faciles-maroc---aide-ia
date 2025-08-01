@@ -1,7 +1,4 @@
 
-
-
-
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './_lib/data-access.js';
@@ -59,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: "L'action et le payload sont requis." });
         }
         
-        let curriculum = await getCurriculumFromSupabase();
+        let curriculum: Level[] = await getCurriculumFromSupabase();
 
         switch (action) {
             case 'ADD_OR_UPDATE_LEVEL': {
@@ -70,17 +67,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             }
             case 'ADD_OR_UPDATE_CHAPTER': {
-                const { levelId, chapter } = payload;
+                const { levelId, chapter } = payload as { levelId: string, chapter: Chapter };
                 const level = curriculum.find(l => l.id === levelId);
                 if (!level) throw new Error("Niveau non trouvé.");
                 if (!level.chapters) level.chapters = [];
-                const index = level.chapters.findIndex(c => c.id === chapter.id);
+                const index = level.chapters.findIndex((c: Chapter) => c.id === chapter.id);
                 if (index > -1) level.chapters[index] = chapter;
                 else level.chapters.push(chapter);
                 break;
             }
              case 'ADD_OR_UPDATE_SERIES': {
-                const { levelId, chapterId, series } = payload;
+                const { levelId, chapterId, series } = payload as { levelId: string, chapterId: string, series: Series };
                 const level = curriculum.find(l => l.id === levelId);
                 if (!level) throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
                 
@@ -91,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     chapter.series = [];
                 }
                 
-                const seriesIndex = chapter.series.findIndex(s => s.id === series.id);
+                const seriesIndex = chapter.series.findIndex((s: Series) => s.id === series.id);
                 if (seriesIndex > -1) {
                     chapter.series[seriesIndex] = series;
                 } else {
@@ -100,8 +97,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             }
             case 'ADD_OR_UPDATE_EXERCISE': {
-                const { levelId, chapterId, seriesId, exercise } = payload;
-
+                const { levelId, chapterId, seriesId, exercise } = payload as { levelId: string, chapterId: string, seriesId: string, exercise: Exercise };
                 const level = curriculum.find(l => l.id === levelId);
                 if (!level) throw new Error(`Niveau non trouvé pour l'ID : ${levelId}`);
                 
@@ -115,7 +111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     series.exercises = [];
                 }
                 
-                const exerciseIndex = series.exercises.findIndex(e => e.id === exercise.id);
+                const exerciseIndex = series.exercises.findIndex((e: Exercise) => e.id === exercise.id);
                 if (exerciseIndex > -1) {
                     series.exercises[exerciseIndex] = exercise;
                 } else {
@@ -124,21 +120,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ': {
-                const { levelId, chapterId, quiz } = payload;
+                const { levelId, chapterId, quiz } = payload as { levelId: string, chapterId: string, quiz: Quiz };
                 const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
                 if (!chapter) throw new Error("Chapitre non trouvé.");
                 if (!chapter.quizzes) chapter.quizzes = [];
-                const index = chapter.quizzes.findIndex(q => q.id === quiz.id);
+                const index = chapter.quizzes.findIndex((q: Quiz) => q.id === quiz.id);
                 if (index > -1) chapter.quizzes[index] = quiz;
                 else chapter.quizzes.push(quiz);
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ_QUESTION': {
-                const { levelId, chapterId, quizId, question } = payload;
+                const { levelId, chapterId, quizId, question } = payload as { levelId: string, chapterId: string, quizId: string, question: QuizQuestion };
                 const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
                 if (!quiz) throw new Error("Quiz non trouvé.");
                 if (!quiz.questions) quiz.questions = [];
-                const index = quiz.questions.findIndex(q => q.id === question.id);
+                const index = quiz.questions.findIndex((q: QuizQuestion) => q.id === question.id);
                 if (index > -1) quiz.questions[index] = question;
                 else quiz.questions.push(question);
                 break;
@@ -150,19 +146,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         curriculum = curriculum.filter(l => l.id !== ids.levelId);
                         break;
                     case 'chapter':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter(c => c.id !== ids.chapterId) } : l);
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter((c: Chapter) => c.id !== ids.chapterId) } : l);
                         break;
                     case 'series':
-                         curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.filter(s => s.id !== ids.seriesId) } : c) } : l);
+                         curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.filter((s: Series) => s.id !== ids.seriesId) } : c) } : l);
                         break;
                     case 'exercise':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, series: c.series.map(s => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter(e => e.id !== ids.exerciseId) } : s) } : c) } : l);
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.map((s: Series) => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter((e: Exercise) => e.id !== ids.exerciseId) } : s) } : c) } : l);
                         break;
                      case 'quiz':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter(q => q.id !== ids.quizId) } : c) } : l);
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter((q: Quiz) => q.id !== ids.quizId) } : c) } : l);
                         break;
                     case 'quizQuestion':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map(c => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map(q => q.id === ids.quizId ? { ...q, questions: q.questions.filter(qu => qu.id !== ids.questionId) } : q) } : c) } : l);
+                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map((q: Quiz) => q.id === ids.quizId ? { ...q, questions: q.questions.filter((qu: QuizQuestion) => qu.id !== ids.questionId) } : q) } : c) } : l);
                         break;
                 }
                 break;

@@ -1,8 +1,9 @@
 
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './_lib/data-access.js';
-import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
+import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './_lib/data-access';
+import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {

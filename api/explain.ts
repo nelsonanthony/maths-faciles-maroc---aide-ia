@@ -2,8 +2,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "@/types.js";
-import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
-import { validateMathResponse } from "./_lib/math-validator.js";
+import { checkUsageLimit, logAiCall } from "@lib/ai-usage-limiter.js";
+import { validateMathResponse } from "@lib/math-validator.js";
 import { cleanLatex } from "@/utils/math-format.js";
 
 // This function runs on Vercel's servers (Node.js environment)

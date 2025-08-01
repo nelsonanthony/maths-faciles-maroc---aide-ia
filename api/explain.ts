@@ -6,6 +6,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
 import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
 
+const cleanLatex = (text: string): string => {
+  if (!text) return '';
+  // Replace MathJax delimiters with LaTeX delimiters
+  let cleaned = text.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+  cleaned = cleaned.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+  return cleaned;
+};
+
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -187,10 +195,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             if(requestType === 'socratic') {
+                 if (parsedJson.path && Array.isArray(parsedJson.path)) {
+                    parsedJson.path.forEach((step: any) => {
+                        if(step.ia_question) step.ia_question = cleanLatex(step.ia_question);
+                        if(step.positive_feedback) step.positive_feedback = cleanLatex(step.positive_feedback);
+                        if(step.hint_for_wrong_answer) step.hint_for_wrong_answer = cleanLatex(step.hint_for_wrong_answer);
+                    });
+                }
                 finalResponse.socraticPath = parsedJson.path;
                 finalResponse.startingStepIndex = parsedJson.starting_step_index;
             } else {
-                finalResponse.explanation = parsedJson.explanation;
+                 if (parsedJson.explanation) {
+                    finalResponse.explanation = cleanLatex(parsedJson.explanation);
+                }
             }
         };
 

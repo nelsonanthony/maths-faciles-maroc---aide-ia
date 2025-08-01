@@ -6,6 +6,14 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
 import { getExerciseById } from "./_lib/data-access.js";
 
+const cleanLatex = (text: string): string => {
+  if (!text) return '';
+  // Replace MathJax delimiters with LaTeX delimiters
+  let cleaned = text.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+  cleaned = cleaned.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
+  return cleaned;
+};
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -160,6 +168,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
         }
         
+        // Clean LaTeX in the response
+        if (parsedJson.summary) {
+            parsedJson.summary = cleanLatex(parsedJson.summary);
+        }
+        if (parsedJson.detailed_feedback && Array.isArray(parsedJson.detailed_feedback)) {
+            parsedJson.detailed_feedback.forEach((fb: any) => {
+                if (fb.explanation) {
+                    fb.explanation = cleanLatex(fb.explanation);
+                }
+            });
+        }
+
         // Log successful AI call
         await logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         

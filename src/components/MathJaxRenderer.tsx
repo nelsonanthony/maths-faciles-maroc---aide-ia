@@ -20,7 +20,7 @@ const initializeMathJax = (): Promise<void> => {
         window.MathJax.config = {
           tex: {
             inlineMath: [['$', '$'], ['\\(', '\\)']],
-            displayMath: [['$$', '$$']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
           },
           svg: {
             fontCache: 'global',

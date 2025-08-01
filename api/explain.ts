@@ -1,10 +1,10 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { AIResponse, VideoChunk } from "../src/types";
-import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter";
-import { validateMathResponse } from "./_lib/math-validator";
-import { cleanLatex } from "../src/utils/math-format";
+import { AIResponse, VideoChunk } from "../src/types.js";
+import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
+import { validateMathResponse } from "./_lib/math-validator.js";
+import { cleanLatex } from "../src/utils/math-format.js";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -69,8 +69,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const finalResponse: AIResponse = {};
 
         // --- Find relevant video chunk function (to be run in parallel) ---
-        const findRelevantVideoChunk = async (): Promise<VideoChunk | undefined> => {
-            const questionMatch = prompt.match(/---DEMANDE ÉLÈVE---\s*([\s\S]*)/);
+        const findRelevantVideoChunk = async (promptForSearch: string): Promise<VideoChunk | undefined> => {
+            const questionMatch = promptForSearch.match(/---DEMANDE ÉLÈVE---\s*([\s\S]*)/);
             const userQuestion = questionMatch ? questionMatch[1].trim() : '';
             if (!userQuestion) return undefined;
 
@@ -117,10 +117,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `;
 
         // --- Main AI Generation Logic ---
-        const generateResponse = async () => {
+        const generateResponse = async (finalPrompt: string) => {
             let responseSchema;
-            const finalPrompt = prompt;
-
+            
             if (requestType === 'socratic') {
                 responseSchema = {
                     type: Type.OBJECT,
@@ -202,8 +201,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // --- Run tasks in parallel ---
         const [_, videoChunkResult] = await Promise.all([
-            generateResponse(),
-            findRelevantVideoChunk()
+            generateResponse(prompt),
+            findRelevantVideoChunk(prompt)
         ]);
 
         if (videoChunkResult) {

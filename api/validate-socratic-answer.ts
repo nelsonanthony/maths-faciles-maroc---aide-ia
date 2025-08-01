@@ -1,8 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
-import { cleanLatex } from "../src/utils/math-format";
+import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
+import { cleanLatex } from "../src/utils/math-format.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');

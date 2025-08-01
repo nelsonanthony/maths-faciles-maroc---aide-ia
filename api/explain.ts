@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
 import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
-import { validateMathResponse } from "./_lib/math-validator.js";
+import { validateMathResponse } from "./_lib/math-validator";
 import { cleanLatex } from "../src/utils/math-format.js";
 
 // This function runs on Vercel's servers (Node.js environment)

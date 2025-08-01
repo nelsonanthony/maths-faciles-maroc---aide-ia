@@ -1,4 +1,4 @@
-import { cleanLatex } from '../../src/utils/math-format.js';
+import { cleanLatex } from '@/utils/math-format.js';
 
 /**
  * Parcourt récursivement un objet ou un tableau et applique la fonction cleanLatex

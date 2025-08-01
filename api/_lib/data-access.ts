@@ -1,6 +1,4 @@
-
-
-import { Level, Exercise } from '../../src/types.js';
+import { Level, Exercise } from '@/types.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // Simple in-memory cache for the serverless function instance.

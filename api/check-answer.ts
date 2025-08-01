@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
 import { getExerciseById } from "./_lib/data-access.js";
+import { validateMathResponse } from "./_lib/math-validator.js";
 import { cleanLatex } from "../src/utils/math-format.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -162,22 +163,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
         }
         
-        // Clean LaTeX in the response
-        if (parsedJson.summary) {
-            parsedJson.summary = cleanLatex(parsedJson.summary);
-        }
-        if (parsedJson.detailed_feedback && Array.isArray(parsedJson.detailed_feedback)) {
-            parsedJson.detailed_feedback.forEach((fb: any) => {
-                if (fb.explanation) {
-                    fb.explanation = cleanLatex(fb.explanation);
-                }
-            });
-        }
+        // Appliquer le nettoyage et la validation à toute la réponse JSON
+        const finalResponse = validateMathResponse(parsedJson);
 
         // Log successful AI call
         await logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         
-        return res.status(200).json(parsedJson);
+        return res.status(200).json(finalResponse);
 
     } catch (error: any) {
         console.error("Error in check-answer:", error);

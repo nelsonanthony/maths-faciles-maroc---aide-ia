@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types.js";
 import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter.js";
+import { validateMathResponse } from "./_lib/math-validator.js";
 import { cleanLatex } from "../src/utils/math-format.js";
 
 // This function runs on Vercel's servers (Node.js environment)
@@ -188,20 +189,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                  throw error;
             }
 
+            // Nettoyage et validation de la réponse JSON avant de la traiter.
+            const cleanedJson = validateMathResponse(parsedJson);
+
             if(requestType === 'socratic') {
-                 if (parsedJson.path && Array.isArray(parsedJson.path)) {
-                    parsedJson.path.forEach((step: any) => {
-                        if(step.ia_question) step.ia_question = cleanLatex(step.ia_question);
-                        if(step.positive_feedback) step.positive_feedback = cleanLatex(step.positive_feedback);
-                        if(step.hint_for_wrong_answer) step.hint_for_wrong_answer = cleanLatex(step.hint_for_wrong_answer);
-                    });
-                }
-                finalResponse.socraticPath = parsedJson.path;
-                finalResponse.startingStepIndex = parsedJson.starting_step_index;
+                finalResponse.socraticPath = cleanedJson.path;
+                finalResponse.startingStepIndex = cleanedJson.starting_step_index;
             } else {
-                 if (parsedJson.explanation) {
-                    finalResponse.explanation = cleanLatex(parsedJson.explanation);
-                }
+                finalResponse.explanation = cleanedJson.explanation;
             }
         };
 

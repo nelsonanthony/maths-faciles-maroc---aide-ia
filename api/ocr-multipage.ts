@@ -1,6 +1,3 @@
-
-
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -68,31 +65,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const ai = new GoogleGenAI({ apiKey });
 
-        const ocrPromptText = `Tu es un système de transcription mathématique pour lycéens marocains. 
+        const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription Mathématique Marocaine]
+1. FORMATAGE OBLIGATOIRE :
+   - Equations en ligne : TOUJOURS utiliser $...$ (ex: $x^2 + 3$)
+   - Equations centrées : TOUJOURS utiliser $$...$$ (ex: $$\\frac{1}{2}$$)
+   - INTERDICTION ABSOLUE d'utiliser \\(, \\), \\[, \\] ou tout format MathJax
 
-RÈGLES ABSOLUES DE FORMATAGE:
-1. MATHÉMATIQUES:
-   - Formules dans le texte: $formule$ (ex: $f(x) = x^2$)
-   - Équations centrées: $$équation$$ (ex: $$\\int_0^1 x dx = \\frac{1}{2}$$)
-   - JAMAIS utiliser: \\(, \\), \\[, \\] (ces formats sont INTERDITS)
+2. CONSIGNES SPÉCIFIQUES :
+   - Ne pas traduire les termes arabes/français
+   - Conserver la ponctuation originale
+   - Signaler les ambiguïtés avec [NOTE:] sans modifier le texte
 
-2. TRANSCRIPTION FIDÈLE:
-   - Conserver EXACTEMENT le texte original (français/arabe)
-   - Respecter la numérotation des questions
-   - Préserver les espaces et sauts de ligne
-   - Ne pas corriger les erreurs de l'élève
+EXEMPLE INCORRECT → CORRECT :
+f(x) = \\(x^2\\) → f(x) = $x^2$
+\\[\\frac{a}{b}\\] → $$\\frac{a}{b}$$
 
-3. SYMBOLES MATHÉMATIQUES COURANTS AU MAROC:
-   - Ensemble des réels: $\\mathbb{R}$
-   - Dérivée: $f'(x)$ ou $\\frac{df}{dx}$
-   - Limite: $\\lim_{x \\to a}$
-   - Intégrale: $\\int_a^b f(x)dx$
-
-EXEMPLE DE TRANSFORMATION:
-[Manuscrit] "Soit f(x) = \\(2x + 1\\). Calculer \\[f'(x) = 2\\]"
-[Transcription] "Soit f(x) = $2x + 1$. Calculer $$f'(x) = 2$$"
-
-Transcris maintenant le contenu de l'image:`;
+Transcris maintenant le contenu de l'image ou des images fournies.`;
 
         // --- STEP 1: OCR on all images in parallel ---
         const ocrPromises = images.map(imagePayload => {
@@ -117,15 +105,17 @@ Transcris maintenant le contenu de l'image:`;
         // --- Combine results ---
         const combinedOcrText = ocrResults.map((ocrResponse, index) => {
             const ocrText = ocrResponse.text?.trim() ?? '';
-            const cleanedText = cleanLatex(ocrText);
-            return `--- Photo ${index + 1} ---\n${cleanedText}`;
+            // Le nettoyage est appliqué ici, mais une seconde passe est faite sur le texte combiné pour plus de sûreté
+            return `--- Photo ${index + 1} ---\n${ocrText}`;
         }).join('\n\n');
         
         if (!combinedOcrText.trim()) {
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
 
-        return res.status(200).json({ text: combinedOcrText.trim() });
+        const finalCleanedText = cleanLatex(combinedOcrText);
+
+        return res.status(200).json({ text: finalCleanedText.trim() });
 
     } catch (error: any) {
         console.error("Error in ocr-multipage:", error);

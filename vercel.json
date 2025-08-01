@@ -1,11 +1,7 @@
 {
   "functions": {
     "api/**/*.ts": {
-      "includeFiles": [
-        "src/types.ts",
-        "src/utils/**",
-        "api/_lib/**"
-      ]
+      "includeFiles": "src/types.ts,src/utils/**,api/_lib/**"
     }
   },
   "rewrites": [

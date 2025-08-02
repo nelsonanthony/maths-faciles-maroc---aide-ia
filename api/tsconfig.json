@@ -1,4 +1,3 @@
-
 {
     "extends": "../tsconfig.json",
     "compilerOptions": {
@@ -14,6 +13,7 @@
       "resolveJsonModule": true,
       "isolatedModules": false,
       "types": ["node"],
+      "declaration": true,
       "baseUrl": "..",
       "paths": {
         "@/*": ["src/*"]

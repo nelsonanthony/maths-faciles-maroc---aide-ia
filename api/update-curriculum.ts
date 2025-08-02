@@ -64,7 +64,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
             case 'ADD_OR_UPDATE_CHAPTER': {
                 const { levelId, chapter } = payload as { levelId: string, chapter: Chapter };
-                 ({ error: rpcError } = await supabase.rpc('upsert_chapter', { p_level_id: levelId, p_chapter_data: chapter as any }));
+                const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
+                if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
+
+                const path = [levelIdx.toString(), 'chapters'];
+                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: chapter as any }));
                 break;
             }
              case 'ADD_OR_UPDATE_SERIES': {

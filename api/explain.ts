@@ -110,14 +110,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.
-            -   Dans toutes les chaînes de caractères que tu génères ('ia_question', 'positive_feedback', 'hint_for_wrong_answer', 'explanation'), toutes les expressions mathématiques DOIVENT être en LaTeX standard.
-                -   **Équations en bloc**: Utilise $$...$$. Exemple : "$$f'(x) = 2x - 4$$"
-                -   **Formules en ligne**: Utilise $...$. Exemple : "La solution est $x=2$."
+            -   Pour les expressions mathématiques, utilise une combinaison d'Unicode et de LaTeX :
+                -   **Symboles simples**: Utilise les caractères Unicode dédiés (ex: 'ℝ' pour les réels, '→', '∈', '∀', '∃', '²', 'ƒ', '𝑥').
+                -   **Expressions complexes** (fractions, racines, intégrales, sommes): Utilise LaTeX.
+                    -   **En bloc**: $$...$$. Exemple : "$$\\frac{x-1}{x+2}$$"
+                    -   **En ligne**: $...$. Exemple : "La dérivée est $f'(x) = 2x$."
                 -   **INTERDICTION D'UTILISER** les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
         `;
 
         // --- Main AI Generation Logic ---
-        const generateResponse = async (finalPrompt: string) => {
+        const generateResponse = async (promptForAI: string) => {
             let responseSchema;
             
             if (requestType === 'socratic') {
@@ -160,12 +162,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: finalPrompt,
+                contents: promptForAI,
                 config: {
                     systemInstruction,
                     responseMimeType: "application/json",
-                    responseSchema,
-                    thinkingConfig: { thinkingBudget: 0 }
+                    responseSchema
                 }
             });
 

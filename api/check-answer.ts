@@ -83,9 +83,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.
-            -   Dans les champs 'summary' et 'explanation', toutes les expressions mathématiques DOIVENT être en LaTeX standard.
-                -   **Équations en bloc**: Utilise $$...$$. Exemple : "$$f'(x) = 2x - 4$$"
-                -   **Formules en ligne**: Utilise $...$. Exemple : "La solution est $x=2$."
+            -   Pour les expressions mathématiques dans 'summary' et 'explanation', utilise une combinaison d'Unicode et de LaTeX :
+                -   **Symboles simples**: Utilise les caractères Unicode dédiés (ex: 'ℝ' pour les réels, '→', '∈', '∀', '∃', '²', 'ƒ', '𝑥').
+                -   **Expressions complexes** (fractions, racines, intégrales, sommes): Utilise LaTeX.
+                    -   **En bloc**: $$...$$. Exemple : "$$\\frac{x-1}{x+2}$$"
+                    -   **En ligne**: $...$. Exemple : "La dérivée est $f'(x) = 2x$."
                 -   **INTERDICTION D'UTILISER** les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
 
             ---
@@ -145,8 +147,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             contents: prompt,
             config: { 
                 responseMimeType: "application/json",
-                responseSchema: answerSchema,
-                thinkingConfig: { thinkingBudget: 0 }
+                responseSchema: answerSchema
             }
         });
         

@@ -2,7 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
+import aiUsageLimiter from './_lib/ai-usage-limiter';
 import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -47,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- Rate Limiting ---
-        const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'OCR');
+        const { limitExceeded, limit } = await aiUsageLimiter.checkUsageLimit(supabase, user.id, 'OCR');
         if (limitExceeded) {
             return res.status(429).json({ error: `Vous avez atteint votre limite de ${limit} analyses d'image par jour.` });
         }
@@ -86,7 +86,7 @@ Transcris maintenant le contenu de l'image en suivant ces règles à la lettre.`
         });
 
         // Log successful AI call
-        await logAiCall(supabase, user.id, 'OCR');
+        await aiUsageLimiter.logAiCall(supabase, user.id, 'OCR');
         
         const extractedText = response.text;
         if (extractedText === undefined) {

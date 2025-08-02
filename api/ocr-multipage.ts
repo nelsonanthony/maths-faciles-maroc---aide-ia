@@ -2,7 +2,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
+import aiUsageLimiter from './_lib/ai-usage-limiter';
 import { cleanLatex } from "../src/utils/math-format";
 
 
@@ -58,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // --- Check usage limit before processing ---
-        const { usageCount, limit } = await checkUsageLimit(supabase, user.id, 'OCR');
+        const { usageCount, limit } = await aiUsageLimiter.checkUsageLimit(supabase, user.id, 'OCR');
         const callsLeft = limit - usageCount;
         if (images.length > callsLeft) {
             return res.status(429).json({ error: `Vous essayez de téléverser ${images.length} images, mais il ne vous reste que ${callsLeft} analyses d'image pour aujourd'hui.` });
@@ -92,7 +92,7 @@ Transcris maintenant le contenu de l'image ou des images fournies en suivant ces
         const ocrResults = await Promise.all(ocrPromises);
 
         // --- Log successful calls ---
-        const logPromises = images.map(() => logAiCall(supabase, user.id, 'OCR'));
+        const logPromises = images.map(() => aiUsageLimiter.logAiCall(supabase, user.id, 'OCR'));
         await Promise.all(logPromises);
 
         // --- Combine results ---

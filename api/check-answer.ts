@@ -2,9 +2,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
-import { getExerciseById } from "./_lib/data-access";
-import { validateMathResponse } from "./_lib/math-validator";
+import aiUsageLimiter from './_lib/ai-usage-limiter';
+import dataAccess from "./_lib/data-access";
+import mathValidator from "./_lib/math-validator";
 import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // --- Rate Limiting ---
-        const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'ANSWER_VALIDATION');
+        const { limitExceeded, limit } = await aiUsageLimiter.checkUsageLimit(supabase, user.id, 'ANSWER_VALIDATION');
         if (limitExceeded) {
              const error: any = new Error(`Vous avez atteint votre limite de ${limit} validations de réponse par jour.`);
              error.status = 429;
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         studentAnswer = cleanLatex(studentAnswer);
         
         // --- Fetch Exercise using the new optimized method ---
-        const exercise = await getExerciseById(exerciseId);
+        const exercise = await dataAccess.getExerciseById(exerciseId);
         if (!exercise) {
             return res.status(404).json({ error: "Exercice non trouvé." });
         }
@@ -204,10 +204,10 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
         }
         
         // Appliquer le nettoyage et la validation à toute la réponse JSON
-        const finalResponse = validateMathResponse(parsedJson);
+        const finalResponse = mathValidator.validateMathResponse(parsedJson);
 
         // Log successful AI call
-        await logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
+        await aiUsageLimiter.logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         
         return res.status(200).json(finalResponse);
 

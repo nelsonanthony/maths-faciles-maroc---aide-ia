@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
+import aiUsageLimiter from './_lib/ai-usage-limiter';
 import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });
         }
 
-        const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'SOCRATIC_VALIDATION');
+        const { limitExceeded, limit } = await aiUsageLimiter.checkUsageLimit(supabase, user.id, 'SOCRATIC_VALIDATION');
         if (limitExceeded) {
             const error: any = new Error(`Vous avez atteint votre limite de ${limit} vérifications par jour.`);
             error.status = 429;
@@ -115,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
         }
         
-        await logAiCall(supabase, user.id, 'SOCRATIC_VALIDATION');
+        await aiUsageLimiter.logAiCall(supabase, user.id, 'SOCRATIC_VALIDATION');
         
         return res.status(200).json(parsedJson);
 

@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Exercise } from "../src/types";
-import { getAllExercisesMap } from "./_lib/data-access";
+import dataAccess from "./_lib/data-access";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Standard CORS headers
@@ -75,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // 3. The RPC function returns only IDs. We need to find the full exercise data from the live curriculum.
-        const allExercisesMap = await getAllExercisesMap();
+        const allExercisesMap = await dataAccess.getAllExercisesMap();
         
         // 4. Map the IDs from the RPC result to full Exercise objects.
         const rpcResult: { id: string }[] = similarExercisesData || [];

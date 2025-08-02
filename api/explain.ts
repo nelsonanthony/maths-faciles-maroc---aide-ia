@@ -3,8 +3,8 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types";
-import { checkUsageLimit, logAiCall } from "./_lib/ai-usage-limiter";
-import { validateMathResponse } from "./_lib/math-validator";
+import aiUsageLimiter from "./_lib/ai-usage-limiter";
+import mathValidator from "./_lib/math-validator";
 import { cleanLatex } from "../src/utils/math-format";
 
 // This function runs on Vercel's servers (Node.js environment)
@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Jeton d\'authentification invalide ou expiré.' });
         }
 
-        const { limitExceeded, limit } = await checkUsageLimit(supabase, user.id, 'EXPLANATION');
+        const { limitExceeded, limit } = await aiUsageLimiter.checkUsageLimit(supabase, user.id, 'EXPLANATION');
         if (limitExceeded) {
              const error: any = new Error(`Vous avez atteint votre limite de ${limit} demandes d'explication par jour.`);
              error.status = 429;
@@ -224,7 +224,7 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
             }
 
             // Nettoyage et validation de la réponse JSON avant de la traiter.
-            const cleanedJson = validateMathResponse(parsedJson);
+            const cleanedJson = mathValidator.validateMathResponse(parsedJson);
 
             if(requestType === 'socratic') {
                 finalResponse.socraticPath = cleanedJson.path;
@@ -245,7 +245,7 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
         }
 
         // Log successful AI call
-        await logAiCall(supabase, user.id, 'EXPLANATION');
+        await aiUsageLimiter.logAiCall(supabase, user.id, 'EXPLANATION');
 
         return res.status(200).json(finalResponse);
 

@@ -1,3 +1,4 @@
+
 import { cleanLatex } from '../../src/utils/math-format';
 
 /**
@@ -6,7 +7,7 @@ import { cleanLatex } from '../../src/utils/math-format';
  * @param content L'objet, le tableau ou la chaîne à nettoyer.
  * @returns Le contenu nettoyé avec le même type que l'entrée.
  */
-export const validateMathResponse = (content: any): any => {
+const validateMathResponse = (content: any): any => {
   if (typeof content === 'string') {
     // Applique le nettoyage et la validation sur chaque chaîne
     return cleanLatex(content);
@@ -30,3 +31,5 @@ export const validateMathResponse = (content: any): any => {
   // Retourne les types non-traités (nombres, booléens, etc.) tels quels
   return content;
 };
+
+export default { validateMathResponse };

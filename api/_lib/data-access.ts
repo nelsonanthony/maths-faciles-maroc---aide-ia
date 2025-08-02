@@ -1,5 +1,6 @@
 
 
+
 import { Level, Exercise } from '../../src/types.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -22,6 +23,15 @@ function getSupabaseAdminClient(): SupabaseClient {
         throw new Error(errorMsg);
     }
     return createClient(supabaseUrl!, supabaseServiceKey!);
+}
+
+/**
+ * Manually invalidates the server-side cache.
+ */
+function invalidateCache() {
+    cachedCurriculum = null;
+    cacheTimestamp = null;
+    console.log("Curriculum cache invalidated.");
 }
 
 
@@ -147,13 +157,13 @@ const saveCurriculumToSupabase = async (levels: Level[]): Promise<void> => {
     }
     
     // Invalidate cache after saving
-    cachedCurriculum = null;
-    cacheTimestamp = null;
+    invalidateCache();
 }
 
 export default {
     getCurriculumFromSupabase,
     saveCurriculumToSupabase,
     getExerciseById,
-    getAllExercisesMap
+    getAllExercisesMap,
+    invalidateCache
 };

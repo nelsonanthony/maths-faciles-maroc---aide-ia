@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getCurriculumFromSupabase, saveCurriculumToSupabase } from './_lib/data-access.js';
-import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "@/types.js";
+import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -25,7 +25,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-    const adminEmail = process.env.VITE_ADMIN_EMAIL;
+    const adminEmail = process.env.ADMIN_EMAIL;
 
     if (!supabaseUrl || !supabaseServiceKey || !adminEmail) {
         return res.status(500).json({ error: "La configuration du serveur est incomplète. Veuillez vérifier les variables d'environnement." });

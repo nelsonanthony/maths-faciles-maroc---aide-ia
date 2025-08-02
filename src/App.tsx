@@ -3,14 +3,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, ExerciseContext, DeletionInfo, ModalState, View, CurriculumActionPayload } from '@/types';
+import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, DeletionInfo, ModalState, View, CurriculumActionPayload, ExerciseContext } from '@/types';
 import { SpinnerIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCurriculum } from '@/services/api';
 import { getSupabase } from '@/services/authService';
 import { MainContent } from '@/components/MainContent';
 import { ModalManager } from '@/components/ModalManager';
-
 
 const callUpdateApi = async (body: CurriculumActionPayload) => {
     const supabase = getSupabase();
@@ -32,11 +31,12 @@ const callUpdateApi = async (body: CurriculumActionPayload) => {
         const errorData = await response.json();
         throw new Error(errorData.error || "La mise à jour a échoué.");
     }
-    return response.json();
+    // The API now returns a lightweight success message, not the full curriculum
+    return response.json(); 
 };
 
 export const App: React.FC = () => {
-    const { user, isAdmin, isLoading: isAuthLoading } = useAuth();
+    const { user, isLoading: isAuthLoading } = useAuth();
     
     const [view, setView] = useState<View>('home');
     const [curriculum, setCurriculum] = useState<Level[] | null>(null);
@@ -52,39 +52,34 @@ export const App: React.FC = () => {
     const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
     const [videoNavigation, setVideoNavigation] = useState<{ videoId: string; time: number; } | null>(null);
     
-    // Centralized modal state
     const [modal, setModal] = useState<ModalState | null>(null);
 
-    // Inject MathQuill styles once when the app loads
-    useEffect(() => {
-        addStyles();
+    useEffect(() => { addStyles(); }, []);
+
+    const fetchInitialData = useCallback(async () => {
+        setIsLoadingData(true);
+        try {
+            const data = await getCurriculum();
+            setCurriculum(data);
+        } catch (error) {
+            console.error("❌ Erreur lors du chargement du programme :", error);
+            setCurriculum(null);
+        } finally {
+            setIsLoadingData(false);
+        }
     }, []);
 
     useEffect(() => {
-        const fetchData = async () => {
-            setIsLoadingData(true);
-            try {
-                const data = await getCurriculum();
-                setCurriculum(data);
-            } catch (error) {
-                console.error("❌ Erreur lors du chargement du programme :", error);
-                setCurriculum(null);
-            } finally {
-                setIsLoadingData(false);
-            }
-        };
-        fetchData();
-    }, []);
+        fetchInitialData();
+    }, [fetchInitialData]);
 
     useEffect(() => {
         if (!isAuthLoading) {
             if (user) {
-                // If user is logged in and on a public-only page, redirect to dashboard.
                 if (['home', 'login', 'register', 'forgotPassword', 'resetPassword'].includes(view)) {
                      setView('dashboard');
                 }
             } else {
-                // If user is not logged in and on a protected page, redirect to home.
                 const protectedViews: View[] = ['dashboard', 'chat', 'courses', 'chapters', 'chapterHome', 'seriesList', 'exerciseList', 'exercise', 'quiz', 'tutor'];
                 if (protectedViews.includes(view)) {
                     setView('home');
@@ -92,7 +87,6 @@ export const App: React.FC = () => {
             }
         }
     }, [user, isAuthLoading, view]);
-
 
     useEffect(() => {
         const supabase = getSupabase();
@@ -102,82 +96,32 @@ export const App: React.FC = () => {
                 setView('resetPassword');
             }
         });
-
-        return () => {
-            subscription.unsubscribe();
-        };
+        return () => subscription.unsubscribe();
     }, []);
 
     const resetSelections = useCallback((level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => {
-        if (level === 'all') {
-            setSelectedLevelId(null);
-        }
-        if (['all', 'level'].includes(level || '')) {
-            setSelectedChapterId(null);
-        }
-        if (['all', 'level', 'chapter'].includes(level || '')) {
-            setSelectedSeriesId(null);
-        }
+        if (level === 'all') setSelectedLevelId(null);
+        if (['all', 'level'].includes(level || '')) setSelectedChapterId(null);
+        if (['all', 'level', 'chapter'].includes(level || '')) setSelectedSeriesId(null);
         if (['all', 'level', 'chapter', 'series'].includes(level || '')) {
             setSelectedExerciseId(null);
             setSelectedQuizId(null);
             setSelectedExerciseContext(null);
         }
-         if (videoNavigation) {
-            setVideoNavigation(null);
-        }
+        if (videoNavigation) setVideoNavigation(null);
     }, [videoNavigation]);
 
     // --- NAVIGATION ---
     const handleNavigate = (targetView: View) => setView(targetView);
-    
-    const handleBackToDefault = () => {
-        resetSelections('all');
-        setView(user ? 'dashboard' : 'home');
-    };
-
-    const handleSelectLevel = (levelId: string) => {
-        setSelectedLevelId(levelId);
-        resetSelections('level');
-        setView('chapters');
-    };
-    
-    const handleSelectChapter = (chapterId: string) => {
-        setSelectedChapterId(chapterId);
-        resetSelections('chapter');
-        setView('chapterHome');
-    };
-
-    const handleSelectSeriesList = () => {
-        setView('seriesList');
-    };
-    
-    const handleSelectSeries = (seriesId: string) => {
-        setSelectedSeriesId(seriesId);
-        resetSelections('series');
-        setView('exerciseList');
-    };
-    
-    const handleSelectExercise = (exerciseId: string) => {
-        setSelectedExerciseId(exerciseId);
-        setView('exercise');
-    };
-
-    const handleSelectQuiz = (quizId: string) => {
-        setSelectedQuizId(quizId);
-        setView('quiz');
-    };
-
-    const handleNavigateToChat = (context: ExerciseContext) => {
-        setSelectedExerciseContext(context);
-        setView('chat');
-    };
-
-    const handleNavigateToTutor = (context: ExerciseContext) => {
-        setSelectedExerciseContext(context);
-        setView('tutor');
-    };
-
+    const handleBackToDefault = () => { resetSelections('all'); setView(user ? 'dashboard' : 'home'); };
+    const handleSelectLevel = (levelId: string) => { setSelectedLevelId(levelId); resetSelections('level'); setView('chapters'); };
+    const handleSelectChapter = (chapterId: string) => { setSelectedChapterId(chapterId); resetSelections('chapter'); setView('chapterHome'); };
+    const handleSelectSeriesList = () => setView('seriesList');
+    const handleSelectSeries = (seriesId: string) => { setSelectedSeriesId(seriesId); resetSelections('series'); setView('exerciseList'); };
+    const handleSelectExercise = (exerciseId: string) => { setSelectedExerciseId(exerciseId); setView('exercise'); };
+    const handleSelectQuiz = (quizId: string) => { setSelectedQuizId(quizId); setView('quiz'); };
+    const handleNavigateToChat = (context: ExerciseContext) => { setSelectedExerciseContext(context); setView('chat'); };
+    const handleNavigateToTutor = (context: ExerciseContext) => { setSelectedExerciseContext(context); setView('tutor'); };
     const handleNavigateToTimestamp = (levelId: string, chapterId: string, videoId: string, time: number) => {
         setSelectedLevelId(levelId);
         setSelectedChapterId(chapterId);
@@ -188,71 +132,156 @@ export const App: React.FC = () => {
     // --- MODAL & CRUD OPERATIONS ---
     const openModal = (modalState: ModalState) => setModal(modalState);
     const closeModal = () => setModal(null);
-    
+
     const handleAddOrUpdateLevel = async (levelData: Level) => {
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
-        setCurriculum(response.curriculum);
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
+        setCurriculum(prev => {
+            if (!prev) return [levelData];
+            const index = prev.findIndex(l => l.id === levelData.id);
+            if (index > -1) {
+                const newState = [...prev];
+                newState[index] = { ...newState[index], ...levelData };
+                return newState;
+            }
+            return [...prev, levelData];
+        });
         closeModal();
     };
 
     const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
-        if (!selectedLevelId) {
-            throw new Error("Impossible d'ajouter/modifier un chapitre : aucun niveau n'est sélectionné.");
-        }
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
-        setCurriculum(response.curriculum);
+        if (!selectedLevelId) throw new Error("Aucun niveau sélectionné.");
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
+        setCurriculum(prev => prev?.map(level => {
+            if (level.id !== selectedLevelId) return level;
+            const chapIndex = level.chapters.findIndex(c => c.id === chapterData.id);
+            const newChaps = [...level.chapters];
+            if (chapIndex > -1) newChaps[chapIndex] = { ...newChaps[chapIndex], ...chapterData };
+            else newChaps.push({ quizzes: [], series: [], ...chapterData });
+            return { ...level, chapters: newChaps };
+        }) || null);
         closeModal();
     };
 
     const handleAddOrUpdateSeries = async (seriesData: Series, chapterId: string) => {
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId: chapterId, series: seriesData } });
-        setCurriculum(response.curriculum);
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId, series: seriesData } });
+        setCurriculum(prev => prev?.map(level => {
+            if (level.id !== selectedLevelId) return level;
+            const newChaps = level.chapters.map(c => {
+                if (c.id !== chapterId) return c;
+                const seriesIndex = c.series.findIndex(s => s.id === seriesData.id);
+                const newSeriesArr = [...c.series];
+                if (seriesIndex > -1) newSeriesArr[seriesIndex] = { ...newSeriesArr[seriesIndex], ...seriesData };
+                else newSeriesArr.push({ exercises: [], ...seriesData });
+                return { ...c, series: newSeriesArr };
+            });
+            return { ...level, chapters: newChaps };
+        }) || null);
         closeModal();
     };
-    
+
     const handleAddOrUpdateExercise = async (exerciseData: Exercise, seriesId: string) => {
-         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId: seriesId, exercise: exerciseData } });
-        setCurriculum(response.curriculum);
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId, exercise: exerciseData } });
+        setCurriculum(prev => prev?.map(l => {
+            if (l.id !== selectedLevelId) return l;
+            const newChaps = l.chapters.map(c => {
+                if (c.id !== selectedChapterId) return c;
+                const newSeriesArr = c.series.map(s => {
+                    if (s.id !== seriesId) return s;
+                    const exIndex = s.exercises.findIndex(e => e.id === exerciseData.id);
+                    const newExArr = [...s.exercises];
+                    if (exIndex > -1) newExArr[exIndex] = exerciseData;
+                    else newExArr.push(exerciseData);
+                    return { ...s, exercises: newExArr };
+                });
+                return { ...c, series: newSeriesArr };
+            });
+            return { ...l, chapters: newChaps };
+        }) || null);
         closeModal();
     };
-    
+
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId: chapterId, quiz: quizData } });
-        setCurriculum(response.curriculum);
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
+        const updatedQuiz = await new Promise<Quiz | undefined>(resolve => {
+            setCurriculum(prev => {
+                let foundQuiz: Quiz | undefined;
+                const newCurriculum = prev?.map(level => {
+                    if (level.id !== selectedLevelId) return level;
+                    const newChaps = level.chapters.map(c => {
+                        if (c.id !== chapterId) return c;
+                        const quizIndex = c.quizzes.findIndex(q => q.id === quizData.id);
+                        const newQuizzesArr = [...c.quizzes];
+                        if (quizIndex > -1) newQuizzesArr[quizIndex] = { ...newQuizzesArr[quizIndex], ...quizData };
+                        else newQuizzesArr.push({ questions: [], ...quizData });
+                        foundQuiz = newQuizzesArr.find(q => q.id === quizData.id);
+                        return { ...c, quizzes: newQuizzesArr };
+                    });
+                    return { ...level, chapters: newChaps };
+                }) || null;
+                resolve(foundQuiz);
+                return newCurriculum;
+            });
+        });
         closeModal();
+        if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
     };
-    
+
     const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {
-        const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
-        setCurriculum(response.curriculum);
-        
-        // After adding/editing a question, we must re-open the parent quiz modal to maintain UX flow.
-        const updatedQuiz = response.curriculum.find((l: Level) => l.id === selectedLevelId)?.chapters.find((c: Chapter) => c.id === chapterId)?.quizzes.find((q: Quiz) => q.id === quizId);
-        
-        closeModal(); // Close question modal first
-        if (updatedQuiz) {
-             openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
-        }
+        await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
+        const updatedQuiz = await new Promise<Quiz | undefined>(resolve => {
+            setCurriculum(prev => {
+                let foundQuiz: Quiz | undefined;
+                const newCurriculum = prev?.map(l => {
+                    if (l.id !== selectedLevelId) return l;
+                    const newChaps = l.chapters.map(c => {
+                        if (c.id !== chapterId) return c;
+                        const newQuizzesArr = c.quizzes.map(q => {
+                            if (q.id !== quizId) return q;
+                            const qIndex = q.questions.findIndex(qu => qu.id === questionData.id);
+                            const newQArr = [...q.questions];
+                            if (qIndex > -1) newQArr[qIndex] = questionData;
+                            else newQArr.push(questionData);
+                            const newQuizData = { ...q, questions: newQArr };
+                            foundQuiz = newQuizData;
+                            return newQuizData;
+                        });
+                        return { ...c, quizzes: newQuizzesArr };
+                    });
+                    return { ...l, chapters: newChaps };
+                }) || null;
+                resolve(foundQuiz);
+                return newCurriculum;
+            });
+        });
+        closeModal();
+        if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
     };
 
     const handleConfirmDelete = async () => {
         if (!modal || modal.type !== 'delete') return;
-        const { payload: deletionInfo } = modal;
-        const response = await callUpdateApi({ action: 'DELETE_ITEM', payload: deletionInfo });
-        setCurriculum(response.curriculum);
+        const { payload: delInfo } = modal;
+        await callUpdateApi({ action: 'DELETE_ITEM', payload: delInfo });
+        const { type, ids } = delInfo;
         
-        // After deleting a question, re-open the quiz modal to see the updated list
-        if (deletionInfo.type === 'quizQuestion' && deletionInfo.ids.chapterId && deletionInfo.ids.quizId && deletionInfo.ids.levelId) {
-            const { ids } = deletionInfo;
-            const updatedQuiz = response.curriculum.find((l: Level) => l.id === ids.levelId)?.chapters.find((c: Chapter) => c.id === ids.chapterId)?.quizzes.find((q: Quiz) => q.id === ids.quizId);
-            closeModal(); // Close delete confirmation
-            if (updatedQuiz) {
-                openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId: ids.chapterId } });
-                return; // Return early to avoid closing the newly opened modal
+        setCurriculum(prev => {
+            if (!prev) return null;
+            let newCurriculum = [...prev];
+            switch (type) {
+                case 'level': return newCurriculum.filter(l => l.id !== ids.levelId);
+                case 'chapter': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.filter(c => c.id !== ids.chapterId) });
+                case 'series': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, series: c.series.filter(s => s.id !== ids.seriesId) }) });
+                case 'exercise': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, series: c.series.map(s => s.id !== ids.seriesId ? s : { ...s, exercises: s.exercises.filter(e => e.id !== ids.exerciseId) }) }) });
+                case 'quiz': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, quizzes: c.quizzes.filter(q => q.id !== ids.quizId) }) });
+                case 'quizQuestion': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, quizzes: c.quizzes.map(q => q.id !== ids.quizId ? q : { ...q, questions: q.questions.filter(qu => qu.id !== ids.questionId) }) }) });
+                default: return prev;
             }
+        });
+
+        closeModal();
+        if (type === 'quizQuestion' && ids.levelId && ids.chapterId && ids.quizId) {
+            const updatedQuiz = curriculum?.find(l => l.id === ids.levelId)?.chapters.find(c => c.id === ids.chapterId)?.quizzes.find(q => q.id === ids.quizId);
+            if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId: ids.chapterId } });
         }
-        
-        closeModal(); // Close delete confirmation for all other cases
     };
     
 
@@ -269,55 +298,31 @@ export const App: React.FC = () => {
     
     return (
         <div className="flex flex-col min-h-screen font-sans bg-slate-950 text-slate-300">
-            <Header
-                onNavigate={handleNavigate}
-            />
+            <Header onNavigate={handleNavigate} />
             <main className="flex-grow container mx-auto px-4 py-8">
                 {curriculum ? (
                     <MainContent
-                        view={view}
-                        user={user}
-                        curriculum={curriculum}
-                        passwordResetToken={passwordResetToken}
-                        selectedLevelId={selectedLevelId}
-                        selectedChapterId={selectedChapterId}
-                        selectedSeriesId={selectedSeriesId}
-                        selectedExerciseId={selectedExerciseId}
-                        selectedQuizId={selectedQuizId}
-                        selectedExerciseContext={selectedExerciseContext}
-                        videoNavigation={videoNavigation}
-                        onNavigate={handleNavigate}
-                        onSelectLevel={handleSelectLevel}
-                        onSelectChapter={handleSelectChapter}
-                        onSelectSeries={handleSelectSeries}
-                        onSelectSeriesList={handleSelectSeriesList}
-                        onSelectExercise={handleSelectExercise}
-                        onSelectQuiz={handleSelectQuiz}
-                        onNavigateToChat={handleNavigateToChat}
-                        onNavigateToTutor={handleNavigateToTutor}
-                        onNavigateToTimestamp={handleNavigateToTimestamp}
-                        onBackToDefault={handleBackToDefault}
-                        resetSelections={resetSelections}
-                        openModal={openModal}
+                        view={view} user={user} curriculum={curriculum} passwordResetToken={passwordResetToken}
+                        selectedLevelId={selectedLevelId} selectedChapterId={selectedChapterId} selectedSeriesId={selectedSeriesId}
+                        selectedExerciseId={selectedExerciseId} selectedQuizId={selectedQuizId} selectedExerciseContext={selectedExerciseContext}
+                        videoNavigation={videoNavigation} onNavigate={handleNavigate} onSelectLevel={handleSelectLevel}
+                        onSelectChapter={handleSelectChapter} onSelectSeries={handleSelectSeries} onSelectSeriesList={handleSelectSeriesList}
+                        onSelectExercise={handleSelectExercise} onSelectQuiz={handleSelectQuiz} onNavigateToChat={onNavigateToChat}
+                        onNavigateToTutor={onNavigateToTutor} onNavigateToTimestamp={onNavigateToTimestamp}
+                        onBackToDefault={handleBackToDefault} resetSelections={resetSelections} openModal={openModal}
                     />
                 ) : (
                     <div className="text-center text-red-400">
                         <p>Impossible de charger le contenu pédagogique. Veuillez réessayer plus tard.</p>
+                        <button onClick={fetchInitialData} className="mt-4 px-4 py-2 bg-brand-blue-600 text-white rounded-lg">Réessayer</button>
                     </div>
                 )}
             </main>
             <Footer />
             <ModalManager
-                modal={modal}
-                levelId={selectedLevelId}
-                onClose={closeModal}
-                openModal={openModal}
-                onSaveLevel={handleAddOrUpdateLevel}
-                onSaveChapter={handleAddOrUpdateChapter}
-                onSaveSeries={handleAddOrUpdateSeries}
-                onSaveExercise={handleAddOrUpdateExercise}
-                onSaveQuiz={handleAddOrUpdateQuiz}
-                onSaveQuizQuestion={handleAddOrUpdateQuizQuestion}
+                modal={modal} levelId={selectedLevelId} onClose={closeModal} openModal={openModal}
+                onSaveLevel={handleAddOrUpdateLevel} onSaveChapter={handleAddOrUpdateChapter} onSaveSeries={handleAddOrUpdateSeries}
+                onSaveExercise={handleAddOrUpdateExercise} onSaveQuiz={handleAddOrUpdateQuiz} onSaveQuizQuestion={handleAddOrUpdateQuizQuestion}
                 onConfirmDelete={handleConfirmDelete}
             />
         </div>

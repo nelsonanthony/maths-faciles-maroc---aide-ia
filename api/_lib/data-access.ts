@@ -9,12 +9,17 @@ let cacheTimestamp: number | null = null;
 const CACHE_DURATION_MS = 1 * 60 * 1000; // 1 minute cache
 
 function getSupabaseAdminClient(): SupabaseClient {
-     const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-        console.error("Server Config Error: Supabase URL or Service Key is missing in data-access.");
-        throw new Error("Database connection is not configured on the server.");
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+
+    if (missingVars.length > 0) {
+        const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+        console.error(`Error in getSupabaseAdminClient: ${errorMsg}`);
+        throw new Error(errorMsg);
     }
     return createClient(supabaseUrl, supabaseServiceKey);
 }

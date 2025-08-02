@@ -1,25 +1,24 @@
 {
-    "extends": "../tsconfig.json",
-    "compilerOptions": {
-      "target": "ESNext",
-      "lib": ["ESNext"],
-      "module": "ESNext",
-      "moduleResolution": "NodeNext",
-      "skipLibCheck": true,
-      "strict": true,
-      "noEmit": false,
-      "allowSyntheticDefaultImports": true,
-      "esModuleInterop": true,
-      "resolveJsonModule": true,
-      "isolatedModules": false,
-      "types": ["node"],
-      "declaration": true,
-      "baseUrl": "..",
-      "paths": {
-        "@/*": ["src/*"]
-      }
-    },
-    "include": ["**/*.ts"],
-    "exclude": ["node_modules"]
-  }
-  
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "target": "ESNext",
+    "lib": ["ESNext"],
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": false,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": false,
+    "types": ["node"],
+    "declaration": true,
+    "baseUrl": "..",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["node_modules"]
+}

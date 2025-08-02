@@ -1,6 +1,5 @@
 
 
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -35,8 +34,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-    if (!apiKey || !supabaseUrl || !supabaseServiceKey) {
-        return res.status(500).json({ error: "La configuration du serveur est incomplète." });
+    const missingVars = [];
+    if (!apiKey) missingVars.push('GEMINI_API_KEY');
+    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+
+    if (missingVars.length > 0) {
+        const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+        return res.status(500).json({ error: errorMsg });
     }
 
     try {

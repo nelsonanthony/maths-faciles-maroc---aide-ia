@@ -29,8 +29,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
     const adminEmail = process.env.ADMIN_EMAIL;
 
-    if (!supabaseUrl || !supabaseServiceKey || !adminEmail) {
-        return res.status(500).json({ error: "La configuration du serveur est incomplète. Veuillez vérifier les variables d'environnement." });
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+    if (!adminEmail) missingVars.push('ADMIN_EMAIL');
+
+    if (missingVars.length > 0) {
+        const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+        return res.status(500).json({ error: errorMsg });
     }
 
     try {

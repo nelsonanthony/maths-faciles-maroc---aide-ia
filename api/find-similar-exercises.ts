@@ -24,13 +24,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).end(`Method ${req.method} Not Allowed`);
     }
 
-    // Check for required environment variables for Supabase
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-    if (!supabaseUrl || !supabaseServiceKey) {
-        console.error("Server Config Error: Supabase URL or Service Key is missing.");
-        return res.status(500).json({ error: "Database connection is not configured on the server." });
+    const missingVars = [];
+    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+    if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+
+    if (missingVars.length > 0) {
+        const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+        return res.status(500).json({ error: errorMsg });
     }
     
     // Validate request body

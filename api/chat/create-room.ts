@@ -1,6 +1,5 @@
 
 
-
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
@@ -33,9 +32,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-        if (!supabaseUrl || !supabaseServiceKey) {
-            console.error('Server configuration error: SUPABASE_URL or SUPABASE_SERVICE_KEY is not set in Vercel environment variables.');
-            return res.status(500).json({ error: 'La configuration de la base de données sur le serveur est incomplète. L\'administrateur doit définir les variables d\'environnement.' });
+        const missingVars = [];
+        if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+        if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+
+        if (missingVars.length > 0) {
+            const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+            return res.status(500).json({ error: errorMsg });
         }
         
         const supabase = createClient(supabaseUrl, supabaseServiceKey);

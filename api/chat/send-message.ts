@@ -33,9 +33,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
         const apiKey = process.env.GEMINI_API_KEY; 
 
-        if (!supabaseUrl || !supabaseServiceKey || !apiKey) {
-            console.error('Server configuration error: One or more required environment variables are missing (SUPABASE_URL, SUPABASE_SERVICE_KEY, GEMINI_API_KEY).');
-            return res.status(500).json({ error: 'La configuration du serveur est incomplète. L\'administrateur doit définir les variables d\'environnement.' });
+        const missingVars = [];
+        if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+        if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+        if (!apiKey) missingVars.push('GEMINI_API_KEY');
+
+        if (missingVars.length > 0) {
+            const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+            return res.status(500).json({ error: errorMsg });
         }
         
         const supabase = createClient(supabaseUrl, supabaseServiceKey);

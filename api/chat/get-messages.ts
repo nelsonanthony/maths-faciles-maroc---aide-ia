@@ -58,9 +58,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const supabaseUrl = process.env.SUPABASE_URL;
         const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
 
-        if (!supabaseUrl || !supabaseAnonKey) {
-            console.error('Server configuration error: SUPABASE_URL or SUPABASE_ANON_KEY is not set in Vercel environment variables.');
-            return res.status(500).json({ error: 'La configuration de la base de données sur le serveur est incomplète. L\'administrateur doit définir les variables d\'environnement.' });
+        const missingVars = [];
+        if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+        if (!supabaseAnonKey) missingVars.push('SUPABASE_ANON_KEY');
+
+        if (missingVars.length > 0) {
+            const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
+            return res.status(500).json({ error: errorMsg });
         }
 
         const { room_id } = req.query;

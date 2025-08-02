@@ -1,6 +1,9 @@
 
 
 
+
+
+
 import React, { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -341,6 +344,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         };
         
         await onSave(finalExercise, seriesId);
+        onClose();
     } catch (error) {
         console.error("Save failed:", error);
         alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

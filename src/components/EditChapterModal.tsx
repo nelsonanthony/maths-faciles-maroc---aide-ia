@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Chapter, VideoLink } from '@/types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
@@ -51,6 +52,7 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
           series: chapter?.series || [],
         };
         await onSave(finalChapter);
+        onClose();
     } catch (error) {
         console.error("Save failed:", error);
         alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

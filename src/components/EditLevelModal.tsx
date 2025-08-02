@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Level } from '@/types';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
@@ -42,7 +43,7 @@ export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, o
         chapters: level?.chapters || [],
       };
       await onSave(finalLevel);
-      // onClose is called by the parent component on success
+      onClose();
     } catch (error) {
       console.error("Save failed:", error);
       alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

@@ -3,6 +3,7 @@
 
 
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
@@ -196,7 +197,6 @@ export const App: React.FC = () => {
     const handleAddOrUpdateLevel = async (levelData: Level) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
         setCurriculum(response.curriculum);
-        closeModal();
     };
 
     const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
@@ -205,25 +205,21 @@ export const App: React.FC = () => {
         }
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
         setCurriculum(response.curriculum);
-        closeModal();
     };
 
     const handleAddOrUpdateSeries = async (seriesData: Series, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId: chapterId, series: seriesData } });
         setCurriculum(response.curriculum);
-        closeModal();
     };
     
     const handleAddOrUpdateExercise = async (exerciseData: Exercise, seriesId: string) => {
          const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId: seriesId, exercise: exerciseData } });
         setCurriculum(response.curriculum);
-        closeModal();
     };
     
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId: chapterId, quiz: quizData } });
         setCurriculum(response.curriculum);
-        closeModal();
     };
     
     const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {

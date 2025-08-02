@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Quiz, QuizQuestion } from '@/types';
 import { XMarkIcon, PencilIcon, TrashIcon, PlusCircleIcon, SpinnerIcon } from '@/components/icons';
@@ -44,6 +45,7 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, onSave, onCl
           questions: quiz?.questions || [],
         };
         await onSave(finalQuiz);
+        onClose();
     } catch (error) {
         console.error("Save failed:", error);
         alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

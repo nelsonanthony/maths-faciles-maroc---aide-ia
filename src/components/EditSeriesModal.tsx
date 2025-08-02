@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Series } from '@/types';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
@@ -40,6 +41,7 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
           exercises: series?.exercises || [],
         };
         await onSave(finalSeries);
+        onClose();
     } catch (error) {
         console.error("Save failed:", error);
         alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);

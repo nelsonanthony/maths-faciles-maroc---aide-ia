@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -57,14 +56,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // --- Body Validation ---
-        let { prompt, chapterId, requestType } = req.body as { prompt?: string, chapterId?: string, requestType?: 'socratic' | 'direct' };
+        const { prompt: rawPrompt, chapterId, requestType } = req.body as { prompt?: string, chapterId?: string, requestType?: 'socratic' | 'direct' };
 
-        if (!prompt || typeof prompt !== 'string' || !chapterId || typeof chapterId !== 'string' || !requestType) {
+        if (!rawPrompt || typeof rawPrompt !== 'string' || !chapterId || typeof chapterId !== 'string' || !requestType) {
             return res.status(400).json({ error: "Les champs 'prompt', 'chapterId', et 'requestType' sont requis et doivent être valides." });
         }
 
-        // Clean prompt to handle potential MathJax from user input/OCR
-        prompt = mathValidator.cleanLatex(prompt);
+        // Clean prompt and ensure it has a definite string type
+        const prompt: string = mathValidator.cleanLatex(rawPrompt);
         
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const finalResponse: AIResponse = {};

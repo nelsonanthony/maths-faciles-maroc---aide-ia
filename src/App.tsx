@@ -133,140 +133,221 @@ export const App: React.FC = () => {
     // --- MODAL & CRUD OPERATIONS ---
     const openModal = (modalState: ModalState) => setModal(modalState);
     const closeModal = () => setModal(null);
+    
+    const handleCRUDError = (error: unknown, operation: string) => {
+        console.error(`${operation} a échoué, restauration de l'état.`, error);
+        alert(`La sauvegarde a échoué (${operation}). Vos modifications ont été annulées.\nErreur: ${error instanceof Error ? error.message : String(error)}`);
+    };
 
     const handleAddOrUpdateLevel = async (levelData: Level) => {
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
-        setCurriculum(prev => {
-            if (!prev) return [levelData];
-            const index = prev.findIndex(l => l.id === levelData.id);
+        const originalCurriculum = curriculum;
+        
+        const optimisticCurriculum = (() => {
+            if (!originalCurriculum) return [levelData];
+            const index = originalCurriculum.findIndex(l => l.id === levelData.id);
             if (index > -1) {
-                const newState = [...prev];
+                const newState = [...originalCurriculum];
                 newState[index] = { ...newState[index], ...levelData };
                 return newState;
             }
-            return [...prev, levelData];
-        });
+            return [...originalCurriculum, levelData];
+        })();
+        
+        setCurriculum(optimisticCurriculum);
         closeModal();
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
+        } catch (error) {
+            handleCRUDError(error, 'niveau');
+            setCurriculum(originalCurriculum);
+        }
     };
 
     const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
-        if (!selectedLevelId) throw new Error("Aucun niveau sélectionné.");
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
-        setCurriculum(prev => prev?.map(level => {
+        if (!selectedLevelId) return;
+
+        const originalCurriculum = curriculum;
+        const optimisticCurriculum = originalCurriculum?.map(level => {
             if (level.id !== selectedLevelId) return level;
-            const chapIndex = level.chapters.findIndex(c => c.id === chapterData.id);
-            const newChaps = [...level.chapters];
-            if (chapIndex > -1) newChaps[chapIndex] = { ...newChaps[chapIndex], ...chapterData };
-            else newChaps.push({ quizzes: [], series: [], ...chapterData });
-            return { ...level, chapters: newChaps };
-        }) || null);
+            const chapters = level.chapters || [];
+            const chapterIndex = chapters.findIndex(c => c.id === chapterData.id);
+            const newChapters = [...chapters];
+            if (chapterIndex > -1) {
+                newChapters[chapterIndex] = { ...newChapters[chapterIndex], ...chapterData };
+            } else {
+                newChapters.push({ quizzes: [], series: [], videoLinks: [], ...chapterData });
+            }
+            return { ...level, chapters: newChapters };
+        }) || null;
+
+        setCurriculum(optimisticCurriculum);
         closeModal();
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
+        } catch (error) {
+            handleCRUDError(error, 'chapitre');
+            setCurriculum(originalCurriculum);
+        }
     };
 
     const handleAddOrUpdateSeries = async (seriesData: Series, chapterId: string) => {
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId, series: seriesData } });
-        setCurriculum(prev => prev?.map(level => {
+        if (!selectedLevelId) return;
+
+        const originalCurriculum = curriculum;
+        const optimisticCurriculum = originalCurriculum?.map(level => {
             if (level.id !== selectedLevelId) return level;
             const newChaps = level.chapters.map(c => {
                 if (c.id !== chapterId) return c;
-                const seriesIndex = c.series.findIndex(s => s.id === seriesData.id);
-                const newSeriesArr = [...c.series];
-                if (seriesIndex > -1) newSeriesArr[seriesIndex] = { ...newSeriesArr[seriesIndex], ...seriesData };
-                else newSeriesArr.push({ exercises: [], ...seriesData });
+                const series = c.series || [];
+                const seriesIndex = series.findIndex(s => s.id === seriesData.id);
+                const newSeriesArr = [...series];
+                if (seriesIndex > -1) {
+                    newSeriesArr[seriesIndex] = { ...newSeriesArr[seriesIndex], ...seriesData };
+                } else {
+                    newSeriesArr.push({ exercises: [], ...seriesData });
+                }
                 return { ...c, series: newSeriesArr };
             });
             return { ...level, chapters: newChaps };
-        }) || null);
+        }) || null;
+
+        setCurriculum(optimisticCurriculum);
         closeModal();
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId, series: seriesData } });
+        } catch (error) {
+            handleCRUDError(error, 'série');
+            setCurriculum(originalCurriculum);
+        }
     };
 
     const handleAddOrUpdateExercise = async (exerciseData: Exercise, seriesId: string) => {
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId, exercise: exerciseData } });
-        setCurriculum(prev => prev?.map(l => {
+        if (!selectedLevelId || !selectedChapterId) return;
+
+        const originalCurriculum = curriculum;
+        const optimisticCurriculum = originalCurriculum?.map(l => {
             if (l.id !== selectedLevelId) return l;
             const newChaps = l.chapters.map(c => {
                 if (c.id !== selectedChapterId) return c;
                 const newSeriesArr = c.series.map(s => {
                     if (s.id !== seriesId) return s;
-                    const exIndex = s.exercises.findIndex(e => e.id === exerciseData.id);
-                    const newExArr = [...s.exercises];
-                    if (exIndex > -1) newExArr[exIndex] = exerciseData;
-                    else newExArr.push(exerciseData);
+                    const exercises = s.exercises || [];
+                    const exIndex = exercises.findIndex(e => e.id === exerciseData.id);
+                    const newExArr = [...exercises];
+                    if (exIndex > -1) {
+                        newExArr[exIndex] = exerciseData;
+                    } else {
+                        newExArr.push(exerciseData);
+                    }
                     return { ...s, exercises: newExArr };
                 });
                 return { ...c, series: newSeriesArr };
             });
             return { ...l, chapters: newChaps };
-        }) || null);
+        }) || null;
+
+        setCurriculum(optimisticCurriculum);
         closeModal();
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId, exercise: exerciseData } });
+        } catch (error) {
+            handleCRUDError(error, 'exercice');
+            setCurriculum(originalCurriculum);
+        }
     };
 
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
-        const updatedQuiz = await new Promise<Quiz | undefined>(resolve => {
-            setCurriculum(prev => {
-                let foundQuiz: Quiz | undefined;
-                const newCurriculum = prev?.map(level => {
-                    if (level.id !== selectedLevelId) return level;
-                    const newChaps = level.chapters.map(c => {
-                        if (c.id !== chapterId) return c;
-                        const quizIndex = c.quizzes.findIndex(q => q.id === quizData.id);
-                        const newQuizzesArr = [...c.quizzes];
-                        if (quizIndex > -1) newQuizzesArr[quizIndex] = { ...newQuizzesArr[quizIndex], ...quizData };
-                        else newQuizzesArr.push({ questions: [], ...quizData });
-                        foundQuiz = newQuizzesArr.find(q => q.id === quizData.id);
-                        return { ...c, quizzes: newQuizzesArr };
-                    });
-                    return { ...level, chapters: newChaps };
-                }) || null;
-                resolve(foundQuiz);
-                return newCurriculum;
+        if (!selectedLevelId) return;
+
+        const originalCurriculum = curriculum;
+        let optimisticQuiz: Quiz | undefined;
+        const optimisticCurriculum = originalCurriculum?.map(level => {
+            if (level.id !== selectedLevelId) return level;
+            const newChaps = level.chapters.map(c => {
+                if (c.id !== chapterId) return c;
+                const quizzes = c.quizzes || [];
+                const quizIndex = quizzes.findIndex(q => q.id === quizData.id);
+                const newQuizzesArr = [...quizzes];
+                if (quizIndex > -1) {
+                    newQuizzesArr[quizIndex] = { ...newQuizzesArr[quizIndex], ...quizData };
+                } else {
+                    newQuizzesArr.push({ questions: [], ...quizData });
+                }
+                optimisticQuiz = newQuizzesArr.find(q => q.id === quizData.id);
+                return { ...c, quizzes: newQuizzesArr };
             });
-        });
+            return { ...level, chapters: newChaps };
+        }) || null;
+        
+        setCurriculum(optimisticCurriculum);
         closeModal();
-        if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
+        if (optimisticQuiz) {
+            openModal({ type: 'editQuiz', payload: { quiz: optimisticQuiz, chapterId } });
+        }
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
+        } catch (error) {
+            handleCRUDError(error, 'quiz');
+            setCurriculum(originalCurriculum);
+            closeModal();
+        }
     };
 
     const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {
-        await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
-        const updatedQuiz = await new Promise<Quiz | undefined>(resolve => {
-            setCurriculum(prev => {
-                let foundQuiz: Quiz | undefined;
-                const newCurriculum = prev?.map(l => {
-                    if (l.id !== selectedLevelId) return l;
-                    const newChaps = l.chapters.map(c => {
-                        if (c.id !== chapterId) return c;
-                        const newQuizzesArr = c.quizzes.map(q => {
-                            if (q.id !== quizId) return q;
-                            const qIndex = q.questions.findIndex(qu => qu.id === questionData.id);
-                            const newQArr = [...q.questions];
-                            if (qIndex > -1) newQArr[qIndex] = questionData;
-                            else newQArr.push(questionData);
-                            const newQuizData = { ...q, questions: newQArr };
-                            foundQuiz = newQuizData;
-                            return newQuizData;
-                        });
-                        return { ...c, quizzes: newQuizzesArr };
-                    });
-                    return { ...l, chapters: newChaps };
-                }) || null;
-                resolve(foundQuiz);
-                return newCurriculum;
+        if (!selectedLevelId) return;
+
+        const originalCurriculum = curriculum;
+        let optimisticQuiz: Quiz | undefined;
+        const optimisticCurriculum = originalCurriculum?.map(l => {
+            if (l.id !== selectedLevelId) return l;
+            const newChaps = l.chapters.map(c => {
+                if (c.id !== chapterId) return c;
+                const newQuizzesArr = c.quizzes.map(q => {
+                    if (q.id !== quizId) return q;
+                    const questions = q.questions || [];
+                    const qIndex = questions.findIndex(qu => qu.id === questionData.id);
+                    const newQArr = [...questions];
+                    if (qIndex > -1) newQArr[qIndex] = questionData;
+                    else newQArr.push(questionData);
+                    const newQuizData = { ...q, questions: newQArr };
+                    optimisticQuiz = newQuizData;
+                    return newQuizData;
+                });
+                return { ...c, quizzes: newQuizzesArr };
             });
-        });
+            return { ...l, chapters: newChaps };
+        }) || null;
+
+        setCurriculum(optimisticCurriculum);
         closeModal();
-        if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId } });
+        if (optimisticQuiz) {
+            openModal({ type: 'editQuiz', payload: { quiz: optimisticQuiz, chapterId } });
+        }
+
+        try {
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
+        } catch (error) {
+            handleCRUDError(error, 'question de quiz');
+            setCurriculum(originalCurriculum);
+            closeModal();
+        }
     };
 
     const handleConfirmDelete = async () => {
         if (!modal || modal.type !== 'delete') return;
+
         const { payload: delInfo } = modal;
-        await callUpdateApi({ action: 'DELETE_ITEM', payload: delInfo });
         const { type, ids } = delInfo;
-        
-        setCurriculum(prev => {
-            if (!prev) return null;
-            let newCurriculum = [...prev];
+        const originalCurriculum = curriculum;
+
+        const optimisticCurriculum = (() => {
+            if (!originalCurriculum) return null;
+            let newCurriculum = [...originalCurriculum];
             switch (type) {
                 case 'level': return newCurriculum.filter(l => l.id !== ids.levelId);
                 case 'chapter': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.filter(c => c.id !== ids.chapterId) });
@@ -274,14 +355,24 @@ export const App: React.FC = () => {
                 case 'exercise': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, series: c.series.map(s => s.id !== ids.seriesId ? s : { ...s, exercises: s.exercises.filter(e => e.id !== ids.exerciseId) }) }) });
                 case 'quiz': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, quizzes: c.quizzes.filter(q => q.id !== ids.quizId) }) });
                 case 'quizQuestion': return newCurriculum.map(l => l.id !== ids.levelId ? l : { ...l, chapters: l.chapters.map(c => c.id !== ids.chapterId ? c : { ...c, quizzes: c.quizzes.map(q => q.id !== ids.quizId ? q : { ...q, questions: q.questions.filter(qu => qu.id !== ids.questionId) }) }) });
-                default: return prev;
+                default: return originalCurriculum;
             }
-        });
-
+        })();
+        
+        setCurriculum(optimisticCurriculum);
         closeModal();
+
         if (type === 'quizQuestion' && ids.levelId && ids.chapterId && ids.quizId) {
-            const updatedQuiz = curriculum?.find(l => l.id === ids.levelId)?.chapters.find(c => c.id === ids.chapterId)?.quizzes.find(q => q.id === ids.quizId);
+            const updatedQuiz = optimisticCurriculum?.find(l => l.id === ids.levelId)?.chapters.find(c => c.id === ids.chapterId)?.quizzes.find(q => q.id === ids.quizId);
             if (updatedQuiz) openModal({ type: 'editQuiz', payload: { quiz: updatedQuiz, chapterId: ids.chapterId } });
+        }
+
+        try {
+            await callUpdateApi({ action: 'DELETE_ITEM', payload: delInfo });
+        } catch (error) {
+            handleCRUDError(error, 'suppression');
+            setCurriculum(originalCurriculum);
+            if (type === 'quizQuestion') closeModal(); // Close the re-opened quiz modal on failure
         }
     };
     

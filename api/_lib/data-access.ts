@@ -40,8 +40,8 @@ async function getCurriculumFromSupabase(): Promise<Curriculum> {
 
     try {
         const supabase = getSupabaseAdminClient();
-        const { data, error } = await supabase
-            .from('curriculum')
+        const { data, error } = await (supabase
+            .from('curriculum') as any)
             .select('data')
             .eq('id', 1)
             .single();

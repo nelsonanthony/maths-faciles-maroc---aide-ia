@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Chapter, VideoLink } from '@/types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
@@ -8,6 +7,24 @@ interface EditChapterModalProps {
   onSave: (chapterData: Chapter) => Promise<void>;
   onClose: () => void;
 }
+
+/**
+ * Extracts a YouTube video ID from various URL formats.
+ * @param url The URL to parse.
+ * @returns The 11-character video ID or the original string if no match is found.
+ */
+const extractYouTubeId = (url: string): string => {
+    if (!url) return '';
+    // This regex covers:
+    // - https://www.youtube.com/watch?v=VIDEO_ID
+    // - https://youtu.be/VIDEO_ID
+    // - https://www.youtube.com/embed/VIDEO_ID
+    // - And variations with other parameters
+    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regex);
+    return match ? match[1] : url; // Return original string if no ID is found
+};
+
 
 export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onSave, onClose }) => {
   const [title, setTitle] = useState(chapter?.title || '');
@@ -21,7 +38,14 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
 
   const handleVideoLinkChange = (index: number, field: keyof VideoLink, value: string) => {
     const newVideoLinks = [...videoLinks];
-    newVideoLinks[index] = { ...newVideoLinks[index], [field]: value };
+    let processedValue = value;
+
+    if (field === 'id') {
+      // Automatically extract the ID from a full YouTube URL
+      processedValue = extractYouTubeId(value);
+    }
+    
+    newVideoLinks[index] = { ...newVideoLinks[index], [field]: processedValue };
     setVideoLinks(newVideoLinks);
   };
 
@@ -120,7 +144,7 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
                         type="text"
                         value={link.id}
                         onChange={(e) => handleVideoLinkChange(index, 'id', e.target.value)}
-                        placeholder="ID YouTube (ex: _RkL24x4k6c)"
+                        placeholder="ID ou lien YouTube"
                         className="w-full p-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
                       />
                     </div>

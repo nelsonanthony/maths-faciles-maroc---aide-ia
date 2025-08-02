@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -205,8 +200,8 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
   const [jsonInput, setJsonInput] = useState('');
   const [isJsonImporterOpen, setIsJsonImporterOpen] = useState(false);
-  const [formulaError, setFormulaError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isCreating = !exercise;
 
@@ -217,9 +212,10 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
 
   const handleJsonImport = () => {
     if (!jsonInput.trim()) {
-        alert("Veuillez coller le contenu JSON dans la zone de texte.");
+        setError("Veuillez coller le contenu JSON dans la zone de texte.");
         return;
     }
+    setError(null);
     try {
         const parsedJson = JSON.parse(jsonInput);
         
@@ -302,27 +298,28 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
 
         setJsonInput('');
         setIsJsonImporterOpen(false);
-        alert("Champs remplis avec succès depuis le JSON !");
 
-    } catch (error) {
-        console.error("Erreur d'importation JSON:", error);
-        alert(`L'importation a échoué. Assurez-vous que le JSON est valide.\nErreur: ${error instanceof Error ? error.message : "Erreur inconnue"}`);
+    } catch (err) {
+        console.error("Erreur d'importation JSON:", err);
+        setError(`L'importation a échoué. Assurez-vous que le JSON est valide. Erreur: ${err instanceof Error ? err.message : "Erreur inconnue"}`);
     }
   };
 
   useEffect(() => {
     const formula = formData.latexFormula?.trim() ?? '';
     if (formula && !/^(y=|x=)/.test(formula)) {
-      setFormulaError('La formule doit commencer par "y=" ou "x=" pour être valide.');
-    } else {
-      setFormulaError(null);
+      setError('La formule doit commencer par "y=" ou "x=" pour être valide.');
+    } else if (error && error.startsWith('La formule doit')) {
+      setError(null);
     }
-  }, [formData.latexFormula]);
+  }, [formData.latexFormula, error]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (formulaError) {
-      alert(`Veuillez corriger l'erreur : ${formulaError}`);
+    setError(null);
+    
+    if (formData.latexFormula?.trim() && !/^(y=|x=)/.test(formData.latexFormula.trim())) {
+      setError('La formule doit commencer par "y=" ou "x=" pour être valide.');
       return;
     }
     
@@ -344,10 +341,10 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         };
         
         await onSave(finalExercise, seriesId);
-        onClose();
-    } catch (error) {
-        console.error("Save failed:", error);
-        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } catch (err) {
+        console.error("Save failed:", err);
+        setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
         setIsSaving(false);
     }
   };
@@ -476,12 +473,11 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
                       type="text" id="latexFormula" name="latexFormula" value={formData.latexFormula || ''} onChange={handleInputChange} placeholder="Ex: y = x^2 + 1"
                       className="w-full p-3 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 disabled:opacity-50"
                     />
-                    {formulaError && <p className="text-sm text-red-400 mt-1">{formulaError}</p>}
                   </div>
               </div>
             </fieldset>
 
-             {(formData.latexFormula?.trim() && !formulaError) ? (
+             {(formData.latexFormula?.trim() && (!error || !error.startsWith('La formule'))) ? (
                 <div className="pt-6 border-t border-gray-700/50">
                      <h4 className="text-sm font-medium text-gray-400 mb-2">Prévisualisation du graphique Desmos</h4>
                     <DesmosGraph latexFormula={formData.latexFormula} />
@@ -489,20 +485,27 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
             ) : null}
           </form>
           
-          <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50 flex-shrink-0">
-            <button
-              type="button" onClick={onClose}
-              disabled={isSaving}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
-            > Annuler </button>
-            <button
-              type="submit" form="edit-exercise-form"
-              disabled={!!formulaError || isSaving}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
-            > 
-                {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-                {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
-            </button>
+          <footer className="flex-col items-stretch p-4 border-t border-gray-700 bg-gray-800/50 flex-shrink-0">
+             {error && (
+                <div className="mb-3 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
+                    <p className="text-sm text-red-300">{error}</p>
+                </div>
+             )}
+             <div className="flex justify-end gap-4">
+                <button
+                  type="button" onClick={onClose}
+                  disabled={isSaving}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
+                > Annuler </button>
+                <button
+                  type="submit" form="edit-exercise-form"
+                  disabled={!!error || isSaving}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
+                > 
+                    {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+                    {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
+                </button>
+             </div>
           </footer>
         </div>
       </div>

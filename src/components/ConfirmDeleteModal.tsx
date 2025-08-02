@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { XMarkIcon, TrashIcon, SpinnerIcon } from './icons';
 
@@ -11,15 +10,17 @@ interface ConfirmDeleteModalProps {
 
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ message, onConfirm, onClose }) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     setIsDeleting(true);
+    setError(null);
     try {
       await onConfirm();
       // onClose is called by the parent component upon success
-    } catch (error) {
-      console.error("Delete failed:", error);
-      alert(`La suppression a échoué: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } catch (err) {
+      console.error("Delete failed:", err);
+      setError(err instanceof Error ? err.message : 'La suppression a échoué.');
       setIsDeleting(false);
     }
   };
@@ -30,7 +31,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ message,
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-delete-title"
-      onClick={onClose}
+      onClick={isDeleting ? undefined : onClose}
     >
       <div
         className="bg-gray-800 rounded-xl border border-gray-700/50 shadow-2xl w-full max-w-md"
@@ -50,24 +51,31 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({ message,
           <p className="text-gray-300">{message}</p>
         </div>
 
-        <footer className="flex justify-end gap-4 p-4 bg-gray-900/50 rounded-b-xl">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isDeleting}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
-          >
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={isDeleting}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-red-600 border-2 border-red-500 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isDeleting && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-            {isDeleting ? 'Suppression...' : 'Confirmer'}
-          </button>
+        <footer className="flex-col items-stretch p-4 bg-gray-900/50 rounded-b-xl">
+           {error && (
+             <div className="mb-3 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
+                 <p className="text-sm text-red-300">{error}</p>
+             </div>
+           )}
+           <div className="flex justify-end gap-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-red-600 border-2 border-red-500 text-white hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isDeleting && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+                {isDeleting ? 'Suppression...' : 'Confirmer'}
+              </button>
+           </div>
         </footer>
       </div>
     </div>

@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Level } from '@/types';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
@@ -18,6 +17,7 @@ const emptyLevel: Omit<Level, 'id' | 'chapters'> = {
 export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, onClose }) => {
   const [formData, setFormData] = useState(level || emptyLevel);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isCreating = !level;
   const modalTitle = isCreating ? "Ajouter un nouveau niveau" : "Modifier le niveau";
@@ -29,8 +29,9 @@ export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, o
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!formData.levelName.trim()) {
-      alert("Le nom du niveau est obligatoire.");
+      setError("Le nom du niveau est obligatoire.");
       return;
     }
 
@@ -43,11 +44,11 @@ export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, o
         chapters: level?.chapters || [],
       };
       await onSave(finalLevel);
-      onClose();
-    } catch (error) {
-      console.error("Save failed:", error);
-      alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
-      setIsSaving(false);
+    } catch (err) {
+      console.error("Save failed:", err);
+      setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -98,24 +99,31 @@ export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, o
           </div>
         </form>
 
-        <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isSaving}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            form="edit-level-form"
-            disabled={isSaving}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
-          >
-            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-            {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
-          </button>
+        <footer className="flex-col items-stretch p-4 border-t border-gray-700 bg-gray-800/50">
+            {error && (
+                <div className="mb-3 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
+                    <p className="text-sm text-red-300">{error}</p>
+                </div>
+            )}
+            <div className="flex justify-end gap-4">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSaving}
+                className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300 disabled:opacity-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                form="edit-level-form"
+                disabled={isSaving}
+                className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+                {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
+              </button>
+            </div>
         </footer>
       </div>
     </div>

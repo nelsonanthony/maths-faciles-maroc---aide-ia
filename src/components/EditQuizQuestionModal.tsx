@@ -20,6 +20,7 @@ const emptyQuestion: Omit<QuizQuestion, 'id'> = {
 export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ question, quizId, chapterId, onSave, onClose }) => {
   const [formData, setFormData] = useState(question || emptyQuestion);
   const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const isCreating = !question;
   const modalTitle = isCreating ? "Ajouter une question" : "Modifier la question";
@@ -45,11 +46,11 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
 
   const handleRemoveOption = (index: number) => {
       if ((formData.options?.length || 0) <= 2) {
-          alert("Une question doit avoir au moins 2 options.");
+          setError("Une question doit avoir au moins 2 options.");
           return;
       }
+      setError(null);
       const newOptions = formData.options?.filter((_, i) => i !== index) || [];
-      // Adjust correct answer index if needed
       const correctIndex = formData.correctAnswerIndex || 0;
       let newCorrectIndex = correctIndex;
       if (index === correctIndex) {
@@ -62,8 +63,9 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
     if (!formData.question.trim() || (formData.options || []).some(opt => !opt.trim())) {
-        alert("La question et toutes les options doivent être remplies.");
+        setError("La question et toutes les options doivent être remplies.");
         return;
     }
 
@@ -77,9 +79,10 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
         };
 
         await onSave(finalQuestion, quizId, chapterId);
-    } catch (error) {
-        console.error("Save failed:", error);
-        alert(`Erreur lors de la sauvegarde: ${error instanceof Error ? error.message : 'Erreur inconnue'}`);
+    } catch (err) {
+        console.error("Save failed:", err);
+        setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+    } finally {
         setIsSaving(false);
     }
   };
@@ -158,14 +161,21 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
           </fieldset>
         </form>
 
-        <footer className="flex justify-end gap-4 p-4 border-t border-gray-700 bg-gray-800/50">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300" disabled={isSaving}>
-            Annuler
-          </button>
-          <button type="submit" form="edit-question-form" className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2" disabled={isSaving}>
-            {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
-            {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
-          </button>
+        <footer className="flex-col items-stretch p-4 border-t border-gray-700 bg-gray-800/50">
+          {error && (
+            <div className="mb-3 p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-center">
+                <p className="text-sm text-red-300">{error}</p>
+            </div>
+          )}
+          <div className="flex justify-end gap-4">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-gray-700/50 border-2 border-gray-600 hover:bg-gray-700 hover:border-gray-500 text-gray-300" disabled={isSaving}>
+              Annuler
+            </button>
+            <button type="submit" form="edit-question-form" className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors duration-200 bg-brand-blue-600 border-2 border-brand-blue-500 text-white hover:bg-brand-blue-700 disabled:opacity-50 flex items-center gap-2" disabled={isSaving}>
+              {isSaving && <SpinnerIcon className="w-4 h-4 animate-spin" />}
+              {isSaving ? 'Sauvegarde...' : (isCreating ? 'Ajouter' : 'Enregistrer')}
+            </button>
+          </div>
         </footer>
       </div>
     </div>

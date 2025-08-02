@@ -43,8 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(500).json({ error: errorMsg });
         }
         
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
 
         const { room_id, content } = req.body;
         const authHeader = req.headers.authorization;

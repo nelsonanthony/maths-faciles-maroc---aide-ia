@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'L\'authentification est requise.' });
         }
         const token = authHeader.split(' ')[1];
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // --- Authorization Check ---
-        if (user.email?.toLowerCase() !== adminEmail.toLowerCase()) {
+        if (user.email?.toLowerCase() !== adminEmail!.toLowerCase()) {
             return res.status(403).json({ error: 'Accès refusé. Seul un administrateur peut effectuer cette action.' });
         }
 

@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: 'exercise_id is required' });
         }
 
-        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        const supabase = createClient(supabaseUrl!, supabaseAnonKey!);
 
         const { data, error } = await (supabase
             .from('chat_rooms') as any)

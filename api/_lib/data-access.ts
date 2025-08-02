@@ -21,7 +21,7 @@ function getSupabaseAdminClient(): SupabaseClient {
         console.error(`Error in getSupabaseAdminClient: ${errorMsg}`);
         throw new Error(errorMsg);
     }
-    return createClient(supabaseUrl, supabaseServiceKey);
+    return createClient(supabaseUrl!, supabaseServiceKey!);
 }
 
 

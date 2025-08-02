@@ -44,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
         // 1. Fetch the embedding for the current exercise from our embeddings table
         const { data: currentExerciseData, error: fetchError } = await (supabase

@@ -48,7 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'L\'authentification est requise.' });
         }
         const token = authHeader.split(' ')[1];
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
@@ -72,7 +72,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Clean prompt and ensure it has a definite string type
         const prompt: string = cleanLatex(rawPrompt);
         
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
         const finalResponse: AIResponse = {};
 
         // --- Find relevant video chunk function (to be run in parallel) ---

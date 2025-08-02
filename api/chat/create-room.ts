@@ -41,7 +41,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(500).json({ error: errorMsg });
         }
         
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         
         const { name, exercise_id } = req.body;
         const authHeader = req.headers.authorization;

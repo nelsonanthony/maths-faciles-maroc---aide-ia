@@ -1,6 +1,5 @@
 
 
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -47,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'L\'authentification est requise.' });
         }
         const token = authHeader.split(' ')[1];
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
@@ -186,7 +185,7 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
         };
 
 
-        const ai = new GoogleGenAI({ apiKey: apiKey });
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: userPrompt,

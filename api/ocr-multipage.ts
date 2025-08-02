@@ -51,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'L\'authentification est requise.' });
         }
         const token = authHeader.split(' ')[1];
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(429).json({ error: `Vous essayez de téléverser ${images.length} images, mais il ne vous reste que ${callsLeft} analyses d'image pour aujourd'hui.` });
         }
 
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
 
         const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription Mathématique Marocaine]
 1.  **Mission**: Transcris le texte mathématique de l'image.

@@ -46,7 +46,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(401).json({ error: 'Authentication is required.' });
         }
         const token = authHeader.split(' ')[1];
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
         const { data: { user }, error: userError } = await supabase.auth.getUser(token);
 
         if (userError || !user) {
@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ error: "Les champs 'image' (base64) et 'mimeType' sont requis." });
         }
         
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey: apiKey! });
         const imagePart = {
             inlineData: {
                 data: image,

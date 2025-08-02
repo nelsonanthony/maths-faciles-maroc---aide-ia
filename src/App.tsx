@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
@@ -198,6 +200,9 @@ export const App: React.FC = () => {
     };
 
     const handleAddOrUpdateChapter = async (chapterData: Chapter) => {
+        if (!selectedLevelId) {
+            throw new Error("Impossible d'ajouter/modifier un chapitre : aucun niveau n'est sélectionné.");
+        }
         const response = await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
         setCurriculum(response.curriculum);
         closeModal();

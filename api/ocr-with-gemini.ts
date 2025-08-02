@@ -66,30 +66,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
         
         const promptText = `[INSTRUCTIONS STRICTES - Transcription Mathématique Marocaine]
-1. FORMATAGE OBLIGATOIRE :
-   - Equations en ligne : TOUJOURS utiliser $...$ (ex: $x^2 + 3$)
-   - Equations centrées : TOUJOURS utiliser $$...$$ (ex: $$\\frac{1}{2}$$)
-   - INTERDICTION ABSOLUE d'utiliser \\(, \\), \\[, \\] ou tout format MathJax
-
-2. CONSIGNES SPÉCIFIQUES :
-   - Ne pas traduire les termes arabes/français
-   - Conserver la ponctuation originale
-   - Signaler les ambiguïtés avec [NOTE:] sans modifier le texte
-
-EXEMPLE INCORRECT → CORRECT :
-f(x) = \\(x^2\\) → f(x) = $x^2$
-\\[\\frac{a}{b}\\] → $$\\frac{a}{b}$$
-
-Transcris maintenant le contenu de l'image.`;
+1.  **Mission**: Transcris le texte mathématique de l'image.
+2.  **Formatage Hybride OBLIGATOIRE**:
+    -   **Unicode (Priorité 1)**: Utilise les caractères Unicode pour TOUT ce qui est simple.
+        -   **Exemples**: \`ƒ: ℝ → ℝ\`, \`𝑥 ⟼ 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`, \`(𝑥−2)² ≥ 0\`.
+        -   Utilise \`²\`, \`³\`, \`→\`, \`ℝ\`, \`ƒ\`, \`𝑥\`, etc.
+    -   **LaTeX (Priorité 2)**: Utilise LaTeX **uniquement** pour les structures complexes qui n'ont pas d'équivalent Unicode simple.
+        -   **Exemples**: Fractions \`$$\\frac{a}{b}$$\`, racines \`$$\\sqrt{x}$$\`, sommes \`$$\\sum_{k=1}^{n} k$$ \`, etc.
+        -   Délimiteurs: en ligne \`$..$\`, en bloc \`$$..$$\`.
+3.  **Règle Capitale**: N'utilise **JAMAIS** les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+Transcris maintenant le contenu de l'image en suivant ces règles à la lettre.`;
 
         const textPart = { text: promptText };
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [imagePart, textPart] },
-            config: {
-                thinkingConfig: { thinkingBudget: 0 }
-            }
+            contents: { parts: [imagePart, textPart] }
         });
 
         // Log successful AI call

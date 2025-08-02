@@ -110,12 +110,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             RÈGLES DE FORMATAGE STRICTES:
             -   Réponds UNIQUEMENT avec un objet JSON valide qui correspond au schéma demandé. Ne produit aucun texte en dehors de l'objet JSON.
-            -   Pour les expressions mathématiques, utilise une combinaison d'Unicode et de LaTeX :
-                -   **Symboles simples**: Utilise les caractères Unicode dédiés (ex: 'ℝ' pour les réels, '→', '∈', '∀', '∃', '²', 'ƒ', '𝑥').
-                -   **Expressions complexes** (fractions, racines, intégrales, sommes): Utilise LaTeX.
-                    -   **En bloc**: $$...$$. Exemple : "$$\\frac{x-1}{x+2}$$"
-                    -   **En ligne**: $...$. Exemple : "La dérivée est $f'(x) = 2x$."
-                -   **INTERDICTION D'UTILISER** les délimiteurs MathJax (\\(...\\) ou \\[...\\]).
+            -   **Formatage Mathématique (à suivre impérativement)**:
+                -   Utilise une combinaison intelligente de caractères Unicode et de formatage LaTeX standard pour toutes les expressions mathématiques.
+                -   **Unicode (pour le simple)**: Utilise les caractères Unicode pour les symboles, variables et exposants courants (ex: ƒ, 𝑥, ℝ, →, ²). Exemple de rendu souhaité: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`.
+                -   **LaTeX (pour le complexe)**: Utilise LaTeX **seulement** pour les structures sans équivalent Unicode simple (fractions, racines, sommes, etc.). Utilise les délimiteurs \`$...\$\` (en ligne) et \`$$...$$\` (en bloc).
+                -   **INTERDICTION ABSOLUE** d'utiliser les anciens délimiteurs MathJax : \`\\( ... \\)\`, \`\\[ ... \\]\`.
         `;
 
         // --- Main AI Generation Logic ---

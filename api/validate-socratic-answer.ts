@@ -4,7 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter';
-import mathValidator from "./_lib/math-validator";
+import { cleanLatex } from "./_lib/math-validator";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Clean student answer to ensure consistent LaTeX format
-        studentAnswer = mathValidator.cleanLatex(studentAnswer);
+        studentAnswer = cleanLatex(studentAnswer);
         
         const ai = new GoogleGenAI({ apiKey: apiKey });
         

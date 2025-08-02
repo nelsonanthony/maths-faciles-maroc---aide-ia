@@ -5,7 +5,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter';
 import dataAccess from "./_lib/data-access";
-import mathValidator from "./_lib/math-validator";
+import { cleanLatex, validateMathResponse } from "./_lib/math-validator";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Clean the student's answer to ensure it uses standard LaTeX delimiters
-        studentAnswer = mathValidator.cleanLatex(studentAnswer);
+        studentAnswer = cleanLatex(studentAnswer);
         
         // --- Fetch Exercise using the new optimized method ---
         const exercise = await dataAccess.getExerciseById(exerciseId);
@@ -204,7 +204,7 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
         }
         
         // Appliquer le nettoyage et la validation à toute la réponse JSON
-        const finalResponse = mathValidator.validateMathResponse(parsedJson);
+        const finalResponse = validateMathResponse(parsedJson);
 
         // Log successful AI call
         await aiUsageLimiter.logAiCall(supabase, user.id, 'ANSWER_VALIDATION');

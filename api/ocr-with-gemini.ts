@@ -4,7 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter';
-import mathValidator from "./_lib/math-validator";
+import { cleanLatex } from "./_lib/math-validator";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -94,7 +94,7 @@ Transcris maintenant le contenu de l'image en suivant ces règles à la lettre.`
              throw new Error("L'IA n'a pas pu extraire de texte de l'image.");
         }
         
-        const cleanedText = mathValidator.cleanLatex(extractedText);
+        const cleanedText = cleanLatex(extractedText);
 
         return res.status(200).json({ text: cleanedText });
 

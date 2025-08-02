@@ -1,6 +1,6 @@
 
 // Duplicated from src/utils/math-format.ts to resolve Vercel build issues
-const cleanLatexUtil = (text: string): string => {
+export const cleanLatex = (text: string): string => {
   if (!text) return '';
 
   // Étape 1: Remplacer les échappements simples et doubles de MathJax par des délimiteurs LaTeX standard.
@@ -33,10 +33,10 @@ const cleanLatexUtil = (text: string): string => {
  * @param content L'objet, le tableau ou la chaîne à nettoyer.
  * @returns Le contenu nettoyé avec le même type que l'entrée.
  */
-const validateMathResponse = (content: any): any => {
+export const validateMathResponse = (content: any): any => {
   if (typeof content === 'string') {
     // Applique le nettoyage et la validation sur chaque chaîne
-    return cleanLatexUtil(content);
+    return cleanLatex(content);
   }
 
   if (Array.isArray(content)) {
@@ -56,11 +56,4 @@ const validateMathResponse = (content: any): any => {
 
   // Retourne les types non-traités (nombres, booléens, etc.) tels quels
   return content;
-};
-
-const cleanLatex = cleanLatexUtil;
-
-export default { 
-    validateMathResponse,
-    cleanLatex 
 };

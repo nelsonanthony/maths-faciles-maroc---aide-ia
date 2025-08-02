@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types";
 import aiUsageLimiter from "./_lib/ai-usage-limiter";
-import mathValidator from "./_lib/math-validator";
+import { cleanLatex, validateMathResponse } from "./_lib/math-validator";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -63,7 +63,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Clean prompt and ensure it has a definite string type
-        const prompt: string = mathValidator.cleanLatex(rawPrompt);
+        const prompt: string = cleanLatex(rawPrompt);
         
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const finalResponse: AIResponse = {};
@@ -223,7 +223,7 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
             }
 
             // Nettoyage et validation de la réponse JSON avant de la traiter.
-            const cleanedJson = mathValidator.validateMathResponse(parsedJson);
+            const cleanedJson = validateMathResponse(parsedJson);
 
             if(requestType === 'socratic') {
                 finalResponse.socraticPath = cleanedJson.path;

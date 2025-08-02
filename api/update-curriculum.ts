@@ -1,5 +1,3 @@
-
-
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import dataAccess from './_lib/data-access.js';
@@ -32,7 +30,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const missingVars = [];
     if (!supabaseUrl) missingVars.push('SUPABASE_URL');
     if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
-    if (!adminEmail) missingVars.push('ADMIN_EMAIL');
 
     if (missingVars.length > 0) {
         const errorMsg = `Configuration du serveur incomplète. Variables d'environnement manquantes: ${missingVars.join(', ')}`;
@@ -54,7 +51,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         
         // --- Authorization Check ---
-        if (user.email?.toLowerCase() !== adminEmail!.toLowerCase()) {
+        if (!adminEmail || user.email?.toLowerCase() !== adminEmail.toLowerCase()) {
             return res.status(403).json({ error: 'Accès refusé. Seul un administrateur peut effectuer cette action.' });
         }
 

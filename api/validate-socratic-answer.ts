@@ -3,7 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
-import { cleanLatex } from "@/utils/math-format";
+import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -102,7 +102,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const response = await ai.models.generateContent(requestPayload);
         
-        const jsonText = response.text?.trim();
+        const jsonText = response.text.trim();
         if (!jsonText) {
             throw new Error("L'IA a retourné une réponse vide. Veuillez réessayer.");
         }

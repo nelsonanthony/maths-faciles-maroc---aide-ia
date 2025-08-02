@@ -1,7 +1,7 @@
 
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Exercise } from "@/types";
+import { Exercise } from "../src/types";
 import { getAllExercisesMap } from "./_lib/data-access";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

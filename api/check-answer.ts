@@ -5,7 +5,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
 import { getExerciseById } from "./_lib/data-access";
 import { validateMathResponse } from "./_lib/math-validator";
-import { cleanLatex } from "@/utils/math-format";
+import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -190,7 +190,7 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
             }
         });
         
-        const jsonText = response.text?.trim();
+        const jsonText = response.text.trim();
         if (!jsonText) {
             throw new Error("L'IA a retourné une réponse vide. Le modèle est peut-être surchargé, veuillez réessayer.");
         }

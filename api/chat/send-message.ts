@@ -79,7 +79,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        const moderationText = moderationResponse.text?.trim();
+        const moderationText = moderationResponse.text.trim();
         if (moderationText) {
             try {
                 const moderationResult = JSON.parse(moderationText);

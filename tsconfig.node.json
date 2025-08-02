@@ -3,7 +3,7 @@
     "composite": true,
     "skipLibCheck": true,
     "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "moduleResolution": "Bundler",
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
     "types": ["node"]

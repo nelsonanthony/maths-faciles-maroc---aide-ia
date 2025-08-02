@@ -1,8 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter.js';
-import { cleanLatex } from "../src/utils/math-format.js";
+import { checkUsageLimit, logAiCall } from './_lib/ai-usage-limiter';
+import { cleanLatex } from "../src/utils/math-format";
 
 
 interface ImagePayload {

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -94,8 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             contents: promptText,
             config: { 
                 responseMimeType: "application/json", 
-                responseSchema: answerSchema,
-                thinkingConfig: { thinkingBudget: 0 }
+                responseSchema: answerSchema
             }
         };
         

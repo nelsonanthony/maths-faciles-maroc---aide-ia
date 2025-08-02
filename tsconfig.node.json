@@ -17,7 +17,6 @@
     "vite.config.ts", 
     "tailwind.config.js", 
     "postcss.config.js",
-    "api/**/*.ts",
     "scripts/**/*.ts",
     "src/types.ts",
     "src/utils/**/*.ts"

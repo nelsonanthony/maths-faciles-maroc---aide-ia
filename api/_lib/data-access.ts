@@ -2,8 +2,11 @@
 import { Level, Exercise } from '../../src/types.js';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Define a type alias to help TypeScript's compiler with potentially deep types.
+type Curriculum = Level[];
+
 // Simple in-memory cache for the serverless function instance.
-let cachedCurriculum: Level[] | null = null;
+let cachedCurriculum: Curriculum | null = null;
 let cacheTimestamp: number | null = null;
 const CACHE_DURATION_MS = 1 * 60 * 1000; // 1 minute cache
 
@@ -29,7 +32,7 @@ function invalidateCache() {
 /**
  * Fetches the curriculum from Supabase, using an in-memory cache.
  */
-async function getCurriculumFromSupabase(): Promise<Level[]> {
+async function getCurriculumFromSupabase(): Promise<Curriculum> {
     const now = Date.now();
     if (cachedCurriculum && cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION_MS)) {
         return cachedCurriculum;
@@ -52,7 +55,7 @@ async function getCurriculumFromSupabase(): Promise<Level[]> {
         if (!curriculumData || !Array.isArray(curriculumData)) {
             cachedCurriculum = [];
         } else {
-            cachedCurriculum = curriculumData as Level[];
+            cachedCurriculum = curriculumData as Curriculum;
         }
         
         cacheTimestamp = now;
@@ -66,7 +69,7 @@ async function getCurriculumFromSupabase(): Promise<Level[]> {
 /**
  * Finds a specific exercise within the curriculum structure.
  */
-function findExerciseInCurriculum(levels: Level[], exerciseId: string): Exercise | undefined {
+function findExerciseInCurriculum(levels: Curriculum, exerciseId: string): Exercise | undefined {
     for (const level of levels) {
         for (const chapter of level.chapters ?? []) {
             for (const series of chapter.series ?? []) {

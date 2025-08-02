@@ -1,11 +1,11 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { AIResponse, VideoChunk } from "../src/types";
 import aiUsageLimiter from "./_lib/ai-usage-limiter";
 import mathValidator from "./_lib/math-validator";
-import { cleanLatex } from "../src/utils/math-format";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Clean prompt to handle potential MathJax from user input/OCR
-        prompt = cleanLatex(prompt);
+        prompt = mathValidator.cleanLatex(prompt);
         
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const finalResponse: AIResponse = {};

@@ -1,11 +1,11 @@
 
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter';
 import dataAccess from "./_lib/data-access";
 import mathValidator from "./_lib/math-validator";
-import { cleanLatex } from "../src/utils/math-format";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -62,7 +62,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Clean the student's answer to ensure it uses standard LaTeX delimiters
-        studentAnswer = cleanLatex(studentAnswer);
+        studentAnswer = mathValidator.cleanLatex(studentAnswer);
         
         // --- Fetch Exercise using the new optimized method ---
         const exercise = await dataAccess.getExerciseById(exerciseId);

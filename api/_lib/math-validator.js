@@ -1,5 +1,5 @@
 
-import { cleanLatex } from '../../src/utils/math-format';
+import { cleanLatex as cleanLatexUtil } from '../../src/utils/math-format';
 
 /**
  * Parcourt récursivement un objet ou un tableau et applique la fonction cleanLatex
@@ -10,7 +10,7 @@ import { cleanLatex } from '../../src/utils/math-format';
 const validateMathResponse = (content: any): any => {
   if (typeof content === 'string') {
     // Applique le nettoyage et la validation sur chaque chaîne
-    return cleanLatex(content);
+    return cleanLatexUtil(content);
   }
 
   if (Array.isArray(content)) {
@@ -32,4 +32,10 @@ const validateMathResponse = (content: any): any => {
   return content;
 };
 
-export default { validateMathResponse };
+// We rename the import to avoid conflict with the key in the exported object.
+const cleanLatex = cleanLatexUtil;
+
+export default { 
+    validateMathResponse,
+    cleanLatex 
+};

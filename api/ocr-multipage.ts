@@ -1,9 +1,10 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter';
-import { cleanLatex } from "../src/utils/math-format";
+import mathValidator from "./_lib/math-validator";
 
 
 interface ImagePayload {
@@ -106,7 +107,7 @@ Transcris maintenant le contenu de l'image ou des images fournies en suivant ces
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
 
-        const finalCleanedText = cleanLatex(combinedOcrText);
+        const finalCleanedText = mathValidator.cleanLatex(combinedOcrText);
 
         return res.status(200).json({ text: finalCleanedText.trim() });
 

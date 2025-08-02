@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -274,9 +273,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700">
                     <ArrowLeftIcon className="w-5 h-5" />
                 </button>
-                <div className="flex-grow">
+                <div className="flex-grow min-w-0">
                     <h2 className="text-xl font-bold text-brand-blue-300">Tuteur IA</h2>
-                    <p className="text-xs text-slate-400 truncate">{exercise.statement}</p>
+                    <div className="text-xs text-slate-400">
+                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement, { breaks: true }) as string)} />
+                    </div>
                 </div>
             </header>
             

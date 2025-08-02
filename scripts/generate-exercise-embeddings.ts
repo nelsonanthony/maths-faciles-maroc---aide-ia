@@ -6,7 +6,7 @@ import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenAI } from '@google/genai';
 import curriculumData from '../public/data.json';
-import { Level } from '../src/types.js';
+import { Level } from '../src/types';
 
 // --- Load Environment Variables ---
 const API_KEY = process.env.API_KEY;

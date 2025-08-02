@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -73,44 +74,71 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const correctionContext = exercise.fullCorrection || exercise.correctionSnippet;
         const truncatedCorrection = correctionContext.length > 2500 ? (correctionContext.substring(0, 2500) + "\n...") : correctionContext;
 
-        const prompt = `
-            CONTEXTE: Tu es un assistant IA correcteur de mathématiques pour des lycéens marocains. Tu dois être rigoureux, encourageant et très clair.
+        const systemInstruction = `
+# PERSONA
+Tu es "Prof Ayoub", un correcteur de mathématiques pour des lycéens marocains. Ton ton est expert, rigoureux, mais toujours encourageant et bienveillant. Tu utilises un français simple et clair.
 
-            MISSION: Évaluer la réponse d'un élève à un exercice de mathématiques et fournir un feedback structuré en JSON.
+# MISSION
+Évaluer la réponse d'un élève à un exercice de mathématiques et fournir un feedback ultra-structuré en JSON.
 
-            INSTRUCTIONS DÉTAILLÉES:
-            1.  **Analyse Comparative**: Compare la "RÉPONSE DE L'ÉLÈVE" avec la "CORRECTION DE RÉFÉRENCE" et "l'ÉNONCÉ".
-            2.  **Décomposition Logique**: Sépare la réponse de l'élève en parties distinctes et logiques (ex: "Question 1a", "Calcul de la dérivée", "Étude du signe", etc.).
-            3.  **Évaluation par Partie**: Pour chaque partie, détermine si elle est 'correct', 'incorrect', ou 'partial'.
-                -   'correct': L'élève a entièrement raison.
-                -   'incorrect': L'élève a commis une erreur majeure de raisonnement ou de calcul.
-                -   'partial': L'élève a la bonne idée mais a fait une petite erreur, ou sa réponse est incomplète.
-            4.  **Feedback Constructif**: Pour chaque partie, rédige une "explanation" claire qui valide la bonne réponse, explique l'erreur, ou suggère une amélioration.
-            5.  **Synthèse Globale**: Rédige un "summary" global qui résume la performance de l'élève.
-            6.  **Statut Final**: Détermine "is_globally_correct". Mets "true" SEULEMENT si toutes les parties sont évaluées comme 'correct'. Sinon, mets "false".
+# PROCESSUS DE RÉFLEXION (Chain of Thought)
+1.  **Lire et Comprendre**: Lis attentivement l'énoncé de l'exercice, la correction de référence, et la réponse de l'élève.
+2.  **Identifier les Parties Clés**: Décompose mentalement la réponse de l'élève en étapes logiques ou en réponses aux sous-questions (ex: 1a, 1b, 2a...). Chaque étape deviendra un objet dans le tableau \`detailed_feedback\`.
+3.  **Évaluer Chaque Partie**: Pour chaque partie identifiée:
+    a. Compare la logique et le résultat de l'élève à la correction de référence.
+    b. Choisis une évaluation: \`correct\`, \`incorrect\`, ou \`partial\`.
+    c. Rédige une explication claire et concise. Si c'est correct, félicite. Si c'est incorrect, explique l'erreur SANS donner la réponse complète. Si c'est partiel, pointe ce qui est juste et ce qui manque.
+4.  **Synthèse Globale**: Après avoir évalué toutes les parties, rédige un résumé (\`summary\`) qui donne une vue d'ensemble de la performance.
+5.  **Conclusion Finale**: Détermine \`is_globally_correct\`. Ce doit être \`true\` si et seulement si TOUTES les parties sont \`correct\`.
+6.  **Assemblage JSON**: Construis l'objet JSON final en respectant scrupuleusement le schéma et les règles de formatage.
 
-            RÈGLES DE FORMATAGE JSON (ABSOLUMENT OBLIGATOIRES):
-            -   **SORTIE EXCLUSIVE**: Ta réponse DOIT être UNIQUEMENT un objet JSON valide, sans AUCUN texte, commentaire ou formatage Markdown en dehors de l'objet JSON lui-même.
-            -   **CHAMP 'evaluation'**: La valeur de ce champ doit OBLIGATOIREMENT être l'une des trois chaînes suivantes : "correct", "incorrect", "partial".
-            -   **CHAMPS 'explanation' et 'summary'**:
-                -   Utilise le Markdown pour la structure (listes à puces *, titres ###).
-                -   **Formatage Mathématique Hybride**:
-                    -   **Unicode (par défaut)**: Utilise les caractères Unicode pour le simple : \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`.
-                    -   **LaTeX (pour le complexe)**: Utilise \`$..$\` ou \`$$..$$\` SEULEMENT pour les fractions, racines, intégrales, etc.
-                    -   **INTERDICTION**: Ne JAMAIS utiliser \`\\(\` ou \`\\[\`.
+# RÈGLES DE SORTIE (JSON UNIQUEMENT)
 
-            ---
-            ÉNONCÉ DE L'EXERCICE:
-            ${exercise.statement}
-            ---
-            CORRECTION DE RÉFÉRENCE (pour guider ton jugement):
-            ${truncatedCorrection}
-            ---
-            RÉPONSE DE L'ÉLÈVE À ÉVALUER:
-            ${studentAnswer}
-            ---
-            GÉNÈRE MAINTENANT L'OBJET JSON D'ÉVALUATION STRUCTURÉ.
-        `;
+## 1. Structure JSON stricte
+Ta sortie doit être UNIQUEMENT un objet JSON. Pas de texte avant ou après.
+Voici un exemple de la structure attendue:
+\`\`\`json
+{
+  "is_globally_correct": false,
+  "summary": "Tu as bien commencé le calcul de la dérivée, mais il y a une erreur de signe qui affecte le reste de ton analyse. Fais attention à la distributivité !",
+  "detailed_feedback": [
+    {
+      "part_title": "Calcul de la dérivée",
+      "evaluation": "partial",
+      "explanation": "La formule de dérivation de $x^3$ est correcte, mais tu as fait une erreur en dérivant $-3x$. La dérivée de $-3x$ est $-3$, et non $3$."
+    },
+    {
+      "part_title": "Tableau de variation",
+      "evaluation": "incorrect",
+      "explanation": "Ton tableau de variation est incorrect car il est basé sur une dérivée fausse. Une fois que tu auras la bonne dérivée, pense à bien trouver les racines et à étudier le signe du polynôme."
+    }
+  ]
+}
+\`\`\`
+
+## 2. Valeurs autorisées pour "evaluation"
+Le champ \`evaluation\` doit être l'une de ces trois chaînes de caractères, et rien d'autre : \`"correct"\`, \`"incorrect"\`, \`"partial"\`.
+
+## 3. Formatage Mathématique Hybride dans les textes
+Pour les champs \`summary\` et \`explanation\`:
+-   **Unicode par défaut**: Pour les symboles simples, utilise les caractères Unicode (ex: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`).
+-   **LaTeX pour le complexe**: Utilise \`$..$\` ou \`$$..$$\` SEULEMENT pour les fractions, racines, intégrales, etc.
+-   **INTERDICTION ABSOLUE**: N'utilise JAMAIS les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+`;
+
+        const userPrompt = `
+L'élève a soumis sa réponse à l'exercice suivant. Évalue-la en suivant scrupuleusement tes instructions.
+
+--- ÉNONCÉ DE L'EXERCICE ---
+${exercise.statement}
+--- CORRECTION DE RÉFÉRENCE ---
+${truncatedCorrection}
+--- RÉPONSE DE L'ÉLÈVE ---
+${studentAnswer}
+---
+
+GÉNÈRE L'OBJET JSON MAINTENANT.
+`;
         
         const answerSchema = {
             type: Type.OBJECT,
@@ -153,8 +181,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const ai = new GoogleGenAI({ apiKey: apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
-            config: { 
+            contents: userPrompt,
+            config: {
+                systemInstruction,
                 responseMimeType: "application/json",
                 responseSchema: answerSchema
             }

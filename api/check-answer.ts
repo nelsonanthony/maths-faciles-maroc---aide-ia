@@ -190,14 +190,14 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
             }
         });
         
-        const jsonText = response.text.trim();
+        const jsonText = response.text;
         if (!jsonText) {
             throw new Error("L'IA a retourné une réponse vide. Le modèle est peut-être surchargé, veuillez réessayer.");
         }
         
         let parsedJson;
         try {
-            parsedJson = JSON.parse(jsonText);
+            parsedJson = JSON.parse(jsonText.trim());
         } catch (e) {
             console.error("Failed to parse JSON from AI in check-answer. Raw response:", jsonText);
             throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");

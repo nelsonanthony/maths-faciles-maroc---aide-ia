@@ -1,6 +1,4 @@
 
-
-
 import { createClient } from '@supabase/supabase-js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenAI } from "@google/genai";
@@ -79,10 +77,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        const moderationText = moderationResponse.text.trim();
+        const moderationText = moderationResponse.text;
         if (moderationText) {
             try {
-                const moderationResult = JSON.parse(moderationText);
+                const moderationResult = JSON.parse(moderationText.trim());
                 if (moderationResult.is_safe === false) {
                     return res.status(403).json({ error: "Message rejeté car jugé inapproprié ou hors-sujet." });
                 }

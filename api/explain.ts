@@ -204,14 +204,14 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
                 }
             });
 
-            const jsonText = response.text.trim();
+            const jsonText = response.text;
             if (!jsonText) {
                 throw new Error("L'IA a retourné une réponse vide. Veuillez réessayer.");
             }
             
             let parsedJson;
             try {
-                parsedJson = JSON.parse(jsonText);
+                parsedJson = JSON.parse(jsonText.trim());
             } catch (e) {
                 console.error("Failed to parse JSON from AI in explain. Raw response:", jsonText);
                 throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");

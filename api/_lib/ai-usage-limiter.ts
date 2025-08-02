@@ -1,6 +1,7 @@
 
+
 import { SupabaseClient } from "@supabase/supabase-js";
-import { AI_USAGE_LIMITS, AiCallType } from './config';
+import { AI_USAGE_LIMITS, AiCallType } from './config.js';
 
 /**
  * Vérifie si un utilisateur a dépassé sa limite quotidienne pour un type d'appel IA spécifique.

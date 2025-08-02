@@ -1,8 +1,9 @@
 
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import dataAccess from './_lib/data-access';
-import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types";
+import dataAccess from './_lib/data-access.js';
+import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -146,19 +147,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         curriculum = curriculum.filter(l => l.id !== ids.levelId);
                         break;
                     case 'chapter':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter((c: Chapter) => c.id !== ids.chapterId) } : l);
+                        curriculum = curriculum.map((l: Level) => l.id === ids.levelId ? { ...l, chapters: l.chapters.filter((c: Chapter) => c.id !== ids.chapterId) } : l);
                         break;
                     case 'series':
-                         curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.filter((s: Series) => s.id !== ids.seriesId) } : c) } : l);
+                         curriculum = curriculum.map((l: Level) => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.filter((s: Series) => s.id !== ids.seriesId) } : c) } : l);
                         break;
                     case 'exercise':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.map((s: Series) => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter((e: Exercise) => e.id !== ids.exerciseId) } : s) } : c) } : l);
+                        curriculum = curriculum.map((l: Level) => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, series: c.series.map((s: Series) => s.id === ids.seriesId ? { ...s, exercises: s.exercises.filter((e: Exercise) => e.id !== ids.exerciseId) } : s) } : c) } : l);
                         break;
                      case 'quiz':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter((q: Quiz) => q.id !== ids.quizId) } : c) } : l);
+                        curriculum = curriculum.map((l: Level) => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.filter((q: Quiz) => q.id !== ids.quizId) } : c) } : l);
                         break;
                     case 'quizQuestion':
-                        curriculum = curriculum.map(l => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map((q: Quiz) => q.id === ids.quizId ? { ...q, questions: q.questions.filter((qu: QuizQuestion) => qu.id !== ids.questionId) } : q) } : c) } : l);
+                        curriculum = curriculum.map((l: Level) => l.id === ids.levelId ? { ...l, chapters: l.chapters.map((c: Chapter) => c.id === ids.chapterId ? { ...c, quizzes: c.quizzes.map((q: Quiz) => q.id === ids.quizId ? { ...q, questions: q.questions.filter((qu: QuizQuestion) => qu.id !== ids.questionId) } : q) } : c) } : l);
                         break;
                 }
                 break;

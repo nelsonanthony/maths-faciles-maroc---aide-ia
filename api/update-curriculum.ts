@@ -1,4 +1,5 @@
 
+
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
@@ -30,21 +31,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
 
-    // --- Environment Variable Validation ---
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-    const adminEmail = process.env.ADMIN_EMAIL;
-
-    const missingVars = [];
-    if (!supabaseUrl) missingVars.push('SUPABASE_URL');
-    if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
-    if (!adminEmail) missingVars.push('ADMIN_EMAIL');
-
-    if (missingVars.length > 0) {
-        return res.status(500).json({ error: `Configuration du serveur incomplète: ${missingVars.join(', ')} manquant(es).` });
-    }
-
     try {
+        // --- Environment Variable Validation ---
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
+        const adminEmail = process.env.ADMIN_EMAIL;
+
+        if (!supabaseUrl || !supabaseServiceKey || !adminEmail) {
+            const missingVars = [];
+            if (!supabaseUrl) missingVars.push('SUPABASE_URL');
+            if (!supabaseServiceKey) missingVars.push('SUPABASE_SERVICE_KEY');
+            if (!adminEmail) missingVars.push('ADMIN_EMAIL');
+            throw new Error(`Configuration du serveur incomplète: ${missingVars.join(', ')} manquant(es).`);
+        }
+
         // --- Authentication & Authorization ---
         const authHeader = req.headers.authorization;
         if (!authHeader) return res.status(401).json({ error: 'Authentification requise.' });
@@ -65,12 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         switch (action) {
             case 'ADD_OR_UPDATE_LEVEL': {
                 const levelData = payload.level as Level;
-                ({ error: rpcError } = await supabase.rpc('upsert_level', { p_level_data: levelData }));
+                ({ error: rpcError } = await supabase.rpc('upsert_level', { p_level_data: levelData as any }));
                 break;
             }
             case 'ADD_OR_UPDATE_CHAPTER': {
                 const { levelId, chapter } = payload as { levelId: string, chapter: Chapter };
-                 ({ error: rpcError } = await supabase.rpc('upsert_chapter', { p_level_id: levelId, p_chapter_data: chapter }));
+                 ({ error: rpcError } = await supabase.rpc('upsert_chapter', { p_level_id: levelId, p_chapter_data: chapter as any }));
                 break;
             }
              case 'ADD_OR_UPDATE_SERIES': {
@@ -81,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const chapterIdx = curriculum[levelIdx].chapters.findIndex((c: Chapter) => c.id === chapterId);
                 if (chapterIdx === -1) throw new Error(`Chapter ${chapterId} not found`);
                 const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: series }));
+                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: series as any }));
                 break;
             }
              case 'ADD_OR_UPDATE_EXERCISE': {
@@ -94,7 +94,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const seriesIdx = curriculum[levelIdx].chapters[chapterIdx].series.findIndex((s: Series) => s.id === seriesId);
                 if (seriesIdx === -1) throw new Error(`Series ${seriesId} not found`);
                 const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series', seriesIdx.toString(), 'exercises'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: exercise }));
+                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: exercise as any }));
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ': {
@@ -105,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const chapterIdx = curriculum[levelIdx].chapters.findIndex((c: Chapter) => c.id === chapterId);
                 if (chapterIdx === -1) throw new Error(`Chapter ${chapterId} not found`);
                 const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: quiz }));
+                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: quiz as any }));
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ_QUESTION': {
@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const quizIdx = curriculum[levelIdx].chapters[chapterIdx].quizzes.findIndex((q: Quiz) => q.id === quizId);
                 if (quizIdx === -1) throw new Error(`Quiz ${quizId} not found`);
                 const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes', quizIdx.toString(), 'questions'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: question }));
+                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: question as any }));
                 break;
             }
             case 'DELETE_ITEM': {

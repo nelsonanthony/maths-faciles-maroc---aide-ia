@@ -11,18 +11,19 @@ interface EditChapterModalProps {
 /**
  * Extracts a YouTube video ID from various URL formats.
  * @param url The URL to parse.
- * @returns The 11-character video ID or the original string if no match is found.
+ * @returns The 11-character video ID or an empty string if no valid ID is found.
  */
 const extractYouTubeId = (url: string): string => {
     if (!url) return '';
-    // This regex covers:
-    // - https://www.youtube.com/watch?v=VIDEO_ID
-    // - https://youtu.be/VIDEO_ID
-    // - https://www.youtube.com/embed/VIDEO_ID
-    // - And variations with other parameters
-    const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regex);
-    return match ? match[1] : url; // Return original string if no ID is found
+    
+    // Case for short 11-character IDs
+    if (/^[a-zA-Z0-9_-]{11}$/.test(url)) return url;
+    
+    // Full URL formats
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    
+    return (match && match[2].length === 11) ? match[2] : '';
 };
 
 
@@ -38,14 +39,9 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
 
   const handleVideoLinkChange = (index: number, field: keyof VideoLink, value: string) => {
     const newVideoLinks = [...videoLinks];
-    let processedValue = value;
-
-    if (field === 'id') {
-      // Automatically extract the ID from a full YouTube URL
-      processedValue = extractYouTubeId(value);
-    }
-    
-    newVideoLinks[index] = { ...newVideoLinks[index], [field]: processedValue };
+    // We don't extract the ID here, we store the raw input from the user
+    // The extraction and validation will happen on save.
+    newVideoLinks[index] = { ...newVideoLinks[index], [field]: value };
     setVideoLinks(newVideoLinks);
   };
 
@@ -66,13 +62,28 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
       return;
     }
     
+    // Enhanced video link validation
+    const validVideoLinks = videoLinks
+      .map(link => ({
+          title: link.title.trim(),
+          id: extractYouTubeId(link.id.trim()) // Sanitize and extract ID
+      }))
+      .filter(link => link.id && link.title); // Filter out any links that are now invalid
+
+    // Check if user provided links but none were valid
+    if (videoLinks.some(l => l.id.trim() || l.title.trim()) && validVideoLinks.length === 0) {
+        setError("Veuillez fournir un titre et un ID/lien YouTube valide pour chaque vidéo. Les liens invalides ont été ignorés.");
+        // We allow saving without videos, so we don't return here.
+        // If the user's intent was to add a video, this error message will guide them.
+    }
+
     setIsSaving(true);
     try {
         const finalChapter: Chapter = {
           id: chapter?.id || `ch-${Date.now()}`,
           title: title.trim(),
           summary: summary.trim(),
-          videoLinks: videoLinks.filter(link => link.id.trim() && link.title.trim()),
+          videoLinks: validVideoLinks, // Use the validated and cleaned links
           quizzes: chapter?.quizzes || [],
           series: chapter?.series || [],
         };

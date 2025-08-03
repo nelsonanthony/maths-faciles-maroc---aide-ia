@@ -183,16 +183,18 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
+            addMessageToDialogue('ai', data.feedback_message); // Add the dynamic feedback
+
             if (data.is_correct) {
                 setVerificationResult('correct');
-                addMessageToDialogue('ai', socraticPath[currentStep].positive_feedback);
+                // The feedback is already added, now we wait and advance
                 setTimeout(() => {
                     setCurrentStep(prev => prev + 1);
                     setVerificationResult(null);
                 }, 2000);
             } else {
                 setVerificationResult('incorrect');
-                addMessageToDialogue('ai', socraticPath[currentStep].hint_for_wrong_answer);
+                // The contextual hint is already added. The student can try again.
             }
         } catch (e: any) {
             setError(e.message);
@@ -222,8 +224,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             validateAnswer(text);
         } else {
             startTutor(text);
-            setStudentInput('');
         }
+        setStudentInput('');
     };
 
     const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -291,9 +293,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                        if (msg.role === 'ai') {
                            return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                        }
-                       // For user messages, wrap in $$ for proper rendering
-                       const userMessageContent = `$$${msg.content}$$`;
-                       const safeContent = DOMPurify.sanitize(marked.parse(userMessageContent, { breaks: true }) as string);
+                       // For user messages, parse as markdown to correctly handle math and text
+                       const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                        return (
                            <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
                                <MathJaxRenderer content={safeContent} />

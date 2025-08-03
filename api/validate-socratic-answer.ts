@@ -83,37 +83,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     type: Type.BOOLEAN,
                     description: "True si la réponse de l'élève est conceptuellement correcte, sinon false."
                 },
+                feedback_message: {
+                    type: Type.STRING,
+                    description: "Si correct, un feedback positif. Si incorrect, un indice contextuel basé sur l'erreur de l'élève. Doit être encourageant et en français simple."
+                }
             },
-            required: ["is_correct"],
+            required: ["is_correct", "feedback_message"],
         };
 
         const promptText = `
 # CONTEXTE GLOBAL
-Tu es un tuteur de mathématiques évaluant une étape de la résolution d'un exercice par un élève.
+Tu es un tuteur de mathématiques expert et bienveillant. Ton objectif est d'aider un lycéen marocain à résoudre une étape d'un exercice.
 
-## ÉNONCÉ DE L'EXERCICE
-${exerciseStatement}
-
-## CORRECTION DE RÉFÉRENCE (pour ton information)
-${exerciseCorrection}
+## Infos sur l'exercice
+- **Énoncé**: ${exerciseStatement}
+- **Correction (pour info)**: ${exerciseCorrection}
 
 # MISSION
-Évalue la réponse de l'élève à la question spécifique qui lui a été posée.
+Évalue la réponse de l'élève à la question spécifique qui lui a été posée, et fournis une réponse JSON structurée.
 
-## QUESTION POSÉE À L'ÉLÈVE
-"${currentIaQuestion}"
+## Évaluation
+- **Question posée à l'élève**: "${currentIaQuestion}"
+- **Concepts clés attendus dans la réponse**: "${expectedAnswerKeywords.join(', ')}"
+- **Réponse fournie par l'élève**: "${studentAnswer || "L'élève n'a rien répondu."}"
 
-## CONCEPTS CLÉS ATTENDUS DANS LA RÉPONSE
-"${expectedAnswerKeywords.join(', ')}"
-
-## RÉPONSE FOURNIE PAR L'ÉLÈVE
-"${studentAnswer}"
-
-# ANALYSE ET DÉCISION
-La réponse de l'élève est-elle conceptuellement correcte par rapport à la question posée ? Ne te fie pas uniquement aux mots-clés. Analyse le sens mathématique. La formulation peut être imparfaite ou venir d'une photo. Sois flexible. Si la réponse est vide ou hors-sujet, elle est incorrecte.
+## Analyse et Rédaction du Feedback
+1.  **Décision**: La réponse de l'élève est-elle conceptuellement correcte pour la question posée, en se basant sur les concepts clés attendus ?
+    -   Sois flexible. L'élève peut utiliser ses propres mots.
+    -   Si la réponse est vide, hors-sujet ou fausse, \`is_correct\` est \`false\`.
+2.  **Rédaction du message**:
+    -   **Si correcte**: Rédige un message de feedback positif qui confirme sa bonne réponse.
+    -   **Si incorrecte**: Rédige un indice **spécifique à l'erreur de l'élève**. Ne te contente pas de répéter la question. Guide-le en pointant son erreur ou en lui posant une sous-question pour l'aider à corriger son raisonnement. Ne donne JAMAIS la solution directement.
+    -   Le ton doit être simple, clair, et encourageant.
 
 # FORMAT DE SORTIE
-Réponds UNIQUEMENT avec un objet JSON valide : \`{ "is_correct": boolean }\`.
+Réponds UNIQUEMENT avec un objet JSON valide suivant ce schéma : \`{ "is_correct": boolean, "feedback_message": "Ton message ici..." }\`.
+Utilise le formatage mathématique hybride (Unicode simple, LaTeX complexe avec $..$ ou $$..$$) dans ton \`feedback_message\`.
 `;
         
         const requestPayload = {

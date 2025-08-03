@@ -72,8 +72,9 @@
   .mq-editable-field {
     @apply w-full p-4 text-lg text-gray-200 bg-gray-900 border-2 border-gray-700 rounded-lg focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500 transition;
   }
-  .mq-editable-field.mq-focused .mq-cursor {
-    @apply !border-l-2 !border-brand-blue-400; /* Use ! to add !important */
+  /* Increased specificity to ensure cursor style is not overridden */
+  .math-input-wrapper .mq-editable-field.mq-focused .mq-cursor {
+    @apply border-l-2 border-solid border-brand-blue-400;
     animation: blink-caret 1s step-end infinite;
   }
   .mq-selection .mq-root-block {

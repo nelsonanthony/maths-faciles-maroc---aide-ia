@@ -167,6 +167,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         resetAIExplain();
         setError(null);
         addMessageToDialogue('user', initialWork.trim() || "Je n'ai pas encore commencé.");
+        setStudentInput('');
         
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
@@ -185,7 +186,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         
         addMessageToDialogue('user', answer);
         setStudentInput('');
-        if (mathFieldRef.current) mathFieldRef.current.latex('');
         setIsVerifying(true);
         setVerificationResult(null);
         setError(null);
@@ -250,7 +250,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     
     // Central submission handler
     const handleSubmission = () => {
-        const text = mathFieldRef.current?.latex() ?? '';
+        const text = studentInput;
         if (isTutorActive) {
             validateAnswer(text);
         } else {
@@ -381,7 +381,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     <div className="space-y-3">
                          {inputMode === 'text' && (
                              <div className="flex items-stretch gap-2">
-                                <div className="flex-grow">
+                                <div className="math-input-wrapper flex-grow">
                                     <EditableMathField
                                         latex={studentInput}
                                         onChange={(field: MathField) => setStudentInput(field.latex())}

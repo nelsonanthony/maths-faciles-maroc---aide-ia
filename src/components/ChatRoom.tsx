@@ -73,14 +73,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
-    const handleSendMessage = async (e: React.FormEvent) => {
+    const handleSendMessage = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
-        const messageToSend = (mathFieldRef.current?.latex() ?? '').trim();
+        const messageToSend = newMessage.trim();
         if (!messageToSend || !user) return;
     
-        // Optimistically clear the input
-        if (mathFieldRef.current) mathFieldRef.current.latex('');
-        setNewMessage('');
+        setNewMessage(''); // Optimistically clear the input via state
         setError(null);
     
         try {
@@ -97,20 +95,18 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             });
     
             if (!response.ok) {
+                // On failure, restore the message.
+                setNewMessage(messageToSend);
                 if (response.status === 403) {
                     setError("Votre message n'a pas pu être envoyé car il a été jugé hors-sujet. Veuillez vous concentrer sur l'exercice de mathématiques.");
                 } else {
                     const errorData = await response.json();
                     throw new Error(errorData.error || 'Failed to send message');
                 }
-                // Restore input on handled error
-                if (mathFieldRef.current) mathFieldRef.current.latex(messageToSend);
-                setNewMessage(messageToSend);
             }
-            // On success, the input is already cleared.
+            // On success, the input remains cleared.
         } catch (err) {
-            // Restore input on any failure
-            if (mathFieldRef.current) mathFieldRef.current.latex(messageToSend);
+            // On any other failure, restore the message.
             setNewMessage(messageToSend);
             setError(err instanceof Error ? err.message : 'Failed to send message');
         }
@@ -160,9 +156,9 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
 
             <footer className="p-4 border-t border-gray-700">
                  {error && <p className="text-sm text-red-400 mb-2 text-center">{error}</p>}
-                <form onSubmit={handleSendMessage} className="space-y-2">
+                <div className="space-y-2">
                     <div className="flex items-stretch gap-2">
-                        <div className="flex-grow">
+                        <div className="math-input-wrapper flex-grow">
                              <EditableMathField
                                 latex={newMessage}
                                 onChange={(field: MathField) => {
@@ -180,11 +176,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                          <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center">
                             <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                         </button>
-                        <button type="submit" className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={!newMessage.trim()}>
+                        <button type="button" onClick={handleSendMessage} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={!newMessage.trim()}>
                             Envoyer
                         </button>
                     </div>
-                </form>
+                </div>
             </footer>
         </div>
     );

@@ -141,8 +141,8 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
                             <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                                 {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
-                                <div className="text-sm break-words">
-                                    <MathJaxRenderer content={mathContent} />
+                                <div className="text-sm">
+                                    <MathJaxRenderer content={mathContent} className="overflow-x-auto py-1" />
                                 </div>
                             </div>
                         </div>

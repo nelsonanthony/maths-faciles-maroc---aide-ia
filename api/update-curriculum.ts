@@ -1,6 +1,4 @@
 
-
-
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
@@ -66,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapter } = payload as { levelId: string, chapter: Chapter };
                 const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
                 if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
-
+                
                 const path = [levelIdx.toString(), 'chapters'];
                 ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: chapter as any }));
                 break;

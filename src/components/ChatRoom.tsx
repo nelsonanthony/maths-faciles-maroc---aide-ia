@@ -134,13 +134,15 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
                 {messages.map(msg => {
-                    const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                    // The content is pure LaTeX from the math input. Wrap it for display rendering.
+                    const mathContent = `$$${msg.content}$$`;
+                    
                     return (
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
                             <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                                 {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
-                                <div className="text-sm break-words prose prose-invert prose-p:my-0 prose-pre:my-0 max-w-none">
-                                    <MathJaxRenderer content={safeContent} />
+                                <div className="text-sm break-words">
+                                    <MathJaxRenderer content={mathContent} />
                                 </div>
                             </div>
                         </div>

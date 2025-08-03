@@ -333,16 +333,19 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 ) : (
                     <>
                         <div className="flex flex-col flex-grow space-y-4">
-                            {dialogue.map((msg, index) => {
+                           {dialogue.map((msg, index) => {
                                if (msg.role === 'ai') {
                                    return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                                }
-                               // For user messages, parse as markdown to correctly handle math and text
-                               const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                               
+                               // It's a user message from here.
+                               // The content is pure LaTeX from the math input. Wrap it for display rendering.
+                               const mathContent = `$$${msg.content}$$`;
+
                                return (
-                                   <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
-                                       <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
-                                           <MathJaxRenderer content={safeContent} />
+                                   <div key={index} className="flex items-end gap-2 justify-end">
+                                       <div className="chat-bubble user-bubble self-end animate-fade-in">
+                                           <MathJaxRenderer content={mathContent} />
                                        </div>
                                    </div>
                                );

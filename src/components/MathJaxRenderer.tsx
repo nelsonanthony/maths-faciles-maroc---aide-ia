@@ -33,7 +33,11 @@ const initializeMathJax = (): Promise<void> => {
           },
           svg: {
             fontCache: 'global',
-            displayAlign: 'center'
+            displayAlign: 'center',
+            linebreaks: {
+              automatic: true,
+              width: '90% container' // Allow automatic line breaking
+            }
           },
         };
         // This promise resolves when MathJax is ready.

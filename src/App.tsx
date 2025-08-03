@@ -158,6 +158,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_LEVEL', payload: { level: levelData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'niveau');
             setCurriculum(originalCurriculum);
@@ -186,6 +187,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_CHAPTER', payload: { levelId: selectedLevelId, chapter: chapterData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'chapitre');
             setCurriculum(originalCurriculum);
@@ -218,6 +220,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_SERIES', payload: { levelId: selectedLevelId, chapterId, series: seriesData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'série');
             setCurriculum(originalCurriculum);
@@ -254,6 +257,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_EXERCISE', payload: { levelId: selectedLevelId, chapterId: selectedChapterId, seriesId, exercise: exerciseData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'exercice');
             setCurriculum(originalCurriculum);
@@ -291,6 +295,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'quiz');
             setCurriculum(originalCurriculum);
@@ -331,6 +336,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'question de quiz');
             setCurriculum(originalCurriculum);
@@ -369,6 +375,7 @@ export const App: React.FC = () => {
 
         try {
             await callUpdateApi({ action: 'DELETE_ITEM', payload: delInfo });
+            await fetchInitialData(); // Re-sync with database
         } catch (error) {
             handleCRUDError(error, 'suppression');
             setCurriculum(originalCurriculum);

@@ -222,6 +222,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             validateAnswer(text);
         } else {
             startTutor(text);
+            setStudentInput('');
         }
     };
 

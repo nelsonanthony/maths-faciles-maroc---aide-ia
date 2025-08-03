@@ -268,7 +268,6 @@ export const App: React.FC = () => {
         if (!selectedLevelId) return;
 
         const originalCurriculum = curriculum;
-        let optimisticQuiz: Quiz | undefined;
         const optimisticCurriculum = originalCurriculum?.map(level => {
             if (level.id !== selectedLevelId) return level;
             const newChaps = level.chapters.map(c => {
@@ -281,7 +280,6 @@ export const App: React.FC = () => {
                 } else {
                     newQuizzesArr.push({ questions: [], ...quizData });
                 }
-                optimisticQuiz = newQuizzesArr.find(q => q.id === quizData.id);
                 return { ...c, quizzes: newQuizzesArr };
             });
             return { ...level, chapters: newChaps };
@@ -289,9 +287,6 @@ export const App: React.FC = () => {
         
         setCurriculum(optimisticCurriculum);
         closeModal();
-        if (optimisticQuiz) {
-            openModal({ type: 'editQuiz', payload: { quiz: optimisticQuiz, chapterId } });
-        }
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });

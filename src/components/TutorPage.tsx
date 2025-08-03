@@ -10,6 +10,8 @@ import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '../services/authService';
 import { MathKeyboard } from './MathKeyboard';
+import { EditableMathField, MathField } from 'react-mathquill';
+
 
 interface TutorPageProps {
     exercise: Exercise;
@@ -367,20 +369,23 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 ) : (
                     <div className="space-y-3">
                          {inputMode === 'text' && (
-                             <div className="flex items-center gap-2">
-                                 <input
-                                     type="text"
-                                     value={studentInput}
-                                     onChange={(e) => setStudentInput(e.target.value)}
-                                     onKeyDown={(e) => e.key === 'Enter' && handleSubmission(studentInput)}
-                                     placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                                     className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-                                     disabled={isDisabled}
-                                 />
-                                 <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600" disabled={isDisabled}>
+                             <div className="flex items-stretch gap-2">
+                                <div className="flex-grow">
+                                    <EditableMathField
+                                        latex={studentInput}
+                                        onChange={(field: MathField) => setStudentInput(field.latex())}
+                                        config={{
+                                            handlers: { enter: () => handleSubmission(studentInput) },
+                                            autoOperatorNames: 'sin cos tan log ln',
+                                        }}
+                                        className="h-full"
+                                        aria-placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
+                                    />
+                                </div>
+                                <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center" disabled={isDisabled}>
                                     <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
-                                 </button>
-                                 <button onClick={() => handleSubmission(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
+                                </button>
+                                <button onClick={() => handleSubmission(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                     Envoyer
                                 </button>
                              </div>

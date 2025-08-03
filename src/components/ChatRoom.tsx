@@ -1,8 +1,8 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
+import { EditableMathField, MathField } from 'react-mathquill';
 import { ChatRoom as ChatRoomType, ChatMessage } from '@/types';
 import { getSupabase } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
@@ -66,7 +66,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [room.id]);
+    }, [room.id, supabase]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,41 +74,50 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newMessage.trim() || !user) return;
+        const messageToSend = newMessage.trim();
+        if (!messageToSend || !user) return;
+    
+        // Optimistically clear the input
+        setNewMessage('');
         setError(null);
-
+    
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error("User not authenticated");
-
+    
             const response = await fetch(`/api/chat/send-message`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${session.access_token}`
                 },
-                body: JSON.stringify({ room_id: room.id, content: newMessage }),
+                body: JSON.stringify({ room_id: room.id, content: messageToSend }),
             });
-
+    
             if (!response.ok) {
+                // If the request fails, restore the input so the user can retry
+                setNewMessage(messageToSend);
                 if (response.status === 403) {
                     setError("Votre message n'a pas pu être envoyé car il a été jugé hors-sujet. Veuillez vous concentrer sur l'exercice de mathématiques.");
                 } else {
                     const errorData = await response.json();
+                    // Re-throw to be caught by the catch block
                     throw new Error(errorData.error || 'Failed to send message');
                 }
-            } else {
-                setNewMessage('');
             }
+            // On success, the input is already cleared.
         } catch (err) {
+            // Restore input on any failure
+            setNewMessage(messageToSend);
             setError(err instanceof Error ? err.message : 'Failed to send message');
         }
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setNewMessage(e.target.value);
-        if (error) {
-            setError(null);
+    const handleEnter = () => {
+        if (newMessage.trim() && user) {
+            // Create a fake event object that mimics React.FormEvent
+            const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+            handleSendMessage(fakeEvent);
         }
     };
 
@@ -153,25 +162,30 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
 
             <footer className="p-4 border-t border-gray-700">
                 <form onSubmit={handleSendMessage} className="space-y-2">
-                    <div className="flex gap-2">
-                        <div className="relative flex-grow">
-                            <input
-                                type="text"
-                                value={newMessage}
-                                onChange={handleInputChange}
-                                placeholder="Écrivez votre message ou utilisez le clavier ƒ(x)"
-                                className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-600 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
-                                disabled={!user}
+                    <div className="flex items-stretch gap-2">
+                        <div className="flex-grow">
+                             <EditableMathField
+                                latex={newMessage}
+                                onChange={(field: MathField) => {
+                                    setNewMessage(field.latex());
+                                    if (error) setError(null);
+                                }}
+                                config={{
+                                    handlers: { enter: handleEnter },
+                                    autoOperatorNames: 'sin cos tan log ln',
+                                }}
+                                className="h-full"
                             />
-                            <button
-                                type="button"
-                                onClick={() => setIsKeyboardOpen(true)}
-                                className="absolute inset-y-0 right-0 flex items-center justify-center w-14 text-gray-400 hover:text-brand-blue-400 rounded-r-lg"
-                                aria-label="Ouvrir le clavier mathématique"
-                            >
-                                <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
-                            </button>
                         </div>
+                        <button
+                            type="button"
+                            onClick={() => setIsKeyboardOpen(true)}
+                            className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center"
+                            aria-label="Ouvrir le clavier mathématique"
+                            disabled={!user}
+                        >
+                            <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
+                        </button>
                         <button type="submit" className="px-6 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex-shrink-0" disabled={!user || !newMessage.trim()}>
                             Envoyer
                         </button>

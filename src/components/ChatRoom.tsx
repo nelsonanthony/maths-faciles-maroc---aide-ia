@@ -23,6 +23,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
     const [error, setError] = useState<string | null>(null);
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const mathFieldRef = useRef<MathField | null>(null);
     const supabase = getSupabase();
 
     useEffect(() => {
@@ -74,10 +75,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        const messageToSend = newMessage.trim();
+        const messageToSend = (mathFieldRef.current?.latex() ?? '').trim();
         if (!messageToSend || !user) return;
     
         // Optimistically clear the input
+        if (mathFieldRef.current) mathFieldRef.current.latex('');
         setNewMessage('');
         setError(null);
     
@@ -95,29 +97,22 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             });
     
             if (!response.ok) {
-                // If the request fails, restore the input so the user can retry
-                setNewMessage(messageToSend);
                 if (response.status === 403) {
                     setError("Votre message n'a pas pu être envoyé car il a été jugé hors-sujet. Veuillez vous concentrer sur l'exercice de mathématiques.");
                 } else {
                     const errorData = await response.json();
-                    // Re-throw to be caught by the catch block
                     throw new Error(errorData.error || 'Failed to send message');
                 }
+                // Restore input on handled error
+                if (mathFieldRef.current) mathFieldRef.current.latex(messageToSend);
+                setNewMessage(messageToSend);
             }
             // On success, the input is already cleared.
         } catch (err) {
             // Restore input on any failure
+            if (mathFieldRef.current) mathFieldRef.current.latex(messageToSend);
             setNewMessage(messageToSend);
             setError(err instanceof Error ? err.message : 'Failed to send message');
-        }
-    };
-
-    const handleEnter = () => {
-        if (newMessage.trim() && user) {
-            // Create a fake event object that mimics React.FormEvent
-            const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
-            handleSendMessage(fakeEvent);
         }
     };
 
@@ -156,6 +151,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                     initialValue={newMessage}
                     onConfirm={(latex) => {
                         setNewMessage(latex);
+                        if(mathFieldRef.current) mathFieldRef.current.latex(latex);
                         setIsKeyboardOpen(false);
                     }}
                     onClose={() => setIsKeyboardOpen(false)}
@@ -163,6 +159,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             )}
 
             <footer className="p-4 border-t border-gray-700">
+                 {error && <p className="text-sm text-red-400 mb-2 text-center">{error}</p>}
                 <form onSubmit={handleSendMessage} className="space-y-2">
                     <div className="flex items-stretch gap-2">
                         <div className="flex-grow">
@@ -172,27 +169,21 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                                     setNewMessage(field.latex());
                                     if (error) setError(null);
                                 }}
+                                mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                 config={{
-                                    handlers: { enter: handleEnter },
                                     autoOperatorNames: 'sin cos tan log ln',
                                 }}
+                                aria-placeholder="Votre réponse..."
                                 className="h-full"
-                            />
+                             />
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setIsKeyboardOpen(true)}
-                            className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center"
-                            aria-label="Ouvrir le clavier mathématique"
-                            disabled={!user}
-                        >
+                         <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center">
                             <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                         </button>
-                        <button type="submit" className="px-6 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex-shrink-0" disabled={!user || !newMessage.trim()}>
+                        <button type="submit" className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={!newMessage.trim()}>
                             Envoyer
                         </button>
                     </div>
-                     {error && <p className="text-red-400 text-sm pl-1">{error}</p>}
                 </form>
             </footer>
         </div>

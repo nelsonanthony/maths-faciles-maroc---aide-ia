@@ -109,6 +109,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
     const [isOcrLoading, setIsLoadingOcr] = useState(false);
 
+    const mathFieldRef = useRef<MathField | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -184,6 +185,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         
         addMessageToDialogue('user', answer);
         setStudentInput('');
+        if (mathFieldRef.current) mathFieldRef.current.latex('');
         setIsVerifying(true);
         setVerificationResult(null);
         setError(null);
@@ -247,13 +249,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     };
     
     // Central submission handler
-    const handleSubmission = (text: string) => {
+    const handleSubmission = () => {
+        const text = mathFieldRef.current?.latex() ?? '';
         if (isTutorActive) {
             validateAnswer(text);
         } else {
             startTutor(text);
         }
-        setStudentInput('');
     };
 
     const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,7 +290,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-            handleSubmission(data.text);
+            
+            if (isTutorActive) {
+                validateAnswer(data.text);
+            } else {
+                startTutor(data.text);
+            }
+
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -377,8 +385,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                     <EditableMathField
                                         latex={studentInput}
                                         onChange={(field: MathField) => setStudentInput(field.latex())}
+                                        mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                         config={{
-                                            handlers: { enter: () => handleSubmission(studentInput) },
                                             autoOperatorNames: 'sin cos tan log ln',
                                         }}
                                         className="h-full"
@@ -388,7 +396,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                 <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center" disabled={isDisabled}>
                                     <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                                 </button>
-                                <button onClick={() => handleSubmission(studentInput)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
+                                <button onClick={handleSubmission} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                     Envoyer
                                 </button>
                              </div>
@@ -433,7 +441,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 {isKeyboardOpen && (
                     <MathKeyboard 
                         initialValue={studentInput}
-                        onConfirm={(latex) => { setStudentInput(latex); setIsKeyboardOpen(false); }}
+                        onConfirm={(latex) => {
+                            setStudentInput(latex);
+                            if(mathFieldRef.current) mathFieldRef.current.latex(latex);
+                            setIsKeyboardOpen(false);
+                        }}
                         onClose={() => setIsKeyboardOpen(false)}
                     />
                 )}

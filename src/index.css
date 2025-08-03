@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  @keyframes blink-caret {
+    from, to { border-color: transparent }
+    50% { border-color: theme('colors.brand-blue.400'); }
+  }
+}
+
 @layer components {
   .ai-response-content h3 { 
     @apply text-xl font-semibold text-brand-blue-300 mt-5 mb-2;
@@ -66,6 +73,7 @@
   }
   .mq-editable-field .mq-cursor {
     @apply border-l-2 border-brand-blue-400;
+    animation: blink-caret 1s step-end infinite;
   }
   .mq-selection .mq-root-block {
     background-color: theme('colors.brand-blue.900/50') !important;

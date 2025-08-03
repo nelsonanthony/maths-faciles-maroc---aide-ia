@@ -53,7 +53,7 @@ const KEY_LAYOUTS: MathKeyboardLayout = {
         { display: '.', type: 'write', value: '.', category: 'main' },
         { display: 'ans', type: 'write', value: 'ans', category: 'func' },
         { display: '+', type: 'write', value: '+', category: 'func' },
-        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action', width: 2 },
+        { display: '↵', type: 'write', value: '\n', category: 'action', width: 2 },
       ],
     ]
   },
@@ -81,7 +81,7 @@ const KEY_LAYOUTS: MathKeyboardLayout = {
         { display: '!', type: 'write', value: '!', category: 'func', width: 2 },
         { display: "'", type: 'write', value: "'", category: 'func', width: 2 },
         { display: '\\pi', type: 'cmd', value: '\\pi', category: 'func', width: 2 },
-        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action', width: 3 },
+        { display: '↵', type: 'write', value: '\n', category: 'action', width: 3 },
       ]
     ]
   },
@@ -118,7 +118,7 @@ const KEY_LAYOUTS: MathKeyboardLayout = {
         { display: '!', type: 'write', value: '!', category: 'func' },
         { display: 'e', type: 'write', value: 'e', category: 'func' },
         { display: '\\pi', type: 'cmd', value: '\\pi', category: 'func' },
-        { display: '↵', type: 'keystroke', value: 'Enter', category: 'action' },
+        { display: '↵', type: 'write', value: '\n', category: 'action' },
       ]
     ]
   }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -388,6 +387,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                         mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                         config={{
                                             autoOperatorNames: 'sin cos tan log ln',
+                                            handlers: {
+                                                enter: (mathField) => {
+                                                    mathField.cmd('\\\\');
+                                                }
+                                            }
                                         }}
                                         className="h-full"
                                         aria-placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}

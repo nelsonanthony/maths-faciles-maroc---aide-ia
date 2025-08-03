@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -168,6 +167,11 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                                 mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                 config={{
                                     autoOperatorNames: 'sin cos tan log ln',
+                                    handlers: {
+                                        enter: (mathField) => {
+                                            mathField.cmd('\\\\');
+                                        }
+                                    }
                                 }}
                                 aria-placeholder="Votre réponse..."
                                 className="h-full"

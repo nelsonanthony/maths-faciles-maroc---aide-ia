@@ -11,6 +11,7 @@ interface EditQuizModalProps {
   onSave: (quizData: Quiz, chapterId: string) => Promise<void>;
   onClose: () => void;
   openModal: (modalState: any) => void;
+  onSaveQuizQuestion: (questionData: QuizQuestion, quizId: string, chapterId: string) => Promise<void>;
 }
 
 const emptyQuiz: Omit<Quiz, 'id'> = {
@@ -18,7 +19,7 @@ const emptyQuiz: Omit<Quiz, 'id'> = {
   questions: [],
 };
 
-export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, onSave, onClose, openModal }) => {
+export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, onSave, onClose, openModal, onSaveQuizQuestion }) => {
   const [formData, setFormData] = useState({ title: quiz?.title || '' });
   const [localQuestions, setLocalQuestions] = useState<QuizQuestion[]>(quiz?.questions || []);
   const [editingQuestion, setEditingQuestion] = useState<{ question: QuizQuestion | null; index: number | null } | null>(null);
@@ -32,20 +33,6 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, o
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSaveQuestion = (questionData: QuizQuestion) => {
-    setLocalQuestions(prev => {
-        const newQuestions = [...prev];
-        const existingIndex = newQuestions.findIndex(q => q.id === questionData.id);
-        if (existingIndex > -1) {
-            newQuestions[existingIndex] = questionData;
-        } else {
-            newQuestions.push(questionData);
-        }
-        return newQuestions;
-    });
-    setEditingQuestion(null);
   };
 
   const handleDeleteQuestion = (index: number) => {
@@ -118,36 +105,41 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, o
                     <h3 className="text-lg font-semibold text-gray-300">Questions</h3>
                     <button
                         onClick={() => setEditingQuestion({ question: null, index: null })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 bg-green-600/50 hover:bg-green-600 text-white disabled:opacity-50"
+                        disabled={isCreating}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 bg-green-600/50 hover:bg-green-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                         aria-label="Ajouter une question"
                     >
                         <PlusCircleIcon className="w-4 h-4" />
                         Ajouter une question
                     </button>
                 </div>
-                <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-                    {localQuestions.length > 0 ? localQuestions.map((q, index) => (
-                        <div key={q.id || index} className="group flex items-center justify-between gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700">
-                           <div className="flex-grow text-gray-300 text-sm">
-                                <span className="font-bold">{index + 1}.</span> <MathJaxRenderer content={q.question} />
-                           </div>
-                           <div className="flex items-center opacity-50 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={() => setEditingQuestion({ question: q, index })}
-                                    className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" aria-label="Modifier la question">
-                                    <PencilIcon className="w-4 h-4"/>
-                                </button>
-                                <button 
-                                     onClick={() => handleDeleteQuestion(index)}
-                                    className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-red-400" aria-label="Supprimer la question">
-                                    <TrashIcon className="w-4 h-4"/>
-                                </button>
-                           </div>
-                        </div>
-                    )) : (
-                        <p className="text-center text-gray-500 py-4">Ce quiz ne contient aucune question.</p>
-                    )}
-                </div>
+                 {isCreating ? (
+                    <p className="text-center text-gray-500 py-4">Veuillez d'abord enregistrer le quiz avant d'ajouter des questions.</p>
+                ) : (
+                    <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-2">
+                        {localQuestions.length > 0 ? localQuestions.map((q, index) => (
+                            <div key={q.id || index} className="group flex items-center justify-between gap-2 bg-gray-900/50 p-3 rounded-lg border border-gray-700">
+                               <div className="flex-grow text-gray-300 text-sm">
+                                    <span className="font-bold">{index + 1}.</span> <MathJaxRenderer content={q.question} />
+                               </div>
+                               <div className="flex items-center opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={() => setEditingQuestion({ question: q, index })}
+                                        className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white" aria-label="Modifier la question">
+                                        <PencilIcon className="w-4 h-4"/>
+                                    </button>
+                                    <button 
+                                         onClick={() => handleDeleteQuestion(index)}
+                                        className="p-1.5 rounded-full text-gray-400 hover:bg-gray-700 hover:text-red-400" aria-label="Supprimer la question">
+                                        <TrashIcon className="w-4 h-4"/>
+                                    </button>
+                               </div>
+                            </div>
+                        )) : (
+                            <p className="text-center text-gray-500 py-4">Ce quiz ne contient aucune question.</p>
+                        )}
+                    </div>
+                )}
             </fieldset>
           </div>
 
@@ -180,12 +172,12 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, o
         </div>
       </div>
       
-      {editingQuestion && (
+      {editingQuestion && quiz?.id && (
         <EditQuizQuestionModal
             question={editingQuestion.question}
-            quizId={quiz?.id || 'new-quiz'}
+            quizId={quiz.id}
             chapterId={chapterId}
-            onSave={(questionData) => handleSaveQuestion(questionData)}
+            onSave={onSaveQuizQuestion}
             onClose={() => setEditingQuestion(null)}
         />
       )}

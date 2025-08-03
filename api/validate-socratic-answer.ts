@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -58,13 +56,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw error;
         }
         
-        let { studentAnswer, currentIaQuestion, expectedAnswerKeywords } = req.body as { studentAnswer?: string, currentIaQuestion?: string, expectedAnswerKeywords?: string[] };
+        let { studentAnswer, currentIaQuestion, expectedAnswerKeywords, exerciseStatement, exerciseCorrection } = req.body as { 
+            studentAnswer?: string, 
+            currentIaQuestion?: string, 
+            expectedAnswerKeywords?: string[],
+            exerciseStatement?: string,
+            exerciseCorrection?: string 
+        };
         
         if (studentAnswer === undefined) {
              return res.status(400).json({ error: "Le champ 'studentAnswer' est requis (peut être vide)." });
         }
-        if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords)) {
-            return res.status(400).json({ error: "Les champs 'currentIaQuestion' et 'expectedAnswerKeywords' sont requis." });
+        if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords) || !exerciseStatement || !exerciseCorrection) {
+            return res.status(400).json({ error: "Les champs 'currentIaQuestion', 'expectedAnswerKeywords', 'exerciseStatement', et 'exerciseCorrection' sont requis." });
         }
 
         // Clean student answer to ensure consistent LaTeX format
@@ -84,18 +88,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         };
 
         const promptText = `
-            CONTEXTE: Tu es un tuteur de mathématiques qui évalue la réponse d'un élève (qui peut provenir d'une transcription d'image).
-            MISSION: Détermine si la réponse de l'élève est correcte. La réponse n'a pas besoin d'être parfaitement formulée, mais elle doit être conceptuellement juste. Sois flexible avec la formulation.
-            
-            QUESTION POSÉE À L'ÉLÈVE: "${currentIaQuestion}"
-            
-            CONCEPTS/MOTS-CLÉS ATTENDUS DANS LA RÉPONSE: "${expectedAnswerKeywords.join(', ')}"
-            
-            RÉPONSE DE L'ÉLÈVE: "${studentAnswer}"
+# CONTEXTE GLOBAL
+Tu es un tuteur de mathématiques évaluant une étape de la résolution d'un exercice par un élève.
 
-            FORMAT DE SORTIE: Réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ou après, avec la structure suivante :
-            { "is_correct": boolean }
-        `;
+## ÉNONCÉ DE L'EXERCICE
+${exerciseStatement}
+
+## CORRECTION DE RÉFÉRENCE (pour ton information)
+${exerciseCorrection}
+
+# MISSION
+Évalue la réponse de l'élève à la question spécifique qui lui a été posée.
+
+## QUESTION POSÉE À L'ÉLÈVE
+"${currentIaQuestion}"
+
+## CONCEPTS CLÉS ATTENDUS DANS LA RÉPONSE
+"${expectedAnswerKeywords.join(', ')}"
+
+## RÉPONSE FOURNIE PAR L'ÉLÈVE
+"${studentAnswer}"
+
+# ANALYSE ET DÉCISION
+La réponse de l'élève est-elle conceptuellement correcte par rapport à la question posée ? Ne te fie pas uniquement aux mots-clés. Analyse le sens mathématique. La formulation peut être imparfaite ou venir d'une photo. Sois flexible. Si la réponse est vide ou hors-sujet, elle est incorrecte.
+
+# FORMAT DE SORTIE
+Réponds UNIQUEMENT avec un objet JSON valide : \`{ "is_correct": boolean }\`.
+`;
         
         const requestPayload = {
             model: 'gemini-2.5-flash',

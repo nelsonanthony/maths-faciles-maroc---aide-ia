@@ -60,29 +60,14 @@ export const ModalManager: React.FC<ModalManagerProps> = ({
         case 'editQuiz': {
             const { quiz, chapterId } = modal.payload;
             if (!levelId) return null;
-
-            const handleAddQuestion = () => {
-                if (!quiz) return; // Should not happen as button is disabled
-                openModal({ type: 'editQuizQuestion', payload: { question: null, quizId: quiz.id, chapterId } });
-            };
-
-            const handleEditQuestion = (questionToEdit: QuizQuestion) => {
-                if (!quiz) return;
-                openModal({ type: 'editQuizQuestion', payload: { question: questionToEdit, quizId: quiz.id, chapterId } });
-            };
-
-            const handleDeleteQuestion = (questionId: string, name: string) => {
-                if (!quiz) return;
-                openModal({ type: 'delete', payload: { type: 'quizQuestion', ids: { levelId, chapterId, quizId: quiz.id, questionId }, name } });
-            };
             
             return <EditQuizModal
                         quiz={quiz}
-                        onSave={(quizData) => onSaveQuiz(quizData, chapterId)}
+                        chapterId={chapterId}
+                        onSave={onSaveQuiz}
                         onClose={onClose}
-                        onAddQuestion={handleAddQuestion}
-                        onEditQuestion={handleEditQuestion}
-                        onDeleteQuestion={handleDeleteQuestion}
+                        openModal={openModal}
+                        onSaveQuizQuestion={onSaveQuizQuestion}
                    />;
         }
         case 'editQuizQuestion':

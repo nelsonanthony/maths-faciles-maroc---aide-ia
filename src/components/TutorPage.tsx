@@ -171,6 +171,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     studentAnswer: answer,
                     currentIaQuestion: socraticPath[currentStep].ia_question,
                     expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
+                    exerciseStatement: exercise.statement,
+                    exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet
                 })
             });
             const bodyText = await response.text();

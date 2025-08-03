@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -126,10 +124,10 @@ Utilise EXACTEMENT cette structure.
 ## 3. Règles pour le champ \`evaluation\`
 Le champ \`evaluation\` doit être l'une des trois valeurs suivantes, sans exception : \`"correct"\`, \`"incorrect"\`, \`"partial"\`.
 
-## 4. Formatage Mathématique
+## 4. Formatage Mathématique (RÈGLE STRICTE)
 Dans les chaînes de caractères (\`summary\`, \`explanation\`), utilise impérativement le formatage hybride suivant :
--   **Priorité à Unicode**: Pour les symboles simples, utilise les caractères Unicode (ex: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`).
--   **LaTeX pour le Complexe**: Utilise les délimiteurs \`$..$\` (en ligne) et \`$$..$$\` (en bloc) UNIQUEMENT pour les fractions, racines, sommes, etc.
+-   **Priorité à Unicode**: Utilise des caractères Unicode pour TOUT ce qui est simple. Exemples: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`(∀𝑥 ∈ ℝ)\`, \`𝑥 ⟼ 𝑥² − 1\`.
+-   **LaTeX pour le Complexe**: Utilise les délimiteurs \`$..$\` (en ligne) et \`$$..$$\` (en bloc) UNIQUEMENT pour les fractions, racines, sommes, etc. Exemple: \`$$\\frac{x^2 - 1}{x+2}$$ \`.
 -   **INTERDICTION**: N'utilise JAMAIS les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
 `;
 

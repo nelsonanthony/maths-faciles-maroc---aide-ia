@@ -1,5 +1,3 @@
-
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -110,10 +108,10 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
 
 # RÈGLES DE FORMATAGE (Valables pour TOUTES les réponses)
 -   **JSON UNIQUEMENT**: Ta sortie doit être un objet JSON valide, sans aucun texte avant ou après.
--   **FORMATAGE MATHÉMATIQUE HYBRIDE**:
-    -   Utilise des caractères **Unicode** pour les symboles simples (ex: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`).
-    -   Utilise **LaTeX** (\`$..$\` ou \`$$..$$\`) SEULEMENT pour les structures complexes (fractions, racines, etc.).
-    -   **INTERDICTION**: N'utilise JAMAIS \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+-   **FORMATAGE MATHÉMATIQUE HYBRIDE (RÈGLE STRICTE)**:
+    -   **Priorité à Unicode**: Utilise des caractères Unicode pour TOUT ce qui est simple. Exemples: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`(∀𝑥 ∈ ℝ)\`, \`𝑥 ⟼ 𝑥² − 1\`.
+    -   **LaTeX pour le Complexe**: Utilise les délimiteurs \`$..$\` (en ligne) et \`$$..$$\` (en bloc) UNIQUEMENT pour les fractions, racines, sommes, etc. Exemple: \`$$\\frac{x^2 - 1}{x+2}$$ \`.
+    -   **INTERDICTION**: N'utilise JAMAIS les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
 
 # INSTRUCTIONS SPÉCIFIQUES PAR \`requestType\`
 

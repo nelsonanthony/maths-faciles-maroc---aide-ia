@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -7,7 +8,7 @@ import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, PencilIcon, 
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
-import { getSupabase } from '@/services/authService';
+import { getSupabase } from '../services/authService';
 import { MathKeyboard } from './MathKeyboard';
 
 interface TutorPageProps {
@@ -54,6 +55,31 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
         </div>
     );
 };
+
+const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }> = ({ dialogue, onBack }) => (
+    <div className="p-4 space-y-4 animate-fade-in h-full flex flex-col">
+        <h3 className="text-2xl font-bold text-center text-slate-100">Résumé de la session</h3>
+        <p className="text-sm text-center text-slate-400">Voici un récapitulatif de votre discussion avec le tuteur.</p>
+        <div className="space-y-4 flex-grow overflow-y-auto p-4 bg-slate-950 rounded-lg border border-slate-800">
+            {dialogue.map((msg, index) => {
+                const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                return (
+                    <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
+                            <MathJaxRenderer content={safeContent} />
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+        <div className="text-center mt-4 flex-shrink-0">
+            <button onClick={onBack} className="px-6 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">
+                Retour à l'exercice
+            </button>
+        </div>
+    </div>
+);
+
 
 export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId, onBack, onNavigateToTimestamp }) => {
     const { user } = useAuth();
@@ -123,11 +149,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
             addMessageToDialogue('ai', currentQuestion);
-        } else if (isTutorActive && socraticPath && currentStep >= socraticPath.length) {
+        } else if (isTutorActive && socraticPath && currentStep >= socraticPath.length && !isTutorFinished) {
             addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
             setIsTutorFinished(true);
         }
-    }, [currentStep, socraticPath, isTutorActive]);
+    }, [currentStep, socraticPath, isTutorActive, isTutorFinished]);
 
     const addMessageToDialogue = (role: DialogueMessage['role'], content: string) => {
         setDialogue(prev => [...prev, { role, content }]);
@@ -261,8 +287,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
             const data = JSON.parse(bodyText);
             handleSubmission(data.text);
-        } catch (e: any) {
-            setError(e.message);
+        } catch (err: any) {
+            setError(err.message);
         } finally {
             setIsLoadingOcr(false);
             setUploadedFile(null);
@@ -287,30 +313,50 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 </div>
             </header>
             
-            <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
-                <div className="flex flex-col flex-grow space-y-4">
-                    {dialogue.map((msg, index) => {
-                       if (msg.role === 'ai') {
-                           return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
-                       }
-                       // For user messages, parse as markdown to correctly handle math and text
-                       const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
-                       return (
-                           <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
-                               <MathJaxRenderer content={safeContent} />
-                           </div>
-                       );
-                   })}
-                   {isLoadingAction && <div className="text-center py-2"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
-                   
-                   {isTutorActive && verificationResult && (
-                       <div className={`self-end flex items-center gap-2 text-sm px-3 py-1 rounded-full ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                           {verificationResult === 'correct' ? <CheckCircleIcon className="w-4 h-4" /> : <XCircleIcon className="w-4 h-4" />}
-                           {verificationResult === 'correct' ? 'Correct !' : 'Incorrect.'}
-                       </div>
-                   )}
+            {isTutorActive && !isTutorFinished && socraticPath && (
+                <div className="p-4 border-b border-slate-800 flex-shrink-0">
+                    <p className="text-sm font-semibold text-center text-slate-400 mb-2">Progression: Étape {currentStep + 1} sur {socraticPath.length}</p>
+                    <div className="w-full bg-slate-700 rounded-full h-2">
+                        <div 
+                            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-500" 
+                            style={{ width: `${Math.min(100, (currentStep / socraticPath.length) * 100)}%` }}>
+                        </div>
+                    </div>
                 </div>
-                <div ref={messagesEndRef} />
+            )}
+
+            <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
+                {isTutorFinished ? (
+                    <TutorSummary dialogue={dialogue} onBack={onBack} />
+                ) : (
+                    <>
+                        <div className="flex flex-col flex-grow space-y-4">
+                            {dialogue.map((msg, index) => {
+                               if (msg.role === 'ai') {
+                                   return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
+                               }
+                               // For user messages, parse as markdown to correctly handle math and text
+                               const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                               return (
+                                   <div key={index} className={`flex items-end gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+                                       <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
+                                           <MathJaxRenderer content={safeContent} />
+                                       </div>
+                                   </div>
+                               );
+                           })}
+                           {isLoadingAction && <div className="text-center py-2"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
+                           
+                           {isTutorActive && verificationResult && (
+                               <div className={`self-end flex items-center gap-2 text-sm px-3 py-1.5 rounded-full animate-fade-in ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
+                                    <span className="text-lg">{verificationResult === 'correct' ? '🎉' : '🤔'}</span>
+                                    <span>{verificationResult === 'correct' ? 'Correct !' : 'Pas tout à fait...'}</span>
+                               </div>
+                           )}
+                        </div>
+                        <div ref={messagesEndRef} />
+                    </>
+                )}
             </main>
             
              <footer className="p-4 bg-slate-800/80 backdrop-blur-sm rounded-b-xl border-b border-x border-slate-700/50">
@@ -328,7 +374,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                      onChange={(e) => setStudentInput(e.target.value)}
                                      onKeyDown={(e) => e.key === 'Enter' && handleSubmission(studentInput)}
                                      placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
-                                     className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-300 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
+                                     className="w-full p-3 pr-14 bg-gray-900 border-2 border-gray-700 rounded-lg text-gray-200 focus:ring-2 focus:ring-brand-blue-500 focus:border-brand-blue-500"
                                      disabled={isDisabled}
                                  />
                                  <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600" disabled={isDisabled}>

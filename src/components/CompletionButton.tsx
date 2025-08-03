@@ -356,8 +356,8 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                     {/* Bilan global */}
                     <div className="flex items-start gap-3 mb-4 pb-4 border-b border-slate-700/50">
                         {checkResult.is_globally_correct
-                            ? <CheckCircleIcon className="w-7 h-7 text-green-400 shrink-0" />
-                            : <XCircleIcon className="w-7 h-7 text-red-400 shrink-0" />}
+                            ? <span className="text-2xl" role="img" aria-label="Succès global">🎉</span>
+                            : <span className="text-2xl" role="img" aria-label="Échec global">🤔</span>}
                         <div className="flex-grow">
                             <h4 className="font-bold text-slate-100 text-lg">Bilan</h4>
                             <p className="text-sm text-slate-300">{checkResult.summary}</p>
@@ -369,10 +369,10 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                         <h4 className="font-bold text-slate-100 text-lg">Explication détaillée</h4>
                         {checkResult.detailed_feedback.map((part, index) => (
                             <div key={index} className="flex items-start gap-3">
-                                <div className="mt-1 shrink-0">
-                                    {part.evaluation === 'correct' && <CheckCircleIcon className="w-5 h-5 text-green-500" />}
-                                    {part.evaluation === 'incorrect' && <XCircleIcon className="w-5 h-5 text-red-500" />}
-                                    {part.evaluation === 'partial' && <PencilIcon className="w-5 h-5 text-yellow-500" />}
+                                <div className="mt-1 shrink-0 text-xl">
+                                    {part.evaluation === 'correct' && <span role="img" aria-label="Succès">🎉</span>}
+                                    {part.evaluation === 'incorrect' && <span role="img" aria-label="Incorrect">❌</span>}
+                                    {part.evaluation === 'partial' && <span role="img" aria-label="Partiel">🔎</span>}
                                 </div>
                                 <div className="flex-grow">
                                     <h5 className="font-semibold text-slate-200">{part.part_title}</h5>

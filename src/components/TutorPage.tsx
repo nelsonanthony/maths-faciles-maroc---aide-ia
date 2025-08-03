@@ -141,8 +141,9 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
-        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
-        ${exercise.correctionSnippet}` : ''}
+        ${exercise.fullCorrection ? `\n---CORRECTION---
+        ${exercise.fullCorrection}`: (exercise.correctionSnippet ? `\n---INDICE---
+        ${exercise.correctionSnippet}` : '')}
         
         ---DEMANDE ÉLÈVE---
         ${initialWork.trim() || "J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique)."}`;
@@ -285,13 +286,19 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             
             <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
                 <div className="flex flex-col flex-grow space-y-4">
-                    {dialogue.map((msg, index) => (
-                       msg.role === 'ai'
-                           ? <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />
-                           : <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
-                               <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
-                             </div>
-                   ))}
+                    {dialogue.map((msg, index) => {
+                       if (msg.role === 'ai') {
+                           return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
+                       }
+                       // For user messages, wrap in $$ for proper rendering
+                       const userMessageContent = `$$${msg.content}$$`;
+                       const safeContent = DOMPurify.sanitize(marked.parse(userMessageContent, { breaks: true }) as string);
+                       return (
+                           <div key={index} className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'system-bubble'} self-end animate-fade-in`}>
+                               <MathJaxRenderer content={safeContent} />
+                           </div>
+                       );
+                   })}
                    {isLoadingAction && <div className="text-center py-2"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
                    
                    {isTutorActive && verificationResult && (

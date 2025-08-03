@@ -161,6 +161,10 @@ export const MathKeyboard: React.FC<MathKeyboardProps> = ({ onConfirm, onClose, 
                 latex={latex}
                 onChange={(field) => setLatex(field.latex())}
                 mathquillDidMount={(field) => setMathField(field)}
+                config={{
+                    // Prevent auto-converting "f" into a function symbol
+                    autoOperatorNames: 'sin cos tan log ln',
+                }}
                 style={{ width: '100%', minHeight: '80px', padding: '1rem' }}
             />
         </div>

@@ -121,7 +121,8 @@ Réponds UNIQUEMENT avec un objet JSON valide : \`{ "is_correct": boolean }\`.
             contents: promptText,
             config: { 
                 responseMimeType: "application/json", 
-                responseSchema: answerSchema
+                responseSchema: answerSchema,
+                thinkingConfig: { thinkingBudget: 0 } // Optimization for low latency
             }
         };
         

@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '../services/authService';
+import { MathKeyboard } from './MathKeyboard';
 
 
 interface TutorPageProps {
@@ -112,6 +113,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
     const [isOcrLoading, setIsLoadingOcr] = useState(false);
     
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const [isRawInput, setIsRawInput] = useState(true);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -441,8 +443,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                  </div>
                                  <div className="flex justify-end items-center gap-2">
                                      <p className="text-xs text-slate-500 flex-grow">
-                                         {isRawInput ? 'Shift+Enter pour une nouvelle ligne.' : 'Cliquez sur la prévisualisation pour modifier.'}
+                                         {isRawInput ? 'Shift+Enter pour une nouvelle ligne.' : 'Cliquez pour modifier.'}
                                      </p>
+                                      <button 
+                                        type="button" 
+                                        onClick={() => setIsKeyboardOpen(true)} 
+                                        className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600 font-serif italic text-lg disabled:opacity-50"
+                                        disabled={isDisabled}
+                                    >
+                                        ƒ(x)
+                                    </button>
                                      <button onClick={handleSubmission} className="px-6 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                          Envoyer
                                      </button>
@@ -487,6 +497,18 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     </div>
                 ) : null}
             </footer>
+
+            {isKeyboardOpen && (
+                <MathKeyboard
+                    initialValue={studentInput}
+                    onConfirm={(latex) => {
+                        setStudentInput(latex);
+                        setIsKeyboardOpen(false);
+                        setIsRawInput(true); 
+                    }}
+                    onClose={() => setIsKeyboardOpen(false)}
+                />
+            )}
         </div>
     );
 };

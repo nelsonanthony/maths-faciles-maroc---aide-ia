@@ -3,13 +3,13 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import imageCompression from 'browser-image-compression';
 import { useAIExplain } from '@/hooks/useAIExplain';
-import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, PencilIcon, XCircleIcon, CheckCircleIcon, CameraIcon } from '@/components/icons';
+import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, XCircleIcon, CameraIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '../services/authService';
-import { MathKeyboard } from './MathKeyboard';
 import { EditableMathField, MathField } from 'react-mathquill';
+import { MathKeyboard } from './MathKeyboard';
 
 
 interface TutorPageProps {
@@ -65,11 +65,17 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
         <p className="text-sm text-center text-slate-400">Voici un récapitulatif de votre discussion avec le tuteur.</p>
         <div className="space-y-4 flex-grow overflow-y-auto p-4 bg-slate-950 rounded-lg border border-slate-800">
             {dialogue.map((msg, index) => {
-                const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                let contentToRender;
+                if (msg.role === 'ai') {
+                    contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
+                } else {
+                    contentToRender = `$$${msg.content}$$`;
+                }
+
                 return (
                     <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
-                            <MathJaxRenderer content={safeContent} />
+                            <MathJaxRenderer content={contentToRender} />
                         </div>
                     </div>
                 );
@@ -103,13 +109,14 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [isRateLimited, setIsRateLimited] = useState(false);
 
     const [inputMode, setInputMode] = useState<'text' | 'photo'>('text');
-    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
     const [isOcrLoading, setIsLoadingOcr] = useState(false);
-
+    
+    const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const mathFieldRef = useRef<MathField | null>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Initialize the conversation if the history is empty
@@ -199,8 +206,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const validateAnswer = async (answer: string) => {
         if (!socraticPath || isVerifying) return;
         
-        const dialogueWithUserAnswer = [...dialogue, { role: 'user', content: answer }];
-        onDialogueUpdate(dialogueWithUserAnswer);
+        addMessageToDialogue('user', answer);
         setStudentInput('');
         setIsVerifying(true);
         setVerificationResult(null);
@@ -229,8 +235,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-            const dialogueWithAiFeedback = [...dialogueWithUserAnswer, { role: 'ai', content: data.feedback_message }];
-            onDialogueUpdate(dialogueWithAiFeedback);
+            addMessageToDialogue('ai', data.feedback_message);
 
             if (data.is_correct) {
                 setVerificationResult('correct');
@@ -268,12 +273,10 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         const text = studentInput.trim();
         if (!text) return;
 
-        const formattedText = `$$\\begin{gathered}${text}\\end{gathered}$$`;
-
         if (isTutorActive) {
-            validateAnswer(formattedText);
+            validateAnswer(text);
         } else {
-            startTutor(formattedText);
+            startTutor(text);
         }
     };
 
@@ -309,13 +312,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-            
-            const formattedOcrText = `$$\\begin{gathered}${data.text.replace(/\n/g, '\\\\')}\\end{gathered}$$`;
 
             if (isTutorActive) {
-                validateAnswer(formattedOcrText);
+                validateAnswer(data.text);
             } else {
-                startTutor(formattedOcrText);
+                startTutor(data.text);
             }
 
         } catch (err: any) {
@@ -367,12 +368,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                    return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                                }
                                
-                               const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
-
+                               const contentToRender = `$$${msg.content}$$`;
                                return (
                                    <div key={index} className="flex items-end gap-2 justify-end">
                                        <div className="chat-bubble user-bubble self-end animate-fade-in">
-                                           <MathJaxRenderer content={safeContent} />
+                                           <MathJaxRenderer content={contentToRender} />
                                        </div>
                                    </div>
                                );
@@ -391,6 +391,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 )}
             </main>
             
+             {isKeyboardOpen && (
+                <MathKeyboard
+                    initialValue={studentInput}
+                    onConfirm={(latex) => {
+                        setStudentInput(latex);
+                        setIsKeyboardOpen(false);
+                    }}
+                    onClose={() => setIsKeyboardOpen(false)}
+                />
+            )}
              <footer className="p-4 bg-slate-800/80 backdrop-blur-sm rounded-b-xl border-b border-x border-slate-700/50">
                 {isRateLimited ? (
                      <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
@@ -399,22 +409,21 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 ) : (
                     <div className="space-y-3">
                          {inputMode === 'text' && (
-                             <div className="flex items-stretch gap-2">
-                                <div className="math-input-wrapper flex-grow">
+                            <div className="flex items-stretch gap-2">
+                                <div className={`math-input-wrapper flex-grow ${isDisabled ? 'opacity-60' : ''}`}>
                                     <EditableMathField
                                         latex={studentInput}
-                                        onChange={(field: MathField) => setStudentInput(field.latex())}
+                                        onChange={(field) => setStudentInput(field.latex())}
                                         mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                         config={{
+                                            readOnly: isDisabled,
                                             autoOperatorNames: 'sin cos tan log ln',
                                             handlers: {
-                                                enter: (mathField) => {
-                                                    mathField.cmd('\\\\');
-                                                }
+                                                enter: () => mathFieldRef.current?.cmd('\\\\')
                                             }
                                         }}
+                                        aria-placeholder="Votre réponse..."
                                         className="h-full"
-                                        aria-placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Votre réponse..."}
                                     />
                                 </div>
                                 <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center" disabled={isDisabled}>
@@ -423,7 +432,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                 <button onClick={handleSubmission} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
                                     Envoyer
                                 </button>
-                             </div>
+                            </div>
                          )}
                          {inputMode === 'photo' && (
                              <div className="flex items-center gap-2">
@@ -461,17 +470,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                          </div>
                          {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
                     </div>
-                )}
-                {isKeyboardOpen && (
-                    <MathKeyboard 
-                        initialValue={studentInput}
-                        onConfirm={(latex) => {
-                            setStudentInput(latex);
-                            if(mathFieldRef.current) mathFieldRef.current.latex(latex);
-                            setIsKeyboardOpen(false);
-                        }}
-                        onClose={() => setIsKeyboardOpen(false)}
-                    />
                 )}
             </footer>
         </div>

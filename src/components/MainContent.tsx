@@ -15,7 +15,7 @@ import { ForgotPasswordPage } from '@/components/ForgotPasswordPage';
 import { ResetPasswordPage } from '@/components/ResetPasswordPage';
 import { ChatPage } from '@/components/ChatPage';
 import { TutorPage } from '@/components/TutorPage';
-import { Level, Chapter, Exercise, Series, Quiz, QuizQuestion, User, ExerciseContext, ModalState, View } from '@/types';
+import { Level, Chapter, Exercise, Series, Quiz, QuizQuestion, User, ExerciseContext, ModalState, View, DialogueMessage } from '@/types';
 
 interface MainContentProps {
     view: View;
@@ -29,6 +29,7 @@ interface MainContentProps {
     selectedQuizId: string | null;
     selectedExerciseContext: ExerciseContext | null;
     selectedRoomId: string | null;
+    tutorSessions: Record<string, DialogueMessage[]>;
     videoNavigation: { videoId: string; time: number; } | null;
     onNavigate: (view: View) => void;
     onSelectLevel: (levelId: string) => void;
@@ -44,15 +45,16 @@ interface MainContentProps {
     resetSelections: (level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => void;
     openModal: (modalState: ModalState) => void;
     onSelectRoom: (roomId: string | null) => void;
+    onUpdateTutorSession: (exerciseId: string, dialogue: DialogueMessage[]) => void;
 }
 
 export const MainContent: React.FC<MainContentProps> = (props) => {
     const {
         view, user, curriculum, passwordResetToken, selectedLevelId, selectedChapterId,
         selectedSeriesId, selectedExerciseId, selectedQuizId, selectedExerciseContext, selectedRoomId,
-        videoNavigation, onNavigate, onSelectLevel, onSelectChapter, onSelectSeries, onSelectSeriesList,
+        tutorSessions, videoNavigation, onNavigate, onSelectLevel, onSelectChapter, onSelectSeries, onSelectSeriesList,
         onSelectExercise, onSelectQuiz, onNavigateToChat, onNavigateToTutor, onNavigateToTimestamp,
-        onBackToDefault, resetSelections, openModal, onSelectRoom
+        onBackToDefault, resetSelections, openModal, onSelectRoom, onUpdateTutorSession
     } = props;
     
     const level = curriculum.find(l => l.id === selectedLevelId);
@@ -78,7 +80,7 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
         case 'dashboard':
             return <DashboardPage onNavigateToCourses={() => onNavigate('courses')} />;
         case 'tutor':
-            if (selectedExerciseContext && exercise && chapter && level) return <TutorPage exercise={exercise} chapter={chapter} levelId={level.id} onBack={handleBackToExercise} onNavigateToTimestamp={onNavigateToTimestamp} />;
+            if (selectedExerciseContext && exercise && chapter && level) return <TutorPage exercise={exercise} chapter={chapter} levelId={level.id} onBack={handleBackToExercise} onNavigateToTimestamp={onNavigateToTimestamp} dialogueHistory={tutorSessions[exercise.id] || []} onDialogueUpdate={(newDialogue) => onUpdateTutorSession(exercise.id, newDialogue)} />;
             break;
         case 'chat':
             if (selectedExerciseContext && user) return <ChatPage exerciseContext={selectedExerciseContext} onBack={() => onNavigate('exercise')} selectedRoomId={selectedRoomId} onSelectRoom={onSelectRoom} />;

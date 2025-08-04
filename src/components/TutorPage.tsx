@@ -18,6 +18,8 @@ interface TutorPageProps {
     levelId: string;
     onBack: () => void;
     onNavigateToTimestamp: (levelId: string, chapterId: string, videoId: string, time: number) => void;
+    dialogueHistory: DialogueMessage[];
+    onDialogueUpdate: (dialogue: DialogueMessage[]) => void;
 }
 
 const fileToBase64 = (file: File): Promise<string> =>
@@ -82,13 +84,12 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
 );
 
 
-export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId, onBack, onNavigateToTimestamp }) => {
+export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId, onBack, onNavigateToTimestamp, dialogueHistory, onDialogueUpdate }) => {
     const { user } = useAuth();
     const { data: aiResponse, isLoading: isAIExplainLoading, error: aiError, explain, reset: resetAIExplain } = useAIExplain();
     
-    const [dialogue, setDialogue] = useState<DialogueMessage[]>([
-        { role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }
-    ]);
+    const dialogue = dialogueHistory;
+    
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [studentInput, setStudentInput] = useState('');
@@ -111,6 +112,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const mathFieldRef = useRef<MathField | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Initialize the conversation if the history is empty
+    useEffect(() => {
+        if (dialogue.length === 0) {
+            onDialogueUpdate([
+                { role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }
+            ]);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [dialogue]);
@@ -125,6 +136,10 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     }, [aiError, error]);
     
+    const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
+        onDialogueUpdate([...dialogue, { role, content }]);
+    }, [dialogue, onDialogueUpdate]);
+
     // Effect to process the initial AI response and start the tutor
     useEffect(() => {
         if (aiResponse?.socraticPath) {
@@ -144,28 +159,29 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [aiResponse]);
     
     // Effect to advance the socratic dialogue
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
-            addMessageToDialogue('ai', currentQuestion);
+            const lastMessage = dialogue[dialogue.length - 1];
+            if (!lastMessage || lastMessage.role !== 'ai' || lastMessage.content !== currentQuestion) {
+                 addMessageToDialogue('ai', currentQuestion);
+            }
         } else if (isTutorActive && socraticPath && currentStep >= socraticPath.length && !isTutorFinished) {
             addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
             setIsTutorFinished(true);
         }
-    }, [currentStep, socraticPath, isTutorActive, isTutorFinished]);
+    }, [currentStep, socraticPath, isTutorActive, isTutorFinished, dialogue, addMessageToDialogue]);
 
-    const addMessageToDialogue = (role: DialogueMessage['role'], content: string) => {
-        setDialogue(prev => [...prev, { role, content }]);
-    };
     
     // Called only for the FIRST user message to initialize the tutor
     const startTutor = (initialWork: string) => {
         resetAIExplain();
         setError(null);
-        addMessageToDialogue('user', initialWork.trim() || "Je n'ai pas encore commencé.");
+        addMessageToDialogue('user', initialWork);
         setStudentInput('');
         
         const prompt = `---CONTEXTE EXERCICE---
@@ -183,7 +199,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const validateAnswer = async (answer: string) => {
         if (!socraticPath || isVerifying) return;
         
-        addMessageToDialogue('user', answer);
+        const dialogueWithUserAnswer = [...dialogue, { role: 'user', content: answer }];
+        onDialogueUpdate(dialogueWithUserAnswer);
         setStudentInput('');
         setIsVerifying(true);
         setVerificationResult(null);
@@ -212,18 +229,17 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-            addMessageToDialogue('ai', data.feedback_message); // Add the dynamic feedback
+            const dialogueWithAiFeedback = [...dialogueWithUserAnswer, { role: 'ai', content: data.feedback_message }];
+            onDialogueUpdate(dialogueWithAiFeedback);
 
             if (data.is_correct) {
                 setVerificationResult('correct');
-                // The feedback is already added, now we wait and advance
                 setTimeout(() => {
                     setCurrentStep(prev => prev + 1);
                     setVerificationResult(null);
                 }, 2000);
             } else {
                 setVerificationResult('incorrect');
-                // The contextual hint is already added. The student can try again.
             }
         } catch (e: any) {
             setError(e.message);
@@ -252,9 +268,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         const text = studentInput.trim();
         if (!text) return;
 
-        // The input from EditableMathField is pure LaTeX. We wrap it to be a display math block.
-        // This allows multiline input using `\\` to be rendered correctly.
-        const formattedText = `$$${text}$$`;
+        const formattedText = `$$\\begin{gathered}${text}\\end{gathered}$$`;
 
         if (isTutorActive) {
             validateAnswer(formattedText);
@@ -296,10 +310,12 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
             const data = JSON.parse(bodyText);
             
+            const formattedOcrText = `$$\\begin{gathered}${data.text.replace(/\n/g, '\\\\')}\\end{gathered}$$`;
+
             if (isTutorActive) {
-                validateAnswer(data.text);
+                validateAnswer(formattedOcrText);
             } else {
-                startTutor(data.text);
+                startTutor(formattedOcrText);
             }
 
         } catch (err: any) {
@@ -351,8 +367,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                    return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                                }
                                
-                               // It's a user message from here.
-                               // The content can be a mix of text and math. Use marked to process it.
                                const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
 
                                return (

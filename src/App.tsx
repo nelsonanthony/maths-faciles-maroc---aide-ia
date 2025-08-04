@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { addStyles } from 'react-mathquill';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
-import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, DeletionInfo, ModalState, View, CurriculumActionPayload, ExerciseContext } from '@/types';
+import { Level, Chapter, Exercise, Quiz, Series, QuizQuestion, DeletionInfo, ModalState, View, CurriculumActionPayload, ExerciseContext, DialogueMessage } from '@/types';
 import { SpinnerIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { getCurriculum } from '@/services/api';
@@ -50,6 +50,8 @@ export const App: React.FC = () => {
     const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
     const [selectedExerciseContext, setSelectedExerciseContext] = useState<ExerciseContext | null>(null);
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+    const [tutorSessions, setTutorSessions] = useState<Record<string, DialogueMessage[]>>({});
+
 
     const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
     const [videoNavigation, setVideoNavigation] = useState<{ videoId: string; time: number; } | null>(null);
@@ -146,6 +148,13 @@ export const App: React.FC = () => {
         setView('chapterHome');
     };
     const handleSelectRoom = (roomId: string | null) => setSelectedRoomId(roomId);
+    
+    const handleUpdateTutorSession = useCallback((exerciseId: string, dialogue: DialogueMessage[]) => {
+        setTutorSessions(prev => ({
+            ...prev,
+            [exerciseId]: dialogue,
+        }));
+    }, []);
 
 
     // --- MODAL & CRUD OPERATIONS ---
@@ -440,12 +449,14 @@ export const App: React.FC = () => {
                                 selectedLevelId={selectedLevelId} selectedChapterId={selectedChapterId} selectedSeriesId={selectedSeriesId}
                                 selectedExerciseId={selectedExerciseId} selectedQuizId={selectedQuizId} selectedExerciseContext={selectedExerciseContext}
                                 selectedRoomId={selectedRoomId}
+                                tutorSessions={tutorSessions}
                                 videoNavigation={videoNavigation} onNavigate={handleNavigate} onSelectLevel={handleSelectLevel}
                                 onSelectChapter={handleSelectChapter} onSelectSeries={handleSelectSeries} onSelectSeriesList={handleSelectSeriesList}
                                 onSelectExercise={handleSelectExercise} onSelectQuiz={handleSelectQuiz} onNavigateToChat={handleNavigateToChat}
                                 onNavigateToTutor={handleNavigateToTutor} onNavigateToTimestamp={handleNavigateToTimestamp}
                                 onBackToDefault={handleBackToDefault} resetSelections={resetSelections} openModal={openModal}
                                 onSelectRoom={handleSelectRoom}
+                                onUpdateTutorSession={handleUpdateTutorSession}
                             />
                         ) : (
                             <div className="text-center text-red-400">

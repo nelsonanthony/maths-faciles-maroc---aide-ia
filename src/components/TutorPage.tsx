@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
 import { getSupabase } from '../services/authService';
+import { EditableMathField, MathField } from 'react-mathquill';
 import { MathKeyboard } from './MathKeyboard';
 
 
@@ -68,7 +69,7 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
-                    contentToRender = `$$${msg.content.replace(/\n/g, '\\\\ ')}$$`;
+                    contentToRender = `$$${msg.content}$$`;
                 }
 
                 return (
@@ -114,7 +115,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [isOcrLoading, setIsLoadingOcr] = useState(false);
     
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
-    const [isRawInput, setIsRawInput] = useState(true);
+    const mathFieldRef = useRef<MathField | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -267,20 +268,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         explain(prompt, chapter.id, 'direct');
     };
     
-    const isLoadingAction = isAIExplainLoading || isVerifying || isOcrLoading;
-    const isDisabled = isLoadingAction || isTutorFinished || isRateLimited;
-
     // Central submission handler
     const handleSubmission = () => {
         const text = studentInput.trim();
-        if (!text || isDisabled) return;
+        if (!text) return;
 
         if (isTutorActive) {
             validateAnswer(text);
         } else {
             startTutor(text);
         }
-        setStudentInput('');
     };
 
     const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -331,6 +328,9 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     };
 
+    const isLoadingAction = isAIExplainLoading || isVerifying || isOcrLoading;
+    const isDisabled = isLoadingAction || isTutorFinished || isRateLimited;
+
     return (
         <div className="max-w-4xl mx-auto flex flex-col h-[90vh]">
             <header className="p-4 flex items-center gap-4 flex-shrink-0">
@@ -368,7 +368,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                    return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                                }
                                
-                               const contentToRender = `$$${msg.content.replace(/\n/g, '\\\\ ')}$$`;
+                               const contentToRender = `$$${msg.content}$$`;
                                return (
                                    <div key={index} className="flex items-end gap-2 justify-end">
                                        <div className="chat-bubble user-bubble self-end animate-fade-in">
@@ -391,73 +391,48 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 )}
             </main>
             
+             {isKeyboardOpen && (
+                <MathKeyboard
+                    initialValue={studentInput}
+                    onConfirm={(latex) => {
+                        setStudentInput(latex);
+                        setIsKeyboardOpen(false);
+                    }}
+                    onClose={() => setIsKeyboardOpen(false)}
+                />
+            )}
              <footer className="p-4 bg-slate-800/80 backdrop-blur-sm rounded-b-xl border-b border-x border-slate-700/50">
                 {isRateLimited ? (
                      <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
                         {error}
                      </div>
-                ) : !isTutorFinished ? (
+                ) : (
                     <div className="space-y-3">
                          {inputMode === 'text' && (
-                             <div className="space-y-2">
-                                <div className="p-2 space-y-2 bg-slate-900/50 rounded-lg border border-slate-700">
-                                     <div className="flex justify-between items-center px-1">
-                                         <span className="text-xs font-semibold text-slate-400">
-                                             {isRawInput ? 'Mode Saisie (Markdown & LaTeX)' : 'Prévisualisation'}
-                                         </span>
-                                         <button
-                                             type="button"
-                                             onClick={() => setIsRawInput(!isRawInput)}
-                                             className="text-xs px-2 py-0.5 bg-slate-700 rounded hover:bg-slate-600 transition-colors"
-                                         >
-                                             {isRawInput ? '👁️ Prévisualiser' : '✍️ Modifier'}
-                                         </button>
-                                     </div>
-                                     {isRawInput ? (
-                                         <textarea
-                                             value={studentInput}
-                                             onChange={(e) => setStudentInput(e.target.value)}
-                                             onKeyDown={(e) => {
-                                                 if (e.key === 'Enter' && !e.shiftKey) {
-                                                     e.preventDefault();
-                                                     handleSubmission();
-                                                 }
-                                             }}
-                                             placeholder={socraticPath?.[currentStep]?.student_response_prompt || "Décrivez votre démarche ou posez votre question..."}
-                                             className="w-full p-2 bg-slate-800 border-slate-700 rounded font-mono text-sm text-slate-200 resize-y disabled:opacity-50"
-                                             rows={4}
-                                             disabled={isDisabled}
-                                         />
-                                     ) : (
-                                         <div
-                                             className="p-3 prose prose-invert max-w-none text-sm min-h-[112px] cursor-text"
-                                             onClick={() => !isDisabled && setIsRawInput(true)}
-                                         >
-                                             {studentInput.trim() ? (
-                                                  <MathJaxRenderer content={`$$${studentInput.replace(/\n/g, '\\\\ ')}$$`} />
-                                             ) : (
-                                                 <p className="text-slate-500">{socraticPath?.[currentStep]?.student_response_prompt || "Décrivez votre démarche ou posez votre question..."}</p>
-                                             )}
-                                         </div>
-                                     )}
-                                 </div>
-                                 <div className="flex justify-end items-center gap-2">
-                                     <p className="text-xs text-slate-500 flex-grow">
-                                         {isRawInput ? 'Shift+Enter pour une nouvelle ligne.' : 'Cliquez pour modifier.'}
-                                     </p>
-                                      <button 
-                                        type="button" 
-                                        onClick={() => setIsKeyboardOpen(true)} 
-                                        className="p-2 bg-slate-700 rounded-lg hover:bg-slate-600 font-serif italic text-lg disabled:opacity-50"
-                                        disabled={isDisabled}
-                                    >
-                                        ƒ(x)
-                                    </button>
-                                     <button onClick={handleSubmission} className="px-6 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
-                                         Envoyer
-                                     </button>
-                                 </div>
-                             </div>
+                            <div className="flex items-stretch gap-2">
+                                <div className={`math-input-wrapper flex-grow ${isDisabled ? 'opacity-60' : ''}`}>
+                                    <EditableMathField
+                                        latex={studentInput}
+                                        onChange={(field) => setStudentInput(field.latex())}
+                                        mathquillDidMount={(field) => (mathFieldRef.current = field)}
+                                        config={{
+                                            readOnly: isDisabled,
+                                            autoOperatorNames: 'sin cos tan log ln',
+                                            handlers: {
+                                                enter: () => mathFieldRef.current?.cmd('\\\\')
+                                            }
+                                        }}
+                                        aria-placeholder="Votre réponse..."
+                                        className="h-full"
+                                    />
+                                </div>
+                                <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center" disabled={isDisabled}>
+                                    <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
+                                </button>
+                                <button onClick={handleSubmission} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
+                                    Envoyer
+                                </button>
+                            </div>
                          )}
                          {inputMode === 'photo' && (
                              <div className="flex items-center gap-2">
@@ -482,7 +457,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             </div>
                          }
 
-                         <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
+                         <div className="flex items-center justify-between">
                              <div className="flex items-center gap-2 p-1 bg-gray-900/50 rounded-lg">
                                  <button onClick={() => setInputMode('text')} className={`px-2 py-1 text-xs rounded ${inputMode === 'text' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Texte</button>
                                  <button onClick={() => setInputMode('photo')} className={`px-2 py-1 text-xs rounded ${inputMode === 'photo' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Photo</button>
@@ -495,20 +470,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                          </div>
                          {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
                     </div>
-                ) : null}
+                )}
             </footer>
-
-            {isKeyboardOpen && (
-                <MathKeyboard
-                    initialValue={studentInput}
-                    onConfirm={(latex) => {
-                        setStudentInput(latex);
-                        setIsKeyboardOpen(false);
-                        setIsRawInput(true); 
-                    }}
-                    onClose={() => setIsKeyboardOpen(false)}
-                />
-            )}
         </div>
     );
 };

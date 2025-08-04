@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { ExerciseContext, ChatRoom as ChatRoomType } from '@/types';
 import { getSupabase } from '@/services/authService';
 import { ChatRoom } from '@/components/ChatRoom';
@@ -8,30 +9,37 @@ import { ArrowLeftIcon, SpinnerIcon, PlusCircleIcon } from '@/components/icons';
 interface ChatPageProps {
     exerciseContext: ExerciseContext;
     onBack: () => void;
+    selectedRoomId: string | null;
+    onSelectRoom: (roomId: string | null) => void;
 }
 
-export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack }) => {
+export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack, selectedRoomId, onSelectRoom }) => {
     const [rooms, setRooms] = useState<ChatRoomType[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [selectedRoom, setSelectedRoom] = useState<ChatRoomType | null>(null);
     const [isCreatingRoom, setIsCreatingRoom] = useState(false);
     const [newRoomName, setNewRoomName] = useState('');
 
-    const fetchRooms = async () => {
-        try {
-            const response = await fetch(`/api/chat/get-rooms?exercise_id=${exerciseContext.exerciseId}`);
-            if (!response.ok) throw new Error('Failed to fetch rooms');
-            const data = await response.json();
-            setRooms(data);
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'An unknown error occurred');
-        } finally {
-            setIsLoading(false);
-        }
-    };
+    const selectedRoom = useMemo(() => {
+        if (!selectedRoomId || rooms.length === 0) return null;
+        return rooms.find(r => r.id === selectedRoomId);
+    }, [selectedRoomId, rooms]);
 
     useEffect(() => {
+        const fetchRooms = async () => {
+            setIsLoading(true);
+            try {
+                const response = await fetch(`/api/chat/get-rooms?exercise_id=${exerciseContext.exerciseId}`);
+                if (!response.ok) throw new Error('Failed to fetch rooms');
+                const data = await response.json();
+                setRooms(data);
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'An unknown error occurred');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         fetchRooms();
     }, [exerciseContext.exerciseId]);
 
@@ -62,7 +70,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack }) =
             setRooms(prev => [newRoom, ...prev]);
             setNewRoomName('');
             setIsCreatingRoom(false);
-            setSelectedRoom(newRoom); // Select the new room immediately
+            onSelectRoom(newRoom.id);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'An unknown error occurred');
         } finally {
@@ -70,8 +78,17 @@ export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack }) =
         }
     };
 
+    if (isLoading) {
+        return (
+            <div className="text-center p-8">
+                <SpinnerIcon className="w-8 h-8 animate-spin mx-auto text-brand-blue-500" />
+                <p className="mt-2 text-slate-400">Chargement des groupes...</p>
+            </div>
+        );
+    }
+
     if (selectedRoom) {
-        return <ChatRoom room={selectedRoom} onBack={() => setSelectedRoom(null)} />;
+        return <ChatRoom room={selectedRoom} onBack={() => onSelectRoom(null)} />;
     }
 
     return (
@@ -82,9 +99,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack }) =
             </button>
             <h2 className="text-3xl font-bold text-brand-blue-300 mb-6">Groupes d'Étude</h2>
 
-            {isLoading ? (
-                <div className="text-center"><SpinnerIcon className="w-8 h-8 animate-spin mx-auto" /></div>
-            ) : error ? (
+            {error ? (
                 <p className="text-red-400 text-center">{error}</p>
             ) : (
                 <div className="space-y-6">
@@ -113,7 +128,7 @@ export const ChatPage: React.FC<ChatPageProps> = ({ exerciseContext, onBack }) =
                         <h3 className="text-xl font-semibold">Groupes existants :</h3>
                         {rooms.length > 0 ? (
                             rooms.map(room => (
-                                <button key={room.id} onClick={() => setSelectedRoom(room)} className="w-full text-left p-4 bg-gray-800 hover:bg-gray-700/60 rounded-lg transition-colors">
+                                <button key={room.id} onClick={() => onSelectRoom(room.id)} className="w-full text-left p-4 bg-gray-800 hover:bg-gray-700/60 rounded-lg transition-colors">
                                     <p className="font-semibold text-gray-200">{room.name}</p>
                                     <p className="text-xs text-gray-400">Créé le {new Date(room.created_at).toLocaleString()}</p>
                                 </button>

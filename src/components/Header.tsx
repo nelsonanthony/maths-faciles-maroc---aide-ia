@@ -1,16 +1,17 @@
 
-
 import React, { useState } from 'react';
-import { ArrowDownTrayIcon, UserCircleIcon, ArrowRightOnRectangleIcon, SpinnerIcon, CheckCircleIcon } from './icons';
+import { Bars3Icon, UserCircleIcon, ArrowRightOnRectangleIcon } from './icons';
 import { useAuth } from '../contexts/AuthContext';
 import { View } from '@/types';
 
 interface HeaderProps {
     onNavigate: (view: View) => void;
+    onToggleSidebar: () => void;
+    showSidebarToggle: boolean;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
-    const { user, isAdmin, logout } = useAuth();
+export const Header: React.FC<HeaderProps> = ({ onNavigate, onToggleSidebar, showSidebarToggle }) => {
+    const { user, logout } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const handleLogout = () => {
@@ -36,9 +37,16 @@ export const Header: React.FC<HeaderProps> = ({ onNavigate }) => {
         <header className="bg-slate-900/80 backdrop-blur-sm border-b border-slate-800 sticky top-0 z-20">
             <div className="container mx-auto px-4">
                 <div className="flex items-center justify-between h-16">
-                    <button onClick={handleLogoClick} className="text-xl md:text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 animate-gradient">
-                        Maths Faciles Maroc
-                    </button>
+                    <div className="flex items-center gap-2">
+                         {showSidebarToggle && (
+                            <button onClick={onToggleSidebar} className="p-2 -ml-2 rounded-md text-slate-400 hover:bg-slate-800 hover:text-white lg:hidden">
+                                <Bars3Icon className="w-6 h-6" />
+                            </button>
+                        )}
+                        <button onClick={handleLogoClick} className="text-xl md:text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 animate-gradient">
+                            Maths Faciles Maroc
+                        </button>
+                    </div>
                     <div className="flex items-center gap-4">
                         <button
                             onClick={handleCoursesClick}

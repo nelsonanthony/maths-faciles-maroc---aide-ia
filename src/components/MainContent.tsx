@@ -1,6 +1,5 @@
 
 
-
 import React from 'react';
 import { HomePage } from '@/components/HomePage';
 import { ChapterListPage } from '@/components/ChapterListPage';
@@ -29,6 +28,7 @@ interface MainContentProps {
     selectedExerciseId: string | null;
     selectedQuizId: string | null;
     selectedExerciseContext: ExerciseContext | null;
+    selectedRoomId: string | null;
     videoNavigation: { videoId: string; time: number; } | null;
     onNavigate: (view: View) => void;
     onSelectLevel: (levelId: string) => void;
@@ -43,15 +43,16 @@ interface MainContentProps {
     onBackToDefault: () => void;
     resetSelections: (level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => void;
     openModal: (modalState: ModalState) => void;
+    onSelectRoom: (roomId: string | null) => void;
 }
 
 export const MainContent: React.FC<MainContentProps> = (props) => {
     const {
         view, user, curriculum, passwordResetToken, selectedLevelId, selectedChapterId,
-        selectedSeriesId, selectedExerciseId, selectedQuizId, selectedExerciseContext, videoNavigation,
-        onNavigate, onSelectLevel, onSelectChapter, onSelectSeries, onSelectSeriesList,
+        selectedSeriesId, selectedExerciseId, selectedQuizId, selectedExerciseContext, selectedRoomId,
+        videoNavigation, onNavigate, onSelectLevel, onSelectChapter, onSelectSeries, onSelectSeriesList,
         onSelectExercise, onSelectQuiz, onNavigateToChat, onNavigateToTutor, onNavigateToTimestamp,
-        onBackToDefault, resetSelections, openModal
+        onBackToDefault, resetSelections, openModal, onSelectRoom
     } = props;
     
     const level = curriculum.find(l => l.id === selectedLevelId);
@@ -60,10 +61,10 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
     const exercise = series?.exercises.find(e => e.id === selectedExerciseId);
     const quiz = chapter?.quizzes.find(q => q.id === selectedQuizId);
 
-    const handleBackToChapters = () => { onNavigate('chapters'); resetSelections('level'); };
-    const handleBackToChapterHome = () => { onNavigate('chapterHome'); resetSelections('chapter'); };
-    const handleBackToSeries = () => { onNavigate('seriesList'); resetSelections('series'); };
-    const handleBackToExercises = () => { onNavigate('exerciseList'); resetSelections('exercise'); };
+    const handleBackToChapters = () => { resetSelections('level'); onNavigate('chapters'); };
+    const handleBackToChapterHome = () => { resetSelections('chapter'); onNavigate('chapterHome'); };
+    const handleBackToSeries = () => { resetSelections('series'); onNavigate('seriesList'); };
+    const handleBackToExercises = () => { resetSelections('exercise'); onNavigate('exerciseList'); };
     const handleBackToExercise = () => { onNavigate('exercise'); };
 
 
@@ -80,14 +81,13 @@ export const MainContent: React.FC<MainContentProps> = (props) => {
             if (selectedExerciseContext && exercise && chapter && level) return <TutorPage exercise={exercise} chapter={chapter} levelId={level.id} onBack={handleBackToExercise} onNavigateToTimestamp={onNavigateToTimestamp} />;
             break;
         case 'chat':
-            if (selectedExerciseContext && user) return <ChatPage exerciseContext={selectedExerciseContext} onBack={() => onNavigate('exercise')} />;
+            if (selectedExerciseContext && user) return <ChatPage exerciseContext={selectedExerciseContext} onBack={() => onNavigate('exercise')} selectedRoomId={selectedRoomId} onSelectRoom={onSelectRoom} />;
             break;
         case 'quiz':
             if (quiz && chapter) {
                 if (user) {
                     return <QuizPage quiz={quiz} chapterId={chapter.id} chapterTitle={chapter.title} onBack={handleBackToChapterHome} />;
                 }
-                // For non-logged-in users, show a prompt
                 return (
                     <div className="max-w-md mx-auto text-center p-8 bg-gray-800/50 rounded-xl border border-gray-700/50">
                         <h2 className="text-2xl font-bold text-brand-blue-300 mb-4">Accès Réservé</h2>

@@ -11,6 +11,7 @@ import { getCurriculum } from '@/services/api';
 import { getSupabase } from '@/services/authService';
 import { MainContent } from '@/components/MainContent';
 import { ModalManager } from '@/components/ModalManager';
+import { NavigationSidebar } from '@/components/NavigationSidebar';
 
 const callUpdateApi = async (body: CurriculumActionPayload) => {
     const supabase = getSupabase();
@@ -32,7 +33,6 @@ const callUpdateApi = async (body: CurriculumActionPayload) => {
         const errorData = await response.json();
         throw new Error(errorData.error || "La mise à jour a échoué.");
     }
-    // The API now returns a lightweight success message, not the full curriculum
     return response.json(); 
 };
 
@@ -49,11 +49,13 @@ export const App: React.FC = () => {
     const [selectedExerciseId, setSelectedExerciseId] = useState<string | null>(null);
     const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
     const [selectedExerciseContext, setSelectedExerciseContext] = useState<ExerciseContext | null>(null);
+    const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
 
     const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
     const [videoNavigation, setVideoNavigation] = useState<{ videoId: string; time: number; } | null>(null);
     
     const [modal, setModal] = useState<ModalState | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     useEffect(() => { addStyles(); }, []);
 
@@ -99,6 +101,19 @@ export const App: React.FC = () => {
         });
         return () => subscription.unsubscribe();
     }, []);
+    
+     useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 1024) {
+                setIsSidebarOpen(false);
+            } else {
+                setIsSidebarOpen(true);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        handleResize();
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     const resetSelections = useCallback((level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => {
         if (level === 'all') setSelectedLevelId(null);
@@ -108,6 +123,7 @@ export const App: React.FC = () => {
             setSelectedExerciseId(null);
             setSelectedQuizId(null);
             setSelectedExerciseContext(null);
+            setSelectedRoomId(null);
         }
         if (videoNavigation) setVideoNavigation(null);
     }, [videoNavigation]);
@@ -119,7 +135,7 @@ export const App: React.FC = () => {
     const handleSelectChapter = (chapterId: string) => { setSelectedChapterId(chapterId); resetSelections('chapter'); setView('chapterHome'); };
     const handleSelectSeriesList = () => setView('seriesList');
     const handleSelectSeries = (seriesId: string) => { setSelectedSeriesId(seriesId); resetSelections('series'); setView('exerciseList'); };
-    const handleSelectExercise = (exerciseId: string) => { setSelectedExerciseId(exerciseId); setView('exercise'); };
+    const handleSelectExercise = (exerciseId: string) => { setSelectedExerciseId(exerciseId); setSelectedRoomId(null); setView('exercise'); };
     const handleSelectQuiz = (quizId: string) => { setSelectedQuizId(quizId); setView('quiz'); };
     const handleNavigateToChat = (context: ExerciseContext) => { setSelectedExerciseContext(context); setView('chat'); };
     const handleNavigateToTutor = (context: ExerciseContext) => { setSelectedExerciseContext(context); setView('tutor'); };
@@ -129,6 +145,8 @@ export const App: React.FC = () => {
         setVideoNavigation({ videoId, time });
         setView('chapterHome');
     };
+    const handleSelectRoom = (roomId: string | null) => setSelectedRoomId(roomId);
+
 
     // --- MODAL & CRUD OPERATIONS ---
     const openModal = (modalState: ModalState) => setModal(modalState);
@@ -374,7 +392,7 @@ export const App: React.FC = () => {
         } catch (error) {
             handleCRUDError(error, 'suppression');
             setCurriculum(originalCurriculum);
-            if (type === 'quizQuestion') closeModal(); // Close the re-opened quiz modal on failure
+            if (type === 'quizQuestion') closeModal();
         }
     };
     
@@ -390,28 +408,54 @@ export const App: React.FC = () => {
         );
     }
     
+    const showSidebar = curriculum && ['courses', 'chapters', 'chapterHome', 'seriesList', 'exerciseList', 'exercise', 'quiz', 'tutor', 'chat'].includes(view);
+
     return (
         <div className="flex flex-col min-h-screen font-sans bg-slate-950 text-slate-300">
-            <Header onNavigate={handleNavigate} />
-            <main className="flex-grow container mx-auto px-4 py-8">
-                {curriculum ? (
-                    <MainContent
-                        view={view} user={user} curriculum={curriculum} passwordResetToken={passwordResetToken}
-                        selectedLevelId={selectedLevelId} selectedChapterId={selectedChapterId} selectedSeriesId={selectedSeriesId}
-                        selectedExerciseId={selectedExerciseId} selectedQuizId={selectedQuizId} selectedExerciseContext={selectedExerciseContext}
-                        videoNavigation={videoNavigation} onNavigate={handleNavigate} onSelectLevel={handleSelectLevel}
-                        onSelectChapter={handleSelectChapter} onSelectSeries={handleSelectSeries} onSelectSeriesList={handleSelectSeriesList}
-                        onSelectExercise={handleSelectExercise} onSelectQuiz={handleSelectQuiz} onNavigateToChat={handleNavigateToChat}
-                        onNavigateToTutor={handleNavigateToTutor} onNavigateToTimestamp={handleNavigateToTimestamp}
-                        onBackToDefault={handleBackToDefault} resetSelections={resetSelections} openModal={openModal}
+            <Header
+                onNavigate={handleNavigate}
+                showSidebarToggle={!!showSidebar}
+                onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+            />
+            <div className="flex-1 flex flex-row overflow-y-hidden">
+                {showSidebar && curriculum && (
+                    <NavigationSidebar
+                        isOpen={isSidebarOpen}
+                        curriculum={curriculum}
+                        selectedLevelId={selectedLevelId}
+                        selectedChapterId={selectedChapterId}
+                        selectedSeriesId={selectedSeriesId}
+                        selectedExerciseId={selectedExerciseId}
+                        onSelectLevel={handleSelectLevel}
+                        onSelectChapter={handleSelectChapter}
+                        onSelectSeries={handleSelectSeries}
+                        onSelectExercise={handleSelectExercise}
                     />
-                ) : (
-                    <div className="text-center text-red-400">
-                        <p>Impossible de charger le contenu pédagogique. Veuillez réessayer plus tard.</p>
-                        <button onClick={fetchInitialData} className="mt-4 px-4 py-2 bg-brand-blue-600 text-white rounded-lg">Réessayer</button>
-                    </div>
                 )}
-            </main>
+                <main className="flex-1 overflow-y-auto">
+                    <div className="p-4 sm:p-6 md:p-8 w-full h-full">
+                        {curriculum ? (
+                            <MainContent
+                                view={view} user={user} curriculum={curriculum} passwordResetToken={passwordResetToken}
+                                selectedLevelId={selectedLevelId} selectedChapterId={selectedChapterId} selectedSeriesId={selectedSeriesId}
+                                selectedExerciseId={selectedExerciseId} selectedQuizId={selectedQuizId} selectedExerciseContext={selectedExerciseContext}
+                                selectedRoomId={selectedRoomId}
+                                videoNavigation={videoNavigation} onNavigate={handleNavigate} onSelectLevel={handleSelectLevel}
+                                onSelectChapter={handleSelectChapter} onSelectSeries={handleSelectSeries} onSelectSeriesList={handleSelectSeriesList}
+                                onSelectExercise={handleSelectExercise} onSelectQuiz={handleSelectQuiz} onNavigateToChat={handleNavigateToChat}
+                                onNavigateToTutor={handleNavigateToTutor} onNavigateToTimestamp={handleNavigateToTimestamp}
+                                onBackToDefault={handleBackToDefault} resetSelections={resetSelections} openModal={openModal}
+                                onSelectRoom={handleSelectRoom}
+                            />
+                        ) : (
+                            <div className="text-center text-red-400">
+                                <p>Impossible de charger le contenu pédagogique. Veuillez réessayer plus tard.</p>
+                                <button onClick={fetchInitialData} className="mt-4 px-4 py-2 bg-brand-blue-600 text-white rounded-lg">Réessayer</button>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
             <Footer />
             <ModalManager
                 modal={modal} levelId={selectedLevelId} onClose={closeModal} openModal={openModal}

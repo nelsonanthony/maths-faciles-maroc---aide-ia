@@ -249,11 +249,17 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     
     // Central submission handler
     const handleSubmission = () => {
-        const text = studentInput;
+        const text = studentInput.trim();
+        if (!text) return;
+
+        // The input from EditableMathField is pure LaTeX. We wrap it to be a display math block.
+        // This allows multiline input using `\\` to be rendered correctly.
+        const formattedText = `$$${text}$$`;
+
         if (isTutorActive) {
-            validateAnswer(text);
+            validateAnswer(formattedText);
         } else {
-            startTutor(text);
+            startTutor(formattedText);
         }
     };
 
@@ -346,13 +352,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                }
                                
                                // It's a user message from here.
-                               // The content is pure LaTeX from the math input. Wrap it for display rendering.
-                               const mathContent = `$$${msg.content}$$`;
+                               // The content can be a mix of text and math. Use marked to process it.
+                               const safeContent = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
 
                                return (
                                    <div key={index} className="flex items-end gap-2 justify-end">
                                        <div className="chat-bubble user-bubble self-end animate-fade-in">
-                                           <MathJaxRenderer content={mathContent} />
+                                           <MathJaxRenderer content={safeContent} />
                                        </div>
                                    </div>
                                );

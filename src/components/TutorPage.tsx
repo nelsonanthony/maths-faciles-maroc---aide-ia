@@ -416,13 +416,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                         latex={studentInput}
                                         onChange={(field) => setStudentInput(field.latex())}
                                         mathquillDidMount={(field) => (mathFieldRef.current = field)}
-                                        readOnly={isDisabled}
                                         config={{
                                             autoOperatorNames: 'sin cos tan log ln',
                                             handlers: {
                                                 enter: () => mathFieldRef.current?.cmd('\\\\')
                                             }
                                         }}
+                                        readOnly={isDisabled}
                                         aria-placeholder="Votre réponse..."
                                         className="h-full"
                                     />

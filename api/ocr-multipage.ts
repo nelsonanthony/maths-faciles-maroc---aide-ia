@@ -72,19 +72,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const ai = new GoogleGenAI({ apiKey: apiKey! });
 
-        const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription Mathématique Marocaine]
-1.  **Mission**: Transcris le texte mathématique de l'image. Ton objectif est de produire une transcription qui est à la fois mathématiquement correcte et lisible.
-2.  **LISIBILITÉ (RÈGLE CRUCIALE)**:
-    -   **ESPACES**: Respecte scrupuleusement les espaces entre les mots, les nombres et les symboles. \`f(x) = x^2\` est correct, \`f(x)=x^2\` est incorrect.
-    -   **SAUTS DE LIGNE (LaTeX)**: Si le texte dans l'image est sur plusieurs lignes, conserve ces sauts de ligne en utilisant \`\\\\\` (un double backslash) dans ta transcription. C'est essentiel pour la mise en forme des calculs en LaTeX.
-3.  **Formatage Hybride OBLIGATOIRE**:
-    -   **Unicode (Priorité 1)**: Utilise les caractères Unicode pour TOUT ce qui est simple.
-        -   **Exemples**: \`ƒ: ℝ → ℝ\`, \`𝑥 ⟼ 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`, \`(𝑥−2)² ≥ 0\`.
-        -   Utilise \`²\`, \`³\`, \`→\`, \`ℝ\`, \`ƒ\`, \`𝑥\`, etc.
-    -   **LaTeX (Priorité 2)**: Utilise LaTeX **uniquement** pour les structures complexes qui n'ont pas d'équivalent Unicode simple.
-        -   **Exemples**: Fractions \`$$\\frac{a}{b}$$\`, racines \`$$\\sqrt{x}$$\`, sommes \`$$\\sum_{k=1}^{n} k$$ \`, etc.
-        -   Délimiteurs: en ligne \`$..$\`, en bloc \`$$..$$\`.
-4.  **Règle Capitale**: N'utilise **JAMAIS** les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+        const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription en LaTeX Pur]
+1.  **Mission**: Transcris l'écriture manuscrite mathématique de l'image en une seule chaîne de caractères LaTeX. La sortie doit être directement insérable dans un environnement mathématique LaTeX (comme \`gathered\` ou \`align*\`).
+2.  **Format de Sortie**: La sortie doit être du LaTeX pur, SANS les délimiteurs externes comme \`$$...$$ \` ou \`$..$\`.
+3.  **Gestion du Texte vs. Mathématiques (RÈGLE CRUCIALE)**:
+    -   Tout texte en langage naturel (français) DOIT être encapsulé dans une commande \`\\text{...}\`. Exemple: \`\\text{Soit f une application}\`.
+    -   Les formules et symboles mathématiques doivent être écrits en LaTeX standard. Exemple: \`f(x) = x^2 - 4x + 1\`.
+4.  **Sauts de Ligne**: Utilise \`\\\\\` pour représenter un saut de ligne, correspondant à ce qui est vu dans l'image. C'est essentiel pour la mise en forme des calculs.
+5.  **Exemple Complet**:
+    -   **Image montre**:
+        Soit f une application tel que :
+        f(x) = x^2 - 4x + 13
+        a) Montrer que f(x) = f(4-x)
+    -   **Ta sortie DOIT être**: \`\\text{Soit f une application tel que :} \\\\ f(x) = x^2 - 4x + 13 \\\\ \\text{a) Montrer que } f(x) = f(4-x)\`
+6.  **Règle Capitale**: N'ajoute pas de formatage Markdown ou d'autres délimiteurs. La sortie est du contenu LaTeX brut.
+
 Transcris maintenant le contenu de l'image ou des images fournies en suivant ces règles à la lettre.`;
 
         // --- STEP 1: OCR on all images in parallel ---
@@ -114,8 +116,12 @@ Transcris maintenant le contenu de l'image ou des images fournies en suivant ces
         if (!combinedOcrText.trim()) {
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
+        
+        // Remove the page markers and combine into a single LaTeX string with newlines
+        const finalCombinedText = ocrResults.map(res => res.text?.trim() ?? '').join(' \\\\ ');
 
-        const finalCleanedText = cleanLatex(combinedOcrText);
+
+        const finalCleanedText = cleanLatex(finalCombinedText);
 
         return res.status(200).json({ text: finalCleanedText.trim() });
 

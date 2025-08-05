@@ -145,7 +145,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     }, [aiError, error]);
     
     const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
-        onDialogueUpdate([...dialogue, { role, content }]);
+        const newDialogue = [...dialogue, { role, content }];
+        onDialogueUpdate(newDialogue);
     }, [dialogue, onDialogueUpdate]);
 
     // Effect to process the initial AI response and start the tutor
@@ -167,7 +168,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
         }
-    }, [aiResponse, addMessageToDialogue]);
+    }, [aiResponse]);
     
     // Effect to advance the socratic dialogue
     useEffect(() => {
@@ -424,14 +425,26 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 ) : ocrVerificationText !== null ? (
                     <div className="space-y-4 animate-fade-in">
                         <h4 className="font-semibold text-yellow-300">Vérifiez la transcription de votre photo</h4>
-                        <p className="text-sm text-slate-400">Corrigez le texte ci-dessous si nécessaire, puis soumettez-le.</p>
-                        <textarea
-                            value={ocrVerificationText}
-                            onChange={(e) => setOcrVerificationText(e.target.value)}
-                            rows={6}
-                            className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
-                            disabled={isLoadingAction}
-                        />
+                        <p className="text-sm text-slate-400">Corrigez le texte ci-dessous. La prévisualisation se mettra à jour en temps réel.</p>
+                        
+                        <div>
+                            <label className="block text-xs font-medium text-slate-400 mb-1">Prévisualisation</label>
+                            <div className="p-4 min-h-[100px] bg-slate-950/70 rounded-lg border border-slate-700">
+                                <MathJaxRenderer content={`$$\\begin{gathered}${ocrVerificationText}\\end{gathered}$$`} />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="ocr-textarea" className="block text-xs font-medium text-slate-400 mb-1">Source LaTeX (modifiable)</label>
+                            <textarea
+                                id="ocr-textarea"
+                                value={ocrVerificationText}
+                                onChange={(e) => setOcrVerificationText(e.target.value)}
+                                rows={6}
+                                className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
+                                disabled={isLoadingAction}
+                            />
+                        </div>
                         <div className="flex flex-col sm:flex-row gap-4">
                             <button
                                 onClick={handleConfirmOcr}

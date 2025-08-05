@@ -69,7 +69,8 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
-                    contentToRender = `$$\\begin{gathered}${msg.content}\\end{gathered}$$`;
+                    const alignedContent = '& ' + msg.content.replace(/\\\\/g, ' \\\\ & ');
+                    contentToRender = `$$\\begin{aligned}${alignedContent}\\end{aligned}$$`;
                 }
 
                 return (
@@ -384,7 +385,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                    return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
                                }
                                
-                               const contentToRender = `$$\\begin{gathered}${msg.content}\\end{gathered}$$`;
+                               const alignedContent = '& ' + msg.content.replace(/\\\\/g, ' \\\\ & ');
+                               const contentToRender = `$$\\begin{aligned}${alignedContent}\\end{aligned}$$`;
                                return (
                                    <div key={index} className="flex items-end gap-2 justify-end">
                                        <div className="chat-bubble user-bubble self-end animate-fade-in">
@@ -430,7 +432,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                         <div>
                             <label className="block text-xs font-medium text-slate-400 mb-1">Prévisualisation</label>
                             <div className="p-4 min-h-[100px] bg-slate-950/70 rounded-lg border border-slate-700">
-                                <MathJaxRenderer content={`$$\\begin{gathered}${ocrVerificationText}\\end{gathered}$$`} />
+                                <MathJaxRenderer content={`$$\\begin{aligned}& ${ocrVerificationText.replace(/\\\\/g, ' \\\\ & ')}\\end{aligned}$$`} />
                             </div>
                         </div>
 

@@ -125,7 +125,7 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 
                 {messages.map(msg => {
                     // The content is pure LaTeX from the math input. Wrap it for display rendering.
-                    const mathContent = `$$${msg.content}$$`;
+                    const mathContent = `$$\\begin{gathered}${msg.content}\\end{gathered}$$`;
                     
                     return (
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>

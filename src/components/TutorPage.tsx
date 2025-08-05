@@ -411,7 +411,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     <div className="space-y-3">
                          {inputMode === 'text' && (
                             <div className="flex items-stretch gap-2">
-                                <div className={`math-input-wrapper flex-grow ${isDisabled ? 'opacity-60' : ''}`}>
+                                <div className={`math-input-wrapper flex-grow ${isDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
                                     <EditableMathField
                                         latex={studentInput}
                                         onChange={(field) => setStudentInput(field.latex())}
@@ -422,7 +422,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                                 enter: () => mathFieldRef.current?.cmd('\\\\')
                                             }
                                         }}
-                                        readOnly={isDisabled}
                                         aria-placeholder="Votre réponse..."
                                         className="h-full"
                                     />

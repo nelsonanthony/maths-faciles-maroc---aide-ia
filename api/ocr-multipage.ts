@@ -1,5 +1,4 @@
 
-
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -74,15 +73,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const ai = new GoogleGenAI({ apiKey: apiKey! });
 
         const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription Mathématique Marocaine]
-1.  **Mission**: Transcris le texte mathématique de l'image.
-2.  **Formatage Hybride OBLIGATOIRE**:
+1.  **Mission**: Transcris le texte mathématique de l'image. Ton objectif est de produire une transcription qui est à la fois mathématiquement correcte et lisible.
+2.  **LISIBILITÉ (RÈGLE CRUCIALE)**:
+    -   **ESPACES**: Respecte scrupuleusement les espaces entre les mots, les nombres et les symboles. \`f(x) = x^2\` est correct, \`f(x)=x^2\` est incorrect.
+    -   **SAUTS DE LIGNE (LaTeX)**: Si le texte dans l'image est sur plusieurs lignes, conserve ces sauts de ligne en utilisant \`\\\\\` (un double backslash) dans ta transcription. C'est essentiel pour la mise en forme des calculs en LaTeX.
+3.  **Formatage Hybride OBLIGATOIRE**:
     -   **Unicode (Priorité 1)**: Utilise les caractères Unicode pour TOUT ce qui est simple.
         -   **Exemples**: \`ƒ: ℝ → ℝ\`, \`𝑥 ⟼ 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`, \`(𝑥−2)² ≥ 0\`.
         -   Utilise \`²\`, \`³\`, \`→\`, \`ℝ\`, \`ƒ\`, \`𝑥\`, etc.
     -   **LaTeX (Priorité 2)**: Utilise LaTeX **uniquement** pour les structures complexes qui n'ont pas d'équivalent Unicode simple.
         -   **Exemples**: Fractions \`$$\\frac{a}{b}$$\`, racines \`$$\\sqrt{x}$$\`, sommes \`$$\\sum_{k=1}^{n} k$$ \`, etc.
         -   Délimiteurs: en ligne \`$..$\`, en bloc \`$$..$$\`.
-3.  **Règle Capitale**: N'utilise **JAMAIS** les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+4.  **Règle Capitale**: N'utilise **JAMAIS** les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
 Transcris maintenant le contenu de l'image ou des images fournies en suivant ces règles à la lettre.`;
 
         // --- STEP 1: OCR on all images in parallel ---

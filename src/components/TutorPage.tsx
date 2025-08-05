@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -114,6 +113,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
     const [isOcrLoading, setIsLoadingOcr] = useState(false);
+    const [ocrVerificationText, setOcrVerificationText] = useState<string | null>(null);
     
     const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
     const mathFieldRef = useRef<MathField | null>(null);
@@ -313,12 +313,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             }
 
             const data = JSON.parse(bodyText);
-
-            if (isTutorActive) {
-                validateAnswer(data.text);
-            } else {
-                startTutor(data.text);
-            }
+            setOcrVerificationText(data.text);
 
         } catch (err: any) {
             setError(err.message);
@@ -328,6 +323,26 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             setUploadedFileSrc(null);
         }
     };
+
+    const handleConfirmOcr = () => {
+        if (ocrVerificationText === null) return;
+        const textToSubmit = ocrVerificationText.trim();
+        if (!textToSubmit) return;
+
+        if (isTutorActive) {
+            validateAnswer(textToSubmit);
+        } else {
+            startTutor(textToSubmit);
+        }
+        setOcrVerificationText(null);
+    };
+
+    const handleCancelOcr = () => {
+        setOcrVerificationText(null);
+        setUploadedFile(null);
+        setUploadedFileSrc(null);
+    };
+    
 
     const isLoadingAction = isAIExplainLoading || isVerifying || isOcrLoading;
     const isDisabled = isLoadingAction || isTutorFinished || isRateLimited;
@@ -407,6 +422,35 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                      <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
                         {error}
                      </div>
+                ) : ocrVerificationText !== null ? (
+                    <div className="space-y-4 animate-fade-in">
+                        <h4 className="font-semibold text-yellow-300">Vérifiez la transcription de votre photo</h4>
+                        <p className="text-sm text-slate-400">Corrigez le texte ci-dessous si nécessaire, puis soumettez-le.</p>
+                        <textarea
+                            value={ocrVerificationText}
+                            onChange={(e) => setOcrVerificationText(e.target.value)}
+                            rows={6}
+                            className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
+                            disabled={isLoadingAction}
+                        />
+                        <div className="flex flex-col sm:flex-row gap-4">
+                            <button
+                                onClick={handleConfirmOcr}
+                                disabled={isLoadingAction}
+                                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70"
+                            >
+                                {isLoadingAction && <SpinnerIcon className="w-5 h-5 animate-spin" />}
+                                Confirmer et Envoyer
+                            </button>
+                            <button
+                                onClick={handleCancelOcr}
+                                disabled={isLoadingAction}
+                                className="px-5 py-3 font-semibold text-slate-300 bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 disabled:opacity-70"
+                            >
+                                Annuler
+                            </button>
+                        </div>
+                    </div>
                 ) : (
                     <div className="space-y-3">
                          {inputMode === 'text' && (

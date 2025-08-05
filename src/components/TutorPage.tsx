@@ -167,8 +167,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [aiResponse]);
+    }, [aiResponse, addMessageToDialogue]);
     
     // Effect to advance the socratic dialogue
     useEffect(() => {

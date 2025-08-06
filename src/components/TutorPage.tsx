@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -330,6 +329,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const isLoading = isAIExplainLoading || isVerifying || isOcrLoading;
     const isInputReadOnly = isLoading || isTutorFinished || ocrVerificationText !== null || !!uploadedFile;
+    const isSubmitDisabled = isLoading || isTutorFinished || isRateLimited || (!studentInput.trim() && (ocrVerificationText === null || !ocrVerificationText.trim()));
     const currentPrompt = socraticPath?.[currentStep]?.student_response_prompt || 'Décris ton raisonnement...';
     
     if (isTutorFinished) {
@@ -471,7 +471,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                 {isLoading ? "Analyse..." : "Extraire le texte de l'image"}
                             </button>
                         )}
-                         <button onClick={handleSubmit} disabled={isInputReadOnly} className="w-full px-4 py-2 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                         <button onClick={handleSubmit} disabled={isSubmitDisabled} className="w-full px-4 py-2 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
                             Envoyer la réponse
                         </button>
                     </div>

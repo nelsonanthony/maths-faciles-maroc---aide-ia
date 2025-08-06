@@ -121,18 +121,22 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
+    const dialogueRef = useRef(dialogueHistory);
+    useEffect(() => {
+        dialogueRef.current = dialogueHistory;
+    }, [dialogueHistory]);
+    
     const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
-        const newDialogue = [...dialogue, { role, content }];
+        const newDialogue = [...dialogueRef.current, { role, content }];
         onDialogueUpdate(newDialogue);
-    }, [dialogue, onDialogueUpdate]);
+    }, [onDialogueUpdate]);
 
     // Initialize the conversation if the history is empty
     useEffect(() => {
         if (dialogue.length === 0) {
             addMessageToDialogue('ai', "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble.");
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [dialogue.length, addMessageToDialogue]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

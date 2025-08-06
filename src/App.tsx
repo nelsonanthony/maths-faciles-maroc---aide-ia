@@ -50,7 +50,15 @@ export const App: React.FC = () => {
     const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
     const [selectedExerciseContext, setSelectedExerciseContext] = useState<ExerciseContext | null>(null);
     const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-    const [tutorSessions, setTutorSessions] = useState<Record<string, DialogueMessage[]>>({});
+    const [tutorSessions, setTutorSessions] = useState<Record<string, DialogueMessage[]>>(() => {
+        try {
+            const savedSessions = sessionStorage.getItem('tutorSessions');
+            return savedSessions ? JSON.parse(savedSessions) : {};
+        } catch (error) {
+            console.error("Failed to parse tutor sessions from sessionStorage", error);
+            return {};
+        }
+    });
 
 
     const [passwordResetToken, setPasswordResetToken] = useState<string | null>(null);
@@ -116,6 +124,14 @@ export const App: React.FC = () => {
         handleResize();
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    useEffect(() => {
+        try {
+            sessionStorage.setItem('tutorSessions', JSON.stringify(tutorSessions));
+        } catch (error) {
+            console.error("Failed to save tutor sessions to sessionStorage", error);
+        }
+    }, [tutorSessions]);
 
     const resetSelections = useCallback((level?: 'all' | 'level' | 'chapter' | 'series' | 'exercise') => {
         if (level === 'all') setSelectedLevelId(null);

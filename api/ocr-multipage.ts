@@ -107,21 +107,19 @@ Transcris maintenant le contenu de l'image ou des images fournies en suivant ces
         await Promise.all(logPromises);
 
         // --- Combine results ---
-        const combinedOcrText = ocrResults.map((ocrResponse, index) => {
+        // Convert newlines (\n) inside each page's OCR result to LaTeX newlines (\\).
+        // Then, join the results from different pages with a LaTeX newline as well.
+        const combinedLatexText = ocrResults.map(ocrResponse => {
             const ocrText = ocrResponse.text?.trim() ?? '';
-            // Le nettoyage est appliqué ici, mais une seconde passe est faite sur le texte combiné pour plus de sûreté
-            return `--- Photo ${index + 1} ---\n${ocrText}`;
-        }).join('\n\n');
+            return ocrText.replace(/\n/g, ' \\\\ ');
+        }).join(' \\\\ ');
         
-        if (!combinedOcrText.trim()) {
+        if (!combinedLatexText.trim()) {
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
         
-        // Remove the page markers and combine into a single LaTeX string with newlines
-        const finalCombinedText = ocrResults.map(res => res.text?.trim() ?? '').join(' \\\\ ');
-
-
-        const finalCleanedText = cleanLatex(finalCombinedText);
+        // Final cleaning pass for any remaining invalid delimiters
+        const finalCleanedText = cleanLatex(combinedLatexText);
 
         return res.status(200).json({ text: finalCleanedText.trim() });
 

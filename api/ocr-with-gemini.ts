@@ -104,7 +104,11 @@ Transcris maintenant le contenu de l'image en suivant ces règles à la lettre.`
              throw new Error("L'IA n'a pas pu extraire de texte de l'image.");
         }
         
-        const cleanedText = cleanLatex(extractedText);
+        // Gemini might return standard newlines (\n) instead of LaTeX newlines (\\).
+        // We convert them here to ensure consistent formatting for MathJax rendering.
+        const textWithLatexNewlines = extractedText.replace(/\n/g, ' \\\\ ');
+        
+        const cleanedText = cleanLatex(textWithLatexNewlines);
 
         return res.status(200).json({ text: cleanedText });
 

@@ -1,6 +1,8 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { DialogueMessage } from '../src/types.js';
 import aiUsageLimiter from './_lib/ai-usage-limiter.js';
 import { cleanLatex } from "./_lib/math-validator.js";
 
@@ -56,19 +58,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             throw error;
         }
         
-        let { studentAnswer, currentIaQuestion, expectedAnswerKeywords, exerciseStatement, exerciseCorrection } = req.body as { 
+        let { studentAnswer, currentIaQuestion, expectedAnswerKeywords, exerciseStatement, exerciseCorrection, dialogueHistory } = req.body as { 
             studentAnswer?: string, 
             currentIaQuestion?: string, 
             expectedAnswerKeywords?: string[],
             exerciseStatement?: string,
-            exerciseCorrection?: string 
+            exerciseCorrection?: string,
+            dialogueHistory?: DialogueMessage[]
         };
         
         if (studentAnswer === undefined) {
              return res.status(400).json({ error: "Le champ 'studentAnswer' est requis (peut être vide)." });
         }
-        if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords) || !exerciseStatement || !exerciseCorrection) {
-            return res.status(400).json({ error: "Les champs 'currentIaQuestion', 'expectedAnswerKeywords', 'exerciseStatement', et 'exerciseCorrection' sont requis." });
+        if (!currentIaQuestion || !Array.isArray(expectedAnswerKeywords) || !exerciseStatement || !exerciseCorrection || !Array.isArray(dialogueHistory)) {
+            return res.status(400).json({ error: "Les champs 'currentIaQuestion', 'expectedAnswerKeywords', 'exerciseStatement', 'exerciseCorrection' et 'dialogueHistory' sont requis." });
         }
 
         // Clean student answer to ensure consistent LaTeX format
@@ -91,29 +94,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             required: ["is_correct", "feedback_message"],
         };
 
+        const formattedHistory = (dialogueHistory || [])
+            .slice(-10) // Take last 10 messages to avoid overly long prompts
+            .map(msg => `${msg.role === 'ai' ? 'Tuteur' : 'Élève'}: ${msg.content}`)
+            .join('\n\n');
+
         const promptText = `
 # CONTEXTE GLOBAL
-Tu es un tuteur de mathématiques expert et bienveillant. Ton objectif est d'aider un lycéen marocain à résoudre une étape d'un exercice.
+Tu es un tuteur de mathématiques expert et bienveillant. Ton objectif est d'aider un lycéen marocain à résoudre une étape d'un exercice en te basant sur l'historique COMPLET de votre conversation.
 
 ## Infos sur l'exercice
 - **Énoncé**: ${exerciseStatement}
 - **Correction (pour info)**: ${exerciseCorrection}
 
+# HISTORIQUE DE LA CONVERSATION (le plus récent est en bas)
+${formattedHistory}
+
 # MISSION
-Évalue la réponse de l'élève à la question spécifique qui lui a été posée, et fournis une réponse JSON structurée.
+Évalue la **dernière** réponse de l'élève (fournie ci-dessous) en tenant compte de tout l'historique. Fournis une réponse JSON structurée.
 
 ## Évaluation
-- **Question posée à l'élève**: "${currentIaQuestion}"
+- **Dernière question posée à l'élève**: "${currentIaQuestion}"
 - **Concepts clés attendus dans la réponse**: "${expectedAnswerKeywords.join(', ')}"
 - **Réponse fournie par l'élève**: "${studentAnswer || "L'élève n'a rien répondu."}"
 
 ## Analyse et Rédaction du Feedback
-1.  **Décision**: La réponse de l'élève est-elle conceptuellement correcte pour la question posée, en se basant sur les concepts clés attendus ?
+1.  **Décision**: La réponse de l'élève est-elle conceptuellement correcte pour la dernière question posée, en se basant sur les concepts clés attendus ET le contexte de l'historique ?
     -   Sois flexible. L'élève peut utiliser ses propres mots.
     -   Si la réponse est vide, hors-sujet ou fausse, \`is_correct\` est \`false\`.
 2.  **Rédaction du message**:
-    -   **Si correcte**: Rédige un message de feedback positif qui confirme sa bonne réponse.
-    -   **Si incorrecte**: Rédige un indice **spécifique à l'erreur de l'élève**. Ne te contente pas de répéter la question. Guide-le en pointant son erreur ou en lui posant une sous-question pour l'aider à corriger son raisonnement. Ne donne JAMAIS la solution directement.
+    -   **Si correcte**: Rédige un message de feedback positif qui confirme sa bonne réponse et fait le lien avec l'étape suivante.
+    -   **Si incorrecte**: Rédige un indice **spécifique à l'erreur de l'élève** et au contexte. Ne te contente pas de répéter un indice générique. Guide-le en pointant son erreur ou en lui posant une sous-question pour l'aider à corriger son raisonnement. Ne donne JAMAIS la solution directement.
     -   Le ton doit être simple, clair, et encourageant.
 
 # FORMAT DE SORTIE

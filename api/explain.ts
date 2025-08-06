@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -120,10 +121,9 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
 -   Structure la réponse avec du Markdown (### Titres, * listes).
 
 ## Si \`requestType\` est "socratic"
--   Crée un parcours pédagogique complet (\`path\`) pour résoudre l'exercice, étape par étape.
--   Compare le travail de l'élève (dans "DEMANDE ÉLÈVE") avec ton parcours pour déterminer le \`starting_step_index\`. C'est l'index de la PREMIÈRE étape que l'élève n'a pas encore (correctement) complétée.
-    -   Si l'élève n'a rien commencé, \`starting_step_index\` est 0.
-    -   Si l'élève a tout résolu, \`starting_step_index\` est égal à la longueur du \`path\`.
+-   **Analyse la DEMANDE ÉLÈVE**: Lis attentivement la demande de l'élève. Identifie sur quelle partie de l'exercice il travaille ou pose une question.
+-   **Crée un parcours pédagogique**: Décompose TOUT l'exercice en petites étapes logiques dans le \`path\`.
+-   **Détermine le point de départ**: Compare la DEMANDE ÉLÈVE avec ton parcours. \`starting_step_index\` doit être l'index de la PREMIÈRE étape qui correspond à la question de l'élève ou qui suit son travail déjà accompli. Par exemple, si l'élève dit "j'ai fini la question 1 et je suis bloqué à la 2a", le \`starting_step_index\` doit correspondre à la première étape de la question 2a. S'il n'a rien commencé, l'index est 0. S'il a tout fini, l'index est égal à la longueur du \`path\`.
 -   **EXEMPLE DE STRUCTURE POUR LE PATH SOCRATIQUE**:
     \`\`\`json
     {

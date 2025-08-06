@@ -4,7 +4,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import imageCompression from 'browser-image-compression';
 import { useAIExplain } from '@/hooks/useAIExplain';
-import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, XCircleIcon, CameraIcon } from '@/components/icons';
+import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, XCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
 import { MathJaxRenderer } from './MathJaxRenderer';
@@ -110,7 +110,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [error, setError] = useState<string | null>(null);
     const [isRateLimited, setIsRateLimited] = useState(false);
 
-    const [inputMode, setInputMode] = useState<'text' | 'photo'>('text');
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadedFile, setUploadedFile] = useState<File | null>(null);
     const [uploadedFileSrc, setUploadedFileSrc] = useState<string | null>(null);
@@ -178,7 +177,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
-            // Use the ref to get the latest dialogue state without adding a dependency on the dialogue array itself.
             const lastMessage = dialogueRef.current[dialogueRef.current.length - 1];
             if (!lastMessage || lastMessage.role !== 'ai' || lastMessage.content !== currentQuestion) {
                  addMessageToDialogue('ai', currentQuestion);
@@ -187,7 +185,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
             setIsTutorFinished(true);
         }
-    // This effect should only run when the step changes, not on every new message.
     }, [currentStep, socraticPath, isTutorActive, isTutorFinished, addMessageToDialogue]);
 
     
@@ -196,7 +193,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         resetAIExplain();
         setError(null);
         addMessageToDialogue('user', initialWork);
-        setStudentInput('');
         
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
@@ -214,7 +210,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (!socraticPath || isVerifying) return;
         
         addMessageToDialogue('user', answer);
-        setStudentInput('');
         setIsVerifying(true);
         setVerificationResult(null);
 
@@ -234,7 +229,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     currentIaQuestion: socraticPath[currentStep].ia_question,
                     expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
                     exerciseStatement: exercise.statement,
-                    exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet
+                    exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet,
+                    dialogueHistory: dialogueRef.current
                 }),
             });
             
@@ -254,11 +250,9 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             const result = await JSON.parse(responseBody);
             
             if(result.is_correct) {
-                // The AI can provide more specific positive feedback than our canned one.
                 const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.positive_feedback;
                 addMessageToDialogue('ai', feedbackMessage);
                 setVerificationResult('correct');
-                // Give time for user to read feedback before showing next question
                 setTimeout(() => {
                     setCurrentStep(prev => prev + 1);
                 }, 1000); 
@@ -280,7 +274,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (file) {
             setUploadedFile(file);
             setUploadedFileSrc(URL.createObjectURL(file));
-            setOcrVerificationText(null); // Reset verification text when new image is uploaded
+            setOcrVerificationText(null);
+            setStudentInput(''); // Clear text input when image is chosen
         }
     };
     
@@ -327,6 +322,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         } else {
             startTutor(textToSend);
         }
+        setStudentInput('');
         setOcrVerificationText(null);
         setUploadedFile(null);
         setUploadedFileSrc(null);
@@ -419,8 +415,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                 ) : null}
 
                 <div className="flex items-end gap-2">
-                    <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
-
                     <div className="flex-grow space-y-1">
                         <div className="flex items-stretch gap-2">
                             <div className="math-input-wrapper flex-grow">
@@ -447,18 +441,30 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                                 className="px-3 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center shrink-0"
                                 aria-label="Joindre une photo"
                             >
-                               <CameraIcon className="w-6 h-6 text-slate-400" />
+                               <PaperClipIcon className="w-6 h-6 text-slate-400" />
                             </button>
                         </div>
                     </div>
-                    
-                    <button
-                        onClick={handleSubmit}
-                        disabled={isLoading || isRateLimited}
-                        className="self-stretch px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center"
-                    >
-                        {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Envoyer'}
-                    </button>
+                     
+                    {uploadedFile && ocrVerificationText === null ? (
+                        <button
+                            onClick={handleOcr}
+                            disabled={isOcrLoading || isRateLimited}
+                            className="self-stretch px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center shrink-0"
+                            title="Extraire le texte de l'image"
+                        >
+                            {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Extraire'}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={handleSubmit}
+                            disabled={isLoading || isRateLimited || (!studentInput.trim() && ocrVerificationText === null)}
+                            className="self-stretch px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center shrink-0"
+                            title={ocrVerificationText !== null ? 'Confirmer le texte et envoyer' : 'Envoyer'}
+                        >
+                            {isVerifying || isAIExplainLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Envoyer'}
+                        </button>
+                    )}
                 </div>
             </footer>
         </div>

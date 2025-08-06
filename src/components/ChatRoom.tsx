@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -124,9 +125,10 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
                 {messages.map(msg => {
-                    // The content is pure LaTeX from the math input. Wrap it for display rendering.
-                    const alignedContent = '& ' + msg.content.replace(/\\\\/g, ' \\\\ & ');
-                    const mathContent = `$$\\begin{aligned}${alignedContent}\\end{aligned}$$`;
+                    // The align* environment is better for top-level display math and handles alignment correctly.
+                    // The & ensures left-alignment for each line. It should also provide better wrapping for long text.
+                    const alignedContent = msg.content.replace(/\\\\/g, ' \\\\ & ');
+                    const mathContent = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
                     
                     return (
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>

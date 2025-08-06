@@ -123,7 +123,10 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
 ## Si \`requestType\` est "socratic"
 -   **Analyse la DEMANDE ÉLÈVE**: Lis attentivement la demande de l'élève. Identifie sur quelle partie de l'exercice il travaille ou pose une question.
 -   **Crée un parcours pédagogique**: Décompose TOUT l'exercice en petites étapes logiques dans le \`path\`.
--   **Détermine le point de départ**: Compare la DEMANDE ÉLÈVE avec ton parcours. \`starting_step_index\` doit être l'index de la PREMIÈRE étape qui correspond à la question de l'élève ou qui suit son travail déjà accompli. Par exemple, si l'élève dit "j'ai fini la question 1 et je suis bloqué à la 2a", le \`starting_step_index\` doit correspondre à la première étape de la question 2a. S'il n'a rien commencé, l'index est 0. S'il a tout fini, l'index est égal à la longueur du \`path\`.
+-   **Détermine le point de départ**: Compare la DEMANDE ÉLÈVE avec ton parcours. \`starting_step_index\` doit être l'index de la PREMIÈRE étape qui correspond à la question de l'élève ou qui suit son travail déjà accompli.
+    -   Exemple 1: si l'élève dit "j'ai fini la question 1 et je suis bloqué à la 2a", le \`starting_step_index\` doit correspondre à la première étape de la question 2a.
+    -   Exemple 2: si l'élève dit "J'ai fait une erreur, j'ai tapé $(x+2)^2$ au lieu de $(x-2)^2$", ton premier pas dans le \`path\` devrait accuser réception de cette information, puis demander à l'élève de recalculer en partant de la bonne expression.
+    -   Exemple 3: S'il n'a rien commencé, l'index est 0. S'il a tout fini, l'index est égal à la longueur du \`path\`.
 -   **EXEMPLE DE STRUCTURE POUR LE PATH SOCRATIQUE**:
     \`\`\`json
     {

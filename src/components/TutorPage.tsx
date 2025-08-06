@@ -70,8 +70,8 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
-                    const alignedContent = '& ' + msg.content.replace(/\\\\/g, ' \\\\ & ');
-                    contentToRender = `$$\\begin{aligned}${alignedContent}\\end{aligned}$$`;
+                    const alignedContent = msg.content.replace(/\\\\/g, ' \\\\ & ');
+                    contentToRender = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
                 }
 
                 return (
@@ -121,8 +121,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
-    const isInputReadOnly = !!uploadedFileSrc && !ocrVerificationText;
-
     const dialogueRef = useRef(dialogueHistory);
     useEffect(() => {
         dialogueRef.current = dialogueHistory;
@@ -331,6 +329,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     };
 
     const isLoading = isAIExplainLoading || isVerifying || isOcrLoading;
+    const isInputReadOnly = isLoading || isTutorFinished || ocrVerificationText !== null || !!uploadedFile;
     const currentPrompt = socraticPath?.[currentStep]?.student_response_prompt || 'Décris ton raisonnement...';
     
     if (isTutorFinished) {
@@ -353,22 +352,30 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
             {/* Chat Area */}
             <main className="flex-grow p-4 overflow-y-auto space-y-4">
-                {dialogue.map((msg, index) => (
-                    msg.role === 'ai' ? (
-                        <AiMessage 
-                            key={index} 
-                            message={msg}
-                            response={aiResponse}
-                            onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk!.video_id, aiResponse?.videoChunk!.start_time_seconds)} 
-                        />
-                    ) : (
-                        <div key={index} className="flex justify-end animate-fade-in">
-                            <div className="chat-bubble user-bubble">
-                                <MathJaxRenderer content={`$$${msg.content.replace(/\\\\/g, '\\\\\\\\')}$$`} />
+                {dialogue.map((msg, index) => {
+                    if (msg.role === 'ai') {
+                        return (
+                            <AiMessage 
+                                key={index} 
+                                message={msg}
+                                response={aiResponse}
+                                onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk!.video_id, aiResponse?.videoChunk!.start_time_seconds)} 
+                            />
+                        );
+                    } else { // user role
+                        // The align* environment is better for top-level display math and handles alignment correctly.
+                        // The & ensures left-alignment for each line.
+                        const alignedContent = msg.content.replace(/\\\\/g, ' \\\\ & ');
+                        const mathContent = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
+                        return (
+                            <div key={index} className="flex justify-end animate-fade-in">
+                                <div className="chat-bubble user-bubble">
+                                    <MathJaxRenderer content={mathContent} />
+                                </div>
                             </div>
-                        </div>
-                    )
-                ))}
+                        );
+                    }
+                })}
                 
                 {isLoading && (
                      <div className="flex justify-start">
@@ -449,36 +456,25 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             >
                                 <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                             </button>
-                             <button
+                            <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="px-3 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center shrink-0"
-                                aria-label="Joindre une photo"
+                                disabled={isLoading || isRateLimited}
+                                className="p-3 bg-slate-800 rounded-lg hover:bg-slate-700 shrink-0 disabled:opacity-50"
+                                aria-label="Joindre une image"
                             >
-                               <PaperClipIcon className="w-6 h-6 text-slate-400" />
+                                <PaperClipIcon className="w-5 h-5" />
                             </button>
                         </div>
+                        {uploadedFile && !ocrVerificationText && (
+                            <button onClick={handleOcr} disabled={isLoading || isRateLimited} className="w-full px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50">
+                                {isLoading ? "Analyse..." : "Extraire le texte de l'image"}
+                            </button>
+                        )}
+                         <button onClick={handleSubmit} disabled={isInputReadOnly} className="w-full px-4 py-2 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
+                            Envoyer la réponse
+                        </button>
                     </div>
-                     
-                    {uploadedFile && ocrVerificationText === null ? (
-                        <button
-                            onClick={handleOcr}
-                            disabled={isOcrLoading || isRateLimited}
-                            className="self-stretch px-4 py-2 bg-purple-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center shrink-0"
-                            title="Extraire le texte de l'image"
-                        >
-                            {isOcrLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Extraire'}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleSubmit}
-                            disabled={isLoading || isRateLimited || (!studentInput.trim() && ocrVerificationText === null)}
-                            className="self-stretch px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center shrink-0"
-                            title={ocrVerificationText !== null ? 'Confirmer le texte et envoyer' : 'Envoyer'}
-                        >
-                            {isVerifying || isAIExplainLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Envoyer'}
-                        </button>
-                    )}
                 </div>
             </footer>
         </div>

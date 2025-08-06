@@ -120,13 +120,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const mathFieldRef = useRef<MathField | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    
+    const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
+        const newDialogue = [...dialogue, { role, content }];
+        onDialogueUpdate(newDialogue);
+    }, [dialogue, onDialogueUpdate]);
 
     // Initialize the conversation if the history is empty
     useEffect(() => {
         if (dialogue.length === 0) {
-            onDialogueUpdate([
-                { role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }
-            ]);
+            addMessageToDialogue('ai', "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble.");
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -145,11 +148,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     }, [aiError, error]);
     
-    const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
-        const newDialogue = [...dialogue, { role, content }];
-        onDialogueUpdate(newDialogue);
-    }, [dialogue, onDialogueUpdate]);
-
     // Effect to process the initial AI response and start the tutor
     useEffect(() => {
         if (aiResponse?.socraticPath) {
@@ -169,7 +167,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (aiResponse?.explanation) {
             addMessageToDialogue('ai', aiResponse.explanation);
         }
-    }, [aiResponse]);
+    }, [aiResponse, addMessageToDialogue]);
     
     // Effect to advance the socratic dialogue
     useEffect(() => {

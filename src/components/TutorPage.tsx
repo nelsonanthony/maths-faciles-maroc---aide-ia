@@ -121,6 +121,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
+    const isInputReadOnly = !!uploadedFileSrc && !ocrVerificationText;
+
     const dialogueRef = useRef(dialogueHistory);
     useEffect(() => {
         dialogueRef.current = dialogueHistory;
@@ -395,6 +397,12 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     />
                 )}
                 
+                {uploadedFileSrc && !ocrVerificationText && (
+                    <div className="text-center text-sm text-yellow-300 mb-2 p-2 bg-yellow-900/20 rounded-md border border-yellow-700/30">
+                        Image prête. Cliquez sur <strong>Extraire</strong> pour que l'IA lise votre écriture.
+                    </div>
+                )}
+
                 {ocrVerificationText !== null ? (
                     <div className="space-y-2 animate-fade-in">
                          <p className="text-xs text-yellow-300 text-center">Veuillez vérifier et corriger le texte extrait de votre image :</p>
@@ -413,19 +421,25 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                         </button>
                     </div>
                 ) : null}
+                
+                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
 
                 <div className="flex items-end gap-2">
                     <div className="flex-grow space-y-1">
                         <div className="flex items-stretch gap-2">
-                            <div className="math-input-wrapper flex-grow">
+                             <div className={`math-input-wrapper flex-grow ${isInputReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}>
                                 <EditableMathField
                                     latex={studentInput}
-                                    onChange={(field) => { setStudentInput(field.latex()); setError(null); }}
+                                    onChange={(field) => {
+                                        if (isInputReadOnly) return;
+                                        setStudentInput(field.latex());
+                                        setError(null);
+                                    }}
                                     mathquillDidMount={(field) => (mathFieldRef.current = field)}
                                     config={{ autoOperatorNames: 'sin cos tan log ln' }}
                                     aria-placeholder={currentPrompt}
-                                    className="h-full"
-                                />
+                                    className={`h-full ${isInputReadOnly ? 'bg-slate-800 pointer-events-none' : ''}`}
+                                 />
                             </div>
                             <button
                                 type="button"

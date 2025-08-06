@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -177,7 +178,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
-            const lastMessage = dialogue[dialogue.length - 1];
+            // Use the ref to get the latest dialogue state without adding a dependency on the dialogue array itself.
+            const lastMessage = dialogueRef.current[dialogueRef.current.length - 1];
             if (!lastMessage || lastMessage.role !== 'ai' || lastMessage.content !== currentQuestion) {
                  addMessageToDialogue('ai', currentQuestion);
             }
@@ -185,7 +187,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
             setIsTutorFinished(true);
         }
-    }, [currentStep, socraticPath, isTutorActive, isTutorFinished, dialogue, addMessageToDialogue]);
+    // This effect should only run when the step changes, not on every new message.
+    }, [currentStep, socraticPath, isTutorActive, isTutorFinished, addMessageToDialogue]);
 
     
     // Called only for the FIRST user message to initialize the tutor
@@ -214,7 +217,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         setStudentInput('');
         setIsVerifying(true);
         setVerificationResult(null);
-        setError(null);
 
         try {
             const supabase = getSupabase();
@@ -223,64 +225,53 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
             const response = await fetch('/api/validate-socratic-answer', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-                body: JSON.stringify({
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ 
                     studentAnswer: answer,
                     currentIaQuestion: socraticPath[currentStep].ia_question,
                     expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
                     exerciseStatement: exercise.statement,
                     exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet
-                })
+                }),
             });
-            const bodyText = await response.text();
+            
+            const responseBody = await response.text();
+
             if (!response.ok) {
-                const errData = JSON.parse(bodyText);
-                throw new Error(errData.error);
+                let errorMessage;
+                try {
+                    const errorData = JSON.parse(responseBody);
+                    errorMessage = errorData.error || `Une erreur est survenue (${response.status})`;
+                } catch (e) {
+                    errorMessage = responseBody || `Une erreur est survenue (${response.status})`;
+                }
+                throw new Error(errorMessage);
             }
-
-            const data = JSON.parse(bodyText);
-            addMessageToDialogue('ai', data.feedback_message);
-
-            if (data.is_correct) {
+            
+            const result = await JSON.parse(responseBody);
+            
+            if(result.is_correct) {
+                // The AI can provide more specific positive feedback than our canned one.
+                const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.positive_feedback;
+                addMessageToDialogue('ai', feedbackMessage);
                 setVerificationResult('correct');
+                // Give time for user to read feedback before showing next question
                 setTimeout(() => {
                     setCurrentStep(prev => prev + 1);
-                    setVerificationResult(null);
-                }, 2000);
+                }, 1000); 
             } else {
+                const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.hint_for_wrong_answer;
+                addMessageToDialogue('ai', feedbackMessage);
                 setVerificationResult('incorrect');
             }
-        } catch (e: any) {
-            setError(e.message);
+            
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors de la vérification.');
         } finally {
             setIsVerifying(false);
-        }
-    };
-
-    const handleGetDirectHelp = () => {
-        const lastAiMessage = dialogue.filter(d => d.role === 'ai').pop();
-        const prompt = `---CONTEXTE EXERCICE---
-        ${exercise.statement}
-        ${exercise.correctionSnippet ? `\n---CORRECTION/INDICE---
-        ${exercise.correctionSnippet}` : ''}
-
-        ---HISTORIQUE DISCUSSION---
-        ${dialogue.map(d => `${d.role}: ${d.content}`).join('\n')}
-        
-        ---DEMANDE ÉLÈVE---
-        Je suis bloqué. Donne-moi une explication directe pour l'étape actuelle : "${lastAiMessage?.content || "l'exercice"}"`;
-        explain(prompt, chapter.id, 'direct');
-    };
-    
-    // Central submission handler
-    const handleSubmission = () => {
-        const text = studentInput.trim();
-        if (!text) return;
-
-        if (isTutorActive) {
-            validateAnswer(text);
-        } else {
-            startTutor(text);
         }
     };
 
@@ -289,248 +280,186 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         if (file) {
             setUploadedFile(file);
             setUploadedFileSrc(URL.createObjectURL(file));
-            setError(null);
+            setOcrVerificationText(null); // Reset verification text when new image is uploaded
         }
     };
-
-    const handleOcrAndSubmit = async () => {
+    
+    const handleOcr = async () => {
         if (!uploadedFile) return;
         setIsLoadingOcr(true);
         setError(null);
         try {
             const supabase = getSupabase();
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Auth required");
+            if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
 
-            const compressedFile = await imageCompression(uploadedFile, { maxSizeMB: 1, maxWidthOrHeight: 1920 });
+            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+            const compressedFile = await imageCompression(uploadedFile, options);
             const base64Image = await fileToBase64(compressedFile);
+
             const response = await fetch('/api/ocr-with-gemini', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type }),
             });
-            const bodyText = await response.text();
+
+            const responseBody = await response.text();
             if (!response.ok) {
-                const errData = JSON.parse(bodyText);
-                throw new Error(errData.error);
+                 const errorData = JSON.parse(responseBody);
+                 throw new Error(errorData.error || `Une erreur est survenue (${response.status})`);
             }
+            const result = JSON.parse(responseBody);
+            setOcrVerificationText(result.text);
 
-            const data = JSON.parse(bodyText);
-            setOcrVerificationText(data.text);
-
-        } catch (err: any) {
-            setError(err.message);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement de l\'image.');
         } finally {
             setIsLoadingOcr(false);
-            setUploadedFile(null);
-            setUploadedFileSrc(null);
         }
     };
 
-    const handleConfirmOcr = () => {
-        if (ocrVerificationText === null) return;
-        const textToSubmit = ocrVerificationText.trim();
-        if (!textToSubmit) return;
+    const handleSubmit = () => {
+        const textToSend = ocrVerificationText !== null ? ocrVerificationText : studentInput;
+        if (!textToSend.trim()) return;
 
         if (isTutorActive) {
-            validateAnswer(textToSubmit);
+            validateAnswer(textToSend);
         } else {
-            startTutor(textToSubmit);
+            startTutor(textToSend);
         }
-        setOcrVerificationText(null);
-    };
-
-    const handleCancelOcr = () => {
         setOcrVerificationText(null);
         setUploadedFile(null);
         setUploadedFileSrc(null);
     };
-    
 
-    const isLoadingAction = isAIExplainLoading || isVerifying || isOcrLoading;
-    const isDisabled = isLoadingAction || isTutorFinished || isRateLimited;
+    const isLoading = isAIExplainLoading || isVerifying || isOcrLoading;
+    const currentPrompt = socraticPath?.[currentStep]?.student_response_prompt || 'Décris ton raisonnement...';
+    
+    if (isTutorFinished) {
+        return <TutorSummary dialogue={dialogue} onBack={onBack} />;
+    }
 
     return (
-        <div className="max-w-4xl mx-auto flex flex-col h-[90vh]">
-            <header className="p-4 flex items-center gap-4 flex-shrink-0">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700">
-                    <ArrowLeftIcon className="w-5 h-5" />
+        <div className="flex flex-col h-full max-h-[85vh] bg-slate-900 rounded-xl border border-slate-800 shadow-2xl">
+            {/* Header */}
+            <header className="p-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700/50">
+                    <ArrowLeftIcon className="w-5 h-5 text-slate-400" />
                 </button>
-                <div className="flex-grow min-w-0">
-                    <h2 className="text-xl font-bold text-brand-blue-300">Tuteur IA</h2>
-                    <div className="text-xs text-slate-400">
-                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement, { breaks: true }) as string)} />
-                    </div>
+                <div className="text-center">
+                    <h2 className="text-base font-bold text-slate-100 truncate max-w-xs sm:max-w-md md:max-w-lg">{exercise.statement}</h2>
+                    <p className="text-xs text-brand-blue-400">Tuteur IA</p>
                 </div>
+                 <div className="w-9 h-9" />
             </header>
-            
-            {isTutorActive && !isTutorFinished && socraticPath && (
-                <div className="p-4 border-b border-slate-800 flex-shrink-0">
-                    <p className="text-sm font-semibold text-center text-slate-400 mb-2">Progression: Étape {currentStep + 1} sur {socraticPath.length}</p>
-                    <div className="w-full bg-slate-700 rounded-full h-2">
-                        <div 
-                            className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-500" 
-                            style={{ width: `${Math.min(100, (currentStep / socraticPath.length) * 100)}%` }}>
-                        </div>
-                    </div>
-                </div>
-            )}
 
-            <main className="flex-grow p-4 overflow-y-auto bg-slate-900/50 rounded-t-xl border-t border-x border-slate-800 flex flex-col">
-                {isTutorFinished ? (
-                    <TutorSummary dialogue={dialogue} onBack={onBack} />
-                ) : (
-                    <>
-                        <div className="flex flex-col flex-grow space-y-4">
-                           {dialogue.map((msg, index) => {
-                               if (msg.role === 'ai') {
-                                   return <AiMessage key={index} message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse!.videoChunk!.video_id, aiResponse!.videoChunk!.start_time_seconds)} />;
-                               }
-                               
-                               const alignedContent = '& ' + msg.content.replace(/\\\\/g, ' \\\\ & ');
-                               const contentToRender = `$$\\begin{aligned}${alignedContent}\\end{aligned}$$`;
-                               return (
-                                   <div key={index} className="flex items-end gap-2 justify-end">
-                                       <div className="chat-bubble user-bubble self-end animate-fade-in">
-                                           <MathJaxRenderer content={contentToRender} />
-                                       </div>
-                                   </div>
-                               );
-                           })}
-                           {isLoadingAction && <div className="text-center py-2"><SpinnerIcon className="w-6 h-6 animate-spin text-slate-400" /></div>}
-                           
-                           {isTutorActive && verificationResult && (
-                               <div className={`self-end flex items-center gap-2 text-sm px-3 py-1.5 rounded-full animate-fade-in ${verificationResult === 'correct' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'}`}>
-                                    <span className="text-lg">{verificationResult === 'correct' ? '🎉' : '🤔'}</span>
-                                    <span>{verificationResult === 'correct' ? 'Correct !' : 'Pas tout à fait...'}</span>
-                               </div>
-                           )}
-                        </div>
-                        <div ref={messagesEndRef} />
-                    </>
-                )}
-            </main>
-            
-             {isKeyboardOpen && (
-                <MathKeyboard
-                    initialValue={studentInput}
-                    onConfirm={(latex) => {
-                        setStudentInput(latex);
-                        setIsKeyboardOpen(false);
-                    }}
-                    onClose={() => setIsKeyboardOpen(false)}
-                />
-            )}
-             <footer className="p-4 bg-slate-800/80 backdrop-blur-sm rounded-b-xl border-b border-x border-slate-700/50">
-                {isRateLimited ? (
-                     <div className="p-3 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm text-center">
-                        {error}
-                     </div>
-                ) : ocrVerificationText !== null ? (
-                    <div className="space-y-4 animate-fade-in">
-                        <h4 className="font-semibold text-yellow-300">Vérifiez la transcription de votre photo</h4>
-                        <p className="text-sm text-slate-400">Corrigez le texte ci-dessous. La prévisualisation se mettra à jour en temps réel.</p>
-                        
-                        <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1">Prévisualisation</label>
-                            <div className="p-4 min-h-[100px] bg-slate-950/70 rounded-lg border border-slate-700">
-                                <MathJaxRenderer content={`$$\\begin{aligned}& ${ocrVerificationText.replace(/\\\\/g, ' \\\\ & ')}\\end{aligned}$$`} />
+            {/* Chat Area */}
+            <main className="flex-grow p-4 overflow-y-auto space-y-4">
+                {dialogue.map((msg, index) => (
+                    msg.role === 'ai' ? (
+                        <AiMessage 
+                            key={index} 
+                            message={msg}
+                            response={aiResponse}
+                            onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk!.video_id, aiResponse?.videoChunk!.start_time_seconds)} 
+                        />
+                    ) : (
+                        <div key={index} className="flex justify-end animate-fade-in">
+                            <div className="chat-bubble user-bubble">
+                                <MathJaxRenderer content={`$$${msg.content.replace(/\\\\/g, '\\\\\\\\')}$$`} />
                             </div>
                         </div>
-
-                        <div>
-                            <label htmlFor="ocr-textarea" className="block text-xs font-medium text-slate-400 mb-1">Source LaTeX (modifiable)</label>
-                            <textarea
-                                id="ocr-textarea"
-                                value={ocrVerificationText}
-                                onChange={(e) => setOcrVerificationText(e.target.value)}
-                                rows={6}
-                                className="w-full p-3 bg-slate-950 border-2 border-slate-700 rounded-lg text-slate-300 font-mono"
-                                disabled={isLoadingAction}
-                            />
-                        </div>
-                        <div className="flex flex-col sm:flex-row gap-4">
-                            <button
-                                onClick={handleConfirmOcr}
-                                disabled={isLoadingAction}
-                                className="flex-1 flex items-center justify-center gap-2 px-5 py-3 font-semibold text-white bg-brand-blue-600 rounded-lg shadow-md hover:bg-brand-blue-700 disabled:opacity-70"
-                            >
-                                {isLoadingAction && <SpinnerIcon className="w-5 h-5 animate-spin" />}
-                                Confirmer et Envoyer
-                            </button>
-                            <button
-                                onClick={handleCancelOcr}
-                                disabled={isLoadingAction}
-                                className="px-5 py-3 font-semibold text-slate-300 bg-slate-700 rounded-lg shadow-md hover:bg-slate-600 disabled:opacity-70"
-                            >
-                                Annuler
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                         {inputMode === 'text' && (
-                            <div className="flex items-stretch gap-2">
-                                <div className={`math-input-wrapper flex-grow ${isDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
-                                    <EditableMathField
-                                        latex={studentInput}
-                                        onChange={(field) => setStudentInput(field.latex())}
-                                        mathquillDidMount={(field) => (mathFieldRef.current = field)}
-                                        config={{
-                                            autoOperatorNames: 'sin cos tan log ln',
-                                            handlers: {
-                                                enter: () => mathFieldRef.current?.cmd('\\\\')
-                                            }
-                                        }}
-                                        aria-placeholder="Votre réponse..."
-                                        className="h-full"
-                                    />
-                                </div>
-                                <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-gray-700 rounded-lg hover:bg-gray-600 flex items-center justify-center" disabled={isDisabled}>
-                                    <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
-                                </button>
-                                <button onClick={handleSubmission} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled || !studentInput.trim()}>
-                                    Envoyer
-                                </button>
-                            </div>
-                         )}
-                         {inputMode === 'photo' && (
-                             <div className="flex items-center gap-2">
-                                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
-                                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-3 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50" disabled={isDisabled}>
-                                    <PaperClipIcon className="w-5 h-5"/> {uploadedFile ? "Changer" : "Choisir photo"}
-                                </button>
-                                {uploadedFile && (
-                                    <button onClick={handleOcrAndSubmit} className="flex-1 px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50" disabled={isDisabled}>
-                                        <div className="flex items-center justify-center gap-2">
-                                            <CameraIcon className="w-5 h-5"/> Envoyer la photo
-                                        </div>
-                                    </button>
-                                )}
-                             </div>
-                         )}
-                         {uploadedFileSrc &&
-                            <div className="flex items-center gap-2 p-2 bg-slate-900/50 rounded-md">
-                                <img src={uploadedFileSrc} alt="Preview" className="w-12 h-12 object-cover rounded"/>
-                                <span className="text-xs text-slate-400 flex-1 truncate">{uploadedFile?.name}</span>
-                                <button onClick={() => { setUploadedFile(null); setUploadedFileSrc(null);}} className="p-1 text-slate-500 hover:text-white"><XCircleIcon className="w-5 h-5"/></button>
-                            </div>
-                         }
-
-                         <div className="flex items-center justify-between">
-                             <div className="flex items-center gap-2 p-1 bg-gray-900/50 rounded-lg">
-                                 <button onClick={() => setInputMode('text')} className={`px-2 py-1 text-xs rounded ${inputMode === 'text' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Texte</button>
-                                 <button onClick={() => setInputMode('photo')} className={`px-2 py-1 text-xs rounded ${inputMode === 'photo' ? 'bg-brand-blue-600/50' : ''}`} disabled={isDisabled}>Photo</button>
-                             </div>
-                             {isTutorActive &&
-                             <button onClick={handleGetDirectHelp} className="text-xs text-slate-400 hover:text-brand-blue-300 disabled:opacity-50" disabled={isDisabled}>
-                                 Je suis bloqué, donne-moi un indice
-                             </button>
-                             }
+                    )
+                ))}
+                
+                {isLoading && (
+                     <div className="flex justify-start">
+                         <div className="chat-bubble ai-bubble flex items-center gap-2">
+                            <SpinnerIcon className="w-5 h-5 animate-spin" />
+                            <span className="text-sm">Analyse en cours...</span>
                          </div>
-                         {error && !isRateLimited && <p className="text-sm text-red-400">{error}</p>}
-                    </div>
+                     </div>
                 )}
+                 <div ref={messagesEndRef} />
+            </main>
+
+            {/* Input Area */}
+            <footer className="p-3 border-t border-slate-800 flex-shrink-0 bg-slate-950/50 rounded-b-xl">
+                 {error && (
+                    <div className="mb-2 p-2 bg-rose-900/30 border border-rose-500/50 rounded-lg text-center text-xs text-rose-300">
+                        {error}
+                    </div>
+                 )}
+
+                 {isKeyboardOpen && (
+                    <MathKeyboard
+                        initialValue={studentInput}
+                        onConfirm={(latex) => { setStudentInput(latex); setIsKeyboardOpen(false); }}
+                        onClose={() => setIsKeyboardOpen(false)}
+                    />
+                )}
+                
+                {ocrVerificationText !== null ? (
+                    <div className="space-y-2 animate-fade-in">
+                         <p className="text-xs text-yellow-300 text-center">Veuillez vérifier et corriger le texte extrait de votre image :</p>
+                         <textarea
+                            value={ocrVerificationText}
+                            onChange={(e) => setOcrVerificationText(e.target.value)}
+                            rows={4}
+                            className="w-full p-2 bg-slate-900 border border-slate-700 rounded-md text-sm font-mono"
+                         />
+                    </div>
+                ) : uploadedFileSrc ? (
+                    <div className="relative w-32 h-32 mx-auto mb-2 group">
+                        <img src={uploadedFileSrc} alt="Preview" className="w-full h-full object-cover rounded-lg" />
+                        <button onClick={() => { setUploadedFile(null); setUploadedFileSrc(null); }} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100">
+                            <XCircleIcon className="w-5 h-5" />
+                        </button>
+                    </div>
+                ) : null}
+
+                <div className="flex items-end gap-2">
+                    <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
+
+                    <div className="flex-grow space-y-1">
+                        <div className="flex items-stretch gap-2">
+                            <div className="math-input-wrapper flex-grow">
+                                <EditableMathField
+                                    latex={studentInput}
+                                    onChange={(field) => { setStudentInput(field.latex()); setError(null); }}
+                                    mathquillDidMount={(field) => (mathFieldRef.current = field)}
+                                    config={{ autoOperatorNames: 'sin cos tan log ln' }}
+                                    aria-placeholder={currentPrompt}
+                                    className="h-full"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsKeyboardOpen(true)}
+                                className="px-3 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center shrink-0"
+                                aria-label="Ouvrir le clavier mathématique"
+                            >
+                                <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
+                            </button>
+                             <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="px-3 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center shrink-0"
+                                aria-label="Joindre une photo"
+                            >
+                               <CameraIcon className="w-6 h-6 text-slate-400" />
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <button
+                        onClick={handleSubmit}
+                        disabled={isLoading || isRateLimited}
+                        className="self-stretch px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50 flex items-center justify-center"
+                    >
+                        {isLoading ? <SpinnerIcon className="w-5 h-5 animate-spin" /> : 'Envoyer'}
+                    </button>
+                </div>
             </footer>
         </div>
     );

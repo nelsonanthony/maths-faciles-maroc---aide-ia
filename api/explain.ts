@@ -121,12 +121,15 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
 -   Structure la réponse avec du Markdown (### Titres, * listes).
 
 ## Si \`requestType\` est "socratic"
--   **Analyse la DEMANDE ÉLÈVE**: Lis attentivement la demande de l'élève. Identifie sur quelle partie de l'exercice il travaille ou pose une question.
--   **Crée un parcours pédagogique**: Décompose TOUT l'exercice en petites étapes logiques dans le \`path\`.
--   **Détermine le point de départ**: Compare la DEMANDE ÉLÈVE avec ton parcours. \`starting_step_index\` doit être l'index de la PREMIÈRE étape qui correspond à la question de l'élève ou qui suit son travail déjà accompli.
-    -   Exemple 1: si l'élève dit "j'ai fini la question 1 et je suis bloqué à la 2a", le \`starting_step_index\` doit correspondre à la première étape de la question 2a.
-    -   Exemple 2: si l'élève dit "J'ai fait une erreur, j'ai tapé $(x+2)^2$ au lieu de $(x-2)^2$", ton premier pas dans le \`path\` devrait accuser réception de cette information, puis demander à l'élève de recalculer en partant de la bonne expression.
-    -   Exemple 3: S'il n'a rien commencé, l'index est 0. S'il a tout fini, l'index est égal à la longueur du \`path\`.
+-   **PROCESSUS DE RÉFLEXION (Chain of Thought)**:
+    1.  **Décomposer l'exercice**: D'abord, j'ignore la demande de l'élève et je lis l'énoncé de l'exercice. Je le décompose mentalement en toutes les petites étapes logiques nécessaires pour le résoudre du début à la fin. C'est la base de mon \`path\`.
+    2.  **Analyser la demande élève**: Maintenant, je lis attentivement ce que l'élève a écrit. A-t-il commencé ? A-t-il fait une partie ? A-t-il identifié une erreur spécifique ? Est-il complètement perdu ?
+    3.  **Synchroniser**: Je compare la progression de l'élève avec mon \`path\` complet.
+        -   S'il dit "je suis bloqué à la question 2", je trouve l'index de la première étape de la question 2 dans mon \`path\`. C'est mon \`starting_step_index\`.
+        -   S'il dit "j'ai fait une erreur de signe en développant (x-2)²...", je dois créer une première étape dans mon \`path\` qui accuse réception de son erreur ("Bien vu ! C'est une erreur fréquente. Peux-tu recalculer avec la bonne identité remarquable ?") et l'invite à corriger. Le \`starting_step_index\` sera 0.
+        -   S'il n'a rien commencé, \`starting_step_index\` est 0.
+        -   S'il montre un travail qui est correct jusqu'à un certain point, je trouve l'étape *suivante* dans mon \`path\`.
+    4.  **Construire le JSON**: Je construis l'objet JSON final avec le \`path\` complet et le \`starting_step_index\` que j'ai déterminé.
 -   **EXEMPLE DE STRUCTURE POUR LE PATH SOCRATIQUE**:
     \`\`\`json
     {
@@ -146,13 +149,6 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
                 "expected_answer_keywords": ["3x^2 - 3", "3x²-3"],
                 "positive_feedback": "C'est la bonne dérivée ! Excellent.",
                 "hint_for_wrong_answer": "Presque ! N'oublie pas la formule de dérivation pour $x^n$ qui est $nx^{n-1}$. Applique-la à chaque terme."
-            },
-            {
-                "ia_question": "Maintenant que nous avons ƒ'(𝑥) = 3𝑥² - 3, que doit-on faire pour trouver les points où la variation change ?",
-                "student_response_prompt": "Que faire avec ƒ'(𝑥) ?",
-                "expected_answer_keywords": ["résoudre f'(x)=0", "trouver les racines", "annuler la dérivée", "signe"],
-                "positive_feedback": "Oui, il faut étudier le signe de la dérivée, et pour ça, on commence par chercher quand elle s'annule. Résous l'équation ƒ'(𝑥) = 0.",
-                "hint_for_wrong_answer": "On cherche les points 'plats' de la courbe. Que vaut la dérivée à ces endroits ? Que doit-on résoudre ?"
             }
         ]
     }

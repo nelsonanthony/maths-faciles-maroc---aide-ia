@@ -72,22 +72,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const ai = new GoogleGenAI({ apiKey: apiKey! });
 
-        const ocrPromptText = `[INSTRUCTIONS STRICTES - Transcription en LaTeX Pur]
-1.  **Mission**: Transcris l'écriture manuscrite mathématique de l'image en une seule chaîne de caractères LaTeX. La sortie doit être directement insérable dans un environnement mathématique LaTeX (comme \`gathered\` ou \`align*\`).
-2.  **Format de Sortie**: La sortie doit être du LaTeX pur, SANS les délimiteurs externes comme \`$$...$$ \` ou \`$..$\`.
-3.  **Gestion du Texte vs. Mathématiques (RÈGLE CRUCIALE)**:
-    -   Tout texte en langage naturel (français) DOIT être encapsulé dans une commande \`\\text{...}\`. Exemple: \`\\text{Soit f une application}\`.
-    -   Les formules et symboles mathématiques doivent être écrits en LaTeX standard. Exemple: \`f(x) = x^2 - 4x + 1\`.
-4.  **Sauts de Ligne**: Utilise \`\\\\\` pour représenter un saut de ligne, correspondant à ce qui est vu dans l'image. C'est essentiel pour la mise en forme des calculs.
-5.  **Exemple Complet**:
-    -   **Image montre**:
-        Soit f une application tel que :
-        f(x) = x^2 - 4x + 13
-        a) Montrer que f(x) = f(4-x)
-    -   **Ta sortie DOIT être**: \`\\text{Soit f une application tel que :} \\\\ f(x) = x^2 - 4x + 13 \\\\ \\text{a) Montrer que } f(x) = f(4-x)\`
-6.  **Règle Capitale**: N'ajoute pas de formatage Markdown ou d'autres délimiteurs. La sortie est du contenu LaTeX brut.
+        const ocrPromptText = `
+# MISSION
+Transcrire l'écriture manuscrite de l'image en texte brut.
 
-Transcris maintenant le contenu de l'image ou des images fournies en suivant ces règles à la lettre.`;
+# RÈGLES DE FORMATAGE (TRÈS IMPORTANTES)
+1.  **Texte Brut Uniquement**: Ne produis AUCUN formatage spécial comme Markdown ou LaTeX. La sortie doit être du texte pur.
+2.  **Symboles Mathématiques**: Utilise les caractères UNICODE pour tous les symboles mathématiques.
+    -   BON: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`, \`𝑥 ⟼ 𝑥²\`
+    -   MAUVAIS: \`f(x) = x^2 - 4x + 1\`, \`$\\forall x \\in \\mathbb{R}$\`
+3.  **Sauts de Ligne**: Respecte les sauts de ligne de l'image en utilisant un saut de ligne standard (\`\\n\`). N'utilise PAS \`\\\\\`.
+4.  **Exemple**:
+    -   Si l'image montre:
+        Soit f une application tel que :
+        f(x) = x² - 4x + 1
+    -   Ta sortie DOIT être EXACTEMENT:
+        Soit ƒ une application tel que :
+        ƒ(𝑥) = 𝑥² − 4𝑥 + 1
+
+# INSTRUCTION FINALE
+Transcris le contenu de l'image ou des images fournies en suivant ces règles à la lettre. La sortie doit être du texte brut et lisible.`;
 
         // --- STEP 1: OCR on all images in parallel ---
         const ocrPromises = images.map(imagePayload => {
@@ -107,21 +111,15 @@ Transcris maintenant le contenu de l'image ou des images fournies en suivant ces
         await Promise.all(logPromises);
 
         // --- Combine results ---
-        // Convert newlines (\n) inside each page's OCR result to LaTeX newlines (\\).
-        // Then, join the results from different pages with a LaTeX newline as well.
-        const combinedLatexText = ocrResults.map(ocrResponse => {
-            const ocrText = ocrResponse.text?.trim() ?? '';
-            return ocrText.replace(/\n/g, ' \\\\ ');
-        }).join(' \\\\ ');
+        const combinedText = ocrResults.map(ocrResponse => {
+            return ocrResponse.text?.trim() ?? '';
+        }).join('\\n'); // Join pages with a standard newline character
         
-        if (!combinedLatexText.trim()) {
+        if (!combinedText.trim()) {
             return res.status(400).json({ error: "L'IA n'a pas pu extraire de texte des images fournies. Essayez des photos plus nettes." });
         }
         
-        // Final cleaning pass for any remaining invalid delimiters
-        const finalCleanedText = cleanLatex(combinedLatexText);
-
-        return res.status(200).json({ text: finalCleanedText.trim() });
+        return res.status(200).json({ text: combinedText.trim() });
 
     } catch (error: any) {
         console.error("Error in ocr-multipage:", error);

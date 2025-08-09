@@ -101,11 +101,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const promptText = `
 # CONTEXTE GLOBAL
-Tu es un tuteur de mathématiques expert et bienveillant. Ton objectif est d'aider un lycéen marocain à résoudre une étape d'un exercice en te basant sur l'historique COMPLET de votre conversation.
+Tu es un tuteur de mathématiques expert. Ton rôle est d'évaluer la réponse d'un élève à TA DERNIÈRE question, en te basant sur l'HISTORIQUE COMPLET de la conversation pour être le plus pertinent possible.
 
 ## Infos sur l'exercice
 - **Énoncé**: ${exerciseStatement}
 - **Correction (pour info)**: ${exerciseCorrection}
+
+# PROCESSUS DE RÉFLEXION (Chain of Thought)
+1.  **Relire ma dernière question**: Je regarde la toute dernière chose que J'AI dite dans l'historique ci-dessous. C'est la question à laquelle l'élève est censé répondre.
+2.  **Analyser la réponse de l'élève**: Je lis la réponse de l'élève. Est-ce qu'elle répond à ma question ? Est-elle correcte mathématiquement ? Est-elle à côté de la plaque ?
+3.  **Comparer aux attentes**: Je compare sa réponse aux \`expected_answer_keywords\`. Est-ce que les concepts y sont ?
+4.  **Décider de la validité**: Je décide si \`is_correct\` est \`true\` ou \`false\`. Même si la réponse est formulée différemment, si le concept est bon, c'est \`true\`.
+5.  **Rédiger le feedback**:
+    -   **Si correcte**: Je rédige un message positif. Je peux même anticiper très brièvement la suite pour que la transition soit fluide.
+    -   **Si incorrecte**: J'analyse PRÉCISÉMENT l'erreur. Est-ce un simple oubli ? Une erreur de calcul ? Une incompréhension totale du concept ? Mon indice doit être directement lié à CETTE erreur spécifique. Je ne dois PAS donner un indice générique. Je dois me baser sur ce que l'élève a écrit.
+6.  **Construire le JSON**: J'assemble l'objet JSON final en respectant les règles.
 
 # HISTORIQUE DE LA CONVERSATION (le plus récent est en bas)
 ${formattedHistory}
@@ -117,15 +127,6 @@ ${formattedHistory}
 - **Dernière question posée à l'élève**: "${currentIaQuestion}"
 - **Concepts clés attendus dans la réponse**: "${expectedAnswerKeywords.join(', ')}"
 - **Réponse fournie par l'élève**: "${studentAnswer || "L'élève n'a rien répondu."}"
-
-## Analyse et Rédaction du Feedback
-1.  **Décision**: La réponse de l'élève est-elle conceptuellement correcte pour la dernière question posée, en se basant sur les concepts clés attendus ET le contexte de l'historique ?
-    -   Sois flexible. L'élève peut utiliser ses propres mots.
-    -   Si la réponse est vide, hors-sujet ou fausse, \`is_correct\` est \`false\`.
-2.  **Rédaction du message**:
-    -   **Si correcte**: Rédige un message de feedback positif qui confirme sa bonne réponse et fait le lien avec l'étape suivante.
-    -   **Si incorrecte**: Rédige un indice **spécifique à l'erreur de l'élève** et au contexte. Ne te contente pas de répéter un indice générique. Guide-le en pointant son erreur ou en lui posant une sous-question pour l'aider à corriger son raisonnement. Ne donne JAMAIS la solution directement.
-    -   Le ton doit être simple, clair, et encourageant.
 
 # FORMAT DE SORTIE
 Réponds UNIQUEMENT avec un objet JSON valide suivant ce schéma : \`{ "is_correct": boolean, "feedback_message": "Ton message ici..." }\`.

@@ -2,7 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { AIResponse, VideoChunk } from "../src/types.js";
+import { AIResponse } from "../src/types.js";
 import aiUsageLimiter from "./_lib/ai-usage-limiter.js";
 import { cleanLatex, validateMathResponse } from "./_lib/math-validator.js";
 
@@ -73,31 +73,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         
         const ai = new GoogleGenAI({ apiKey: apiKey! });
         const finalResponse: AIResponse = {};
-
-        // --- Find relevant video chunk function (to be run in parallel) ---
-        const findRelevantVideoChunk = async (promptForSearch: string): Promise<VideoChunk | undefined> => {
-            const questionMatch = promptForSearch.match(/---DEMANDE ÉLÈVE---\s*([\s\S]*)/);
-            const userQuestion = questionMatch ? questionMatch[1].trim() : '';
-            if (!userQuestion) return undefined;
-
-            try {
-                const embeddingResult = await ai.models.embedContent({
-                    model: 'text-embedding-004',
-                    contents: userQuestion
-                });
-                if (embeddingResult.embeddings && embeddingResult.embeddings.length > 0) {
-                    const embedding = embeddingResult.embeddings[0].values;
-                    const { data: chunkData } = await supabase.rpc('match_video_chunk', {
-                        query_embedding: embedding,
-                        target_chapter_id: chapterId
-                    });
-                    return chunkData as unknown as VideoChunk;
-                }
-            } catch (e) {
-                console.error("Error during video chunk search (non-blocking):", e);
-            }
-            return undefined;
-        };
         
         // --- System instruction ---
         const systemInstruction = `
@@ -237,15 +212,8 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
             }
         };
 
-        // --- Run tasks in parallel ---
-        const [_, videoChunkResult] = await Promise.all([
-            generateResponse(prompt),
-            findRelevantVideoChunk(prompt)
-        ]);
-
-        if (videoChunkResult) {
-            finalResponse.videoChunk = videoChunkResult;
-        }
+        // --- Run main generation task ---
+        await generateResponse(prompt);
 
         // Log successful AI call
         await aiUsageLimiter.logAiCall(supabase, user.id, 'EXPLANATION');

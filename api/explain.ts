@@ -84,10 +84,10 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
 
 # RÈGLES DE FORMATAGE (Valables pour TOUTES les réponses)
 -   **JSON UNIQUEMENT**: Ta sortie doit être un objet JSON valide, sans aucun texte avant ou après.
--   **FORMATAGE MATHÉMATIQUE HYBRIDE (RÈGLE STRICTE)**:
-    -   **Priorité à Unicode**: Utilise des caractères Unicode pour TOUT ce qui est simple. Exemples: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`(∀𝑥 ∈ ℝ)\`, \`𝑥 ⟼ 𝑥² − 1\`.
-    -   **LaTeX pour le Complexe**: Utilise les délimiteurs \`$..$\` (en ligne) et \`$$..$$\` (en bloc) UNIQUEMENT pour les fractions, racines, sommes, etc. Exemple: \`$$\\frac{x^2 - 1}{x+2}$$ \`.
-    -   **INTERDICTION**: N'utilise JAMAIS les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+-   **FORMATAGE MATHÉMATIQUE (RÈGLE CRITIQUE)**:
+    -   Ton utilisation des symboles \`$\` ou \`$$\` est **STRICTEMENT INTERDITE**.
+    -   Utilise **UNIQUEMENT** des caractères Unicode pour les mathématiques (ex: ƒ(𝑥), 𝑥², ∈, ∀).
+    -   Toute sortie contenant des délimiteurs LaTeX sera considérée comme une erreur.
 
 # INSTRUCTIONS SPÉCIFIQUES PAR \`requestType\`
 
@@ -123,7 +123,7 @@ Analyse la "DEMANDE ÉLÈVE" dans le prompt. Réponds UNIQUEMENT avec un objet J
                 "student_response_prompt": "ƒ'(𝑥) = ...",
                 "expected_answer_keywords": ["3x^2 - 3", "3x²-3"],
                 "positive_feedback": "C'est la bonne dérivée ! Excellent.",
-                "hint_for_wrong_answer": "Presque ! N'oublie pas la formule de dérivation pour $x^n$ qui est $nx^{n-1}$. Applique-la à chaque terme."
+                "hint_for_wrong_answer": "Presque ! N'oublie pas la formule de dérivation pour xⁿ qui est nxⁿ⁻¹. Applique-la à chaque terme."
             }
         ]
     }

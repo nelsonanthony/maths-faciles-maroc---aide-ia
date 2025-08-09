@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -110,7 +111,7 @@ Utilise EXACTEMENT cette structure.
     {
       "part_title": "Question 1) a) - Montrer que f(x) = f(4-x)",
       "evaluation": "partial",
-      "explanation": "L'idée de partir de $f(4-x)$ est excellente. Tu as bien remplacé $x$ par $(4-x)$ dans l'expression. Ton développement de $(4-x)^2$ est juste, mais tu as fait une petite erreur de signe en développant $-4(4-x)$. Recalcule bien cette partie et tu y es presque !"
+      "explanation": "L'idée de partir de ƒ(4−𝑥) est excellente. Tu as bien remplacé 𝑥 par (4−𝑥) dans l'expression. Ton développement de (4−𝑥)² est juste, mais tu as fait une petite erreur de signe en développant −4(4−𝑥). Recalcule bien cette partie et tu y es presque !"
     },
     {
       "part_title": "Question 1) b) - Déduire que f n'est pas injective",
@@ -124,11 +125,8 @@ Utilise EXACTEMENT cette structure.
 ## 3. Règles pour le champ \`evaluation\`
 Le champ \`evaluation\` doit être l'une des trois valeurs suivantes, sans exception : \`"correct"\`, \`"incorrect"\`, \`"partial"\`.
 
-## 4. Formatage Mathématique (RÈGLE STRICTE)
-Dans les chaînes de caractères (\`summary\`, \`explanation\`), utilise impérativement le formatage hybride suivant :
--   **Priorité à Unicode**: Utilise des caractères Unicode pour TOUT ce qui est simple. Exemples: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`(∀𝑥 ∈ ℝ)\`, \`𝑥 ⟼ 𝑥² − 1\`.
--   **LaTeX pour le Complexe**: Utilise les délimiteurs \`$..$\` (en ligne) et \`$$..$$\` (en bloc) UNIQUEMENT pour les fractions, racines, sommes, etc. Exemple: \`$$\\frac{x^2 - 1}{x+2}$$ \`.
--   **INTERDICTION**: N'utilise JAMAIS les délimiteurs MathJax comme \`\\( ... \\)\` ou \`\\[ ... \\]\`.
+## 4. Formatage Mathématique (RÈGLE CRITIQUE)
+Dans les chaînes de caractères (\`summary\`, \`explanation\`), ton utilisation des symboles \`$\` ou \`$$\` est **STRICTEMENT INTERDITE**. Utilise **UNIQUEMENT** des caractères Unicode pour les mathématiques (ex: ƒ(𝑥), 𝑥², ∈, ∀). Toute sortie contenant des délimiteurs LaTeX sera considérée comme une erreur.
 `;
 
         const userPrompt = `
@@ -206,19 +204,17 @@ GÉNÈRE L'OBJET JSON MAINTENANT.
             console.error("Failed to parse JSON from AI in check-answer. Raw response:", jsonText);
             throw new Error("La réponse de l'IA était mal formatée. Veuillez réessayer.");
         }
-        
-        // Appliquer le nettoyage et la validation à toute la réponse JSON
-        const finalResponse = validateMathResponse(parsedJson);
 
-        // Log successful AI call
+        const cleanedJson = validateMathResponse(parsedJson);
+
         await aiUsageLimiter.logAiCall(supabase, user.id, 'ANSWER_VALIDATION');
         
-        return res.status(200).json(finalResponse);
+        return res.status(200).json(cleanedJson);
 
-    } catch (error: any) {
-        console.error("Error in check-answer:", error);
-        const status = error.status || 500;
-        const message = error.message || "Une erreur interne est survenue.";
+    } catch (e: any) {
+        console.error("Critical error in 'check-answer' function:", e);
+        const status = e.status || 500;
+        const message = e.message || "Une erreur interne est survenue.";
         return res.status(status).json({ error: message });
     }
 }

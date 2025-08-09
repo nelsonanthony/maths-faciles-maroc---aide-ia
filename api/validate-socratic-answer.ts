@@ -130,7 +130,7 @@ ${formattedHistory}
 
 # FORMAT DE SORTIE
 Réponds UNIQUEMENT avec un objet JSON valide suivant ce schéma : \`{ "is_correct": boolean, "feedback_message": "Ton message ici..." }\`.
-Utilise le formatage mathématique hybride (Unicode simple, LaTeX complexe avec $..$ ou $$..$$) dans ton \`feedback_message\`.
+Dans ton \`feedback_message\`, l'utilisation des délimiteurs LaTeX comme \`$\` ou \`$$\` est **STRICTEMENT INTERDITE**. Utilise **UNIQUEMENT** des caractères Unicode pour les mathématiques (ex: ƒ(𝑥), 𝑥², ∈).
 `;
         
         const requestPayload = {

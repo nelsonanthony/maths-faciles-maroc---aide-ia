@@ -80,7 +80,7 @@ Transcrire l'écriture manuscrite de l'image en texte brut.
 2.  **Symboles Mathématiques**: Utilise les caractères UNICODE pour tous les symboles mathématiques.
     -   BON: \`ƒ(𝑥) = 𝑥² − 4𝑥 + 1\`, \`∀𝑥 ∈ ℝ\`, \`𝑥 ⟼ 𝑥²\`
     -   MAUVAIS: \`f(x) = x^2 - 4x + 1\`, \`$\\forall x \\in \\mathbb{R}$\`
-3.  **Sauts de Ligne**: Respecte les sauts de ligne de l'image en utilisant un saut de ligne standard (\`\\n\`). N'utilise PAS \`\\\\\`.
+3.  **MISE EN PAGE FIDÈLE (RÈGLE CRITIQUE)**: Tu dois reproduire **EXACTEMENT** les sauts de ligne et les espacements de l'image. Chaque ligne de ta sortie doit correspondre à une ligne de l'image. Chaque espace doit être préservé. Utilise un retour à la ligne standard (\`\\n\`) pour les sauts de ligne.
 4.  **Exemple**:
     -   Si l'image montre:
         Soit f une application tel que :

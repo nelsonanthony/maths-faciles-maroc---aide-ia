@@ -95,12 +95,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const { user } = useAuth();
     const { data: aiResponse, isLoading: isAIExplainLoading, error: aiError, explain, reset: resetAIExplain } = useAIExplain();
     
+    // dialogueHistory prop is the source of truth for the conversation state.
     const dialogue = dialogueHistory;
     
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
     const [currentStep, setCurrentStep] = useState(0);
     const [studentInput, setStudentInput] = useState('');
-    const [isTutorActive, setIsTutorActive] = useState(false); // Controls if we are in socratic mode
+    const [isTutorActive, setIsTutorActive] = useState(false);
     const [isTutorFinished, setIsTutorFinished] = useState(false);
 
     const [isVerifying, setIsVerifying] = useState(false);
@@ -120,22 +121,12 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
-    const dialogueRef = useRef(dialogueHistory);
-    useEffect(() => {
-        dialogueRef.current = dialogueHistory;
-    }, [dialogueHistory]);
-    
-    const addMessageToDialogue = useCallback((role: DialogueMessage['role'], content: string) => {
-        const newDialogue = [...dialogueRef.current, { role, content }];
-        onDialogueUpdate(newDialogue);
-    }, [onDialogueUpdate]);
-
     // Initialize the conversation if the history is empty
     useEffect(() => {
         if (dialogue.length === 0) {
-            addMessageToDialogue('ai', "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble.");
+            onDialogueUpdate([{ role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }]);
         }
-    }, [dialogue.length, addMessageToDialogue]);
+    }, []); // Run only once
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -153,45 +144,47 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     
     // Effect to process the initial AI response and start the tutor
     useEffect(() => {
-        if (aiResponse?.socraticPath) {
+        if (!aiResponse) return;
+
+        if (aiResponse.socraticPath) {
             const path = aiResponse.socraticPath;
             const startIndex = aiResponse.startingStepIndex ?? 0;
 
             setSocraticPath(path);
             
             if (startIndex >= path.length) {
-                addMessageToDialogue('ai', "Il semble que tu aies déjà résolu cet exercice avec succès. Excellent travail ! Si tu as d'autres questions, n'hésite pas.");
+                onDialogueUpdate([...dialogue, { role: 'ai', content: "Il semble que tu aies déjà résolu cet exercice avec succès. Excellent travail ! Si tu as d'autres questions, n'hésite pas." }]);
                 setIsTutorFinished(true);
             } else {
                 setCurrentStep(startIndex);
             }
             setIsTutorActive(true);
         }
-        if (aiResponse?.explanation) {
-            addMessageToDialogue('ai', aiResponse.explanation);
+        if (aiResponse.explanation) {
+            onDialogueUpdate([...dialogue, { role: 'ai', content: aiResponse.explanation }]);
         }
-    }, [aiResponse, addMessageToDialogue]);
+    }, [aiResponse]);
     
     // Effect to advance the socratic dialogue
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
-            const lastMessage = dialogueRef.current[dialogueRef.current.length - 1];
+            const lastMessage = dialogue[dialogue.length - 1];
             if (!lastMessage || lastMessage.role !== 'ai' || lastMessage.content !== currentQuestion) {
-                 addMessageToDialogue('ai', currentQuestion);
+                 onDialogueUpdate([...dialogue, { role: 'ai', content: currentQuestion }]);
             }
         } else if (isTutorActive && socraticPath && currentStep >= socraticPath.length && !isTutorFinished) {
-            addMessageToDialogue('ai', "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP.");
+            onDialogueUpdate([...dialogue, { role: 'ai', content: "Bravo, vous avez terminé toutes les étapes ! L'exercice est résolu. Vous pouvez maintenant le marquer comme terminé sur la page de l'exercice pour gagner de l'XP." }]);
             setIsTutorFinished(true);
         }
-    }, [currentStep, socraticPath, isTutorActive, isTutorFinished, addMessageToDialogue]);
+    }, [currentStep, socraticPath, isTutorActive, isTutorFinished, dialogue, onDialogueUpdate]);
 
     
     // Called only for the FIRST user message to initialize the tutor
     const startTutor = (initialWork: string) => {
         resetAIExplain();
         setError(null);
-        addMessageToDialogue('user', initialWork);
+        onDialogueUpdate([...dialogue, { role: 'user', content: initialWork }]);
         
         const prompt = `---CONTEXTE EXERCICE---
         ${exercise.statement}
@@ -208,7 +201,9 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const validateAnswer = async (answer: string) => {
         if (!socraticPath || isVerifying) return;
         
-        addMessageToDialogue('user', answer);
+        const historyForApi = [...dialogue, { role: 'user' as const, content: answer }];
+        onDialogueUpdate(historyForApi);
+        
         setIsVerifying(true);
         setVerificationResult(null);
 
@@ -229,7 +224,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                     expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
                     exerciseStatement: exercise.statement,
                     exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet,
-                    dialogueHistory: dialogueRef.current
+                    dialogueHistory: historyForApi
                 }),
             });
             
@@ -250,14 +245,14 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
             
             if(result.is_correct) {
                 const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.positive_feedback;
-                addMessageToDialogue('ai', feedbackMessage);
+                onDialogueUpdate([...historyForApi, { role: 'ai', content: feedbackMessage }]);
                 setVerificationResult('correct');
                 setTimeout(() => {
                     setCurrentStep(prev => prev + 1);
                 }, 1000); 
             } else {
                 const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.hint_for_wrong_answer;
-                addMessageToDialogue('ai', feedbackMessage);
+                onDialogueUpdate([...historyForApi, { role: 'ai', content: feedbackMessage }]);
                 setVerificationResult('incorrect');
             }
             

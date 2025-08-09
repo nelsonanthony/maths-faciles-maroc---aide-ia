@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter.js';
-import { cleanLatex } from "./_lib/math-validator.js";
 
 
 interface ImagePayload {
@@ -100,7 +99,10 @@ Transcris le contenu de l'image ou des images fournies en suivant ces règles à
             
             return ai.models.generateContent({
                model: 'gemini-2.5-flash',
-               contents: { parts: [ocrImagePart, ocrTextPart] }
+               contents: { parts: [ocrImagePart, ocrTextPart] },
+               config: {
+                   thinkingConfig: { thinkingBudget: 0 }
+               }
             });
         });
 

@@ -3,7 +3,6 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import aiUsageLimiter from './_lib/ai-usage-limiter.js';
-import { cleanLatex } from "./_lib/math-validator.js";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
@@ -98,18 +97,21 @@ Transcris le contenu de l'image en suivant ces règles à la lettre. La sortie d
 
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: { parts: [imagePart, textPart] }
+            contents: { parts: [imagePart, textPart] },
+            config: {
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         });
 
         // Log successful AI call
         await aiUsageLimiter.logAiCall(supabase, user.id, 'OCR');
         
-        const extractedText = response.text;
-        if (extractedText === undefined) {
-             throw new Error("L'IA n'a pas pu extraire de texte de l'image.");
+        const extractedText = response.text?.trim() ?? '';
+        if (!extractedText) {
+             throw new Error("L'IA n'a pas pu extraire de texte de l'image. Assurez-vous que l'image est claire et lisible.");
         }
         
-        return res.status(200).json({ text: extractedText.trim() });
+        return res.status(200).json({ text: extractedText });
 
     } catch (error: any) {
         console.error("Error in ocr-with-gemini:", error);

@@ -138,8 +138,7 @@ Utilise le formatage mathématique hybride (Unicode simple, LaTeX complexe avec 
             contents: promptText,
             config: { 
                 responseMimeType: "application/json", 
-                responseSchema: answerSchema,
-                thinkingConfig: { thinkingBudget: 0 } // Optimization for low latency
+                responseSchema: answerSchema
             }
         };
         

@@ -17,14 +17,9 @@ interface ChatRoomProps {
 
 const processLineForMathJax = (line: string): string => {
     if (!line) return '';
-    // Wrap words of 2+ letters in \text{} to ensure proper spacing and non-italic rendering in math mode.
-    // Single letters are assumed to be variables and are not wrapped.
-    return line.split(' ').map(part => {
-        if (/^[a-zA-Z\u00C0-\u017F]{2,}$/.test(part)) {
-            return `\\text{${part}}`;
-        }
-        return part;
-    }).join(' ');
+    // This regex finds sequences of 2 or more letters (including accented ones)
+    // and wraps them in \text{...}. It preserves all spacing between elements.
+    return line.replace(/([a-zA-Z\u00C0-\u017F]{2,})/g, '\\text{$1}');
 };
 
 export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {

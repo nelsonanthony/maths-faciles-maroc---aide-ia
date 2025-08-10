@@ -60,14 +60,19 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
 };
 
 const processLineForMathJax = (line: string): string => {
-    if (!line) return '';
-    const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/;
-    const parts = line.split(textRegex);
+    // This regex identifies consecutive sequences of 2 or more letters (including accented ones).
+    const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/g;
     
+    // Split the line by these text blocks. The text blocks will be at odd indices in the resulting array.
+    const parts = line.split(textRegex);
+
     return parts.map((part, index) => {
+        // If it's a text block (odd index), wrap it in \text{}.
         if (index % 2 === 1) {
             return `\\text{${part}}`;
         } else {
+            // Otherwise, it's a mix of symbols, numbers, single letters, and spaces.
+            // Replace spaces with non-breaking spaces `~` for correct rendering in math mode.
             return part.replace(/ /g, '~');
         }
     }).join('');
@@ -83,9 +88,10 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     content = <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />;
                 } else {
-                    const mathContent = `$$ \\begin{array}{l} ${
+                     const mathContent = `$$ \\begin{array}{l} ${
                         msg.content
-                            .replace(/\\\\/g, '\n') // Normalize breaks
+                            .replace(/\\ /g, ' ') // Normalize MathQuill space
+                            .replace(/\\\\/g, '\n') // Normalize MathQuill breaks
                             .split('\n')
                             .map(processLineForMathJax)
                             .join(' \\\\ ')
@@ -115,7 +121,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const { user } = useAuth();
     const { data: aiResponse, isLoading: isAIExplainLoading, error: aiError, explain, reset: resetAIExplain } = useAIExplain();
     
-    // dialogueHistory prop is the source of truth for the conversation state.
     const dialogue = dialogueHistory;
     
     const [socraticPath, setSocraticPath] = useState<SocraticPath | null>(null);
@@ -125,7 +130,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     const [isTutorFinished, setIsTutorFinished] = useState(false);
 
     const [isVerifying, setIsVerifying] = useState(false);
-    const [verificationResult, setVerificationResult] = useState<'correct' | 'incorrect' | null>(null);
 
     const [error, setError] = useState<string | null>(null);
     const [isRateLimited, setIsRateLimited] = useState(false);
@@ -141,12 +145,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
-    // Initialize the conversation if the history is empty
     useEffect(() => {
         if (dialogue.length === 0) {
             onDialogueUpdate([{ role: 'ai', content: "Bonjour ! Pour commencer, décris-moi ce que tu as déjà fait ou envoie-moi une photo de ton brouillon. Si tu n'as pas encore commencé, dis-le moi et nous débuterons ensemble." }]);
         }
-    }, []); // Run only once
+    }, []);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -162,7 +165,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     }, [aiError, error]);
     
-    // Effect to process the initial AI response and start the tutor
     useEffect(() => {
         if (!aiResponse) return;
 
@@ -185,7 +187,6 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     }, [aiResponse]);
     
-    // Effect to advance the socratic dialogue
     useEffect(() => {
         if (isTutorActive && socraticPath && currentStep < socraticPath.length) {
             const currentQuestion = socraticPath[currentStep].ia_question;
@@ -199,138 +200,81 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         }
     }, [currentStep, socraticPath, isTutorActive, isTutorFinished, dialogue, onDialogueUpdate]);
 
-    
-    // Called only for the FIRST user message to initialize the tutor
-    const startTutor = (initialWork: string) => {
+    const startTutor = useCallback((initialWork: string) => {
         resetAIExplain();
         setError(null);
-        onDialogueUpdate([...dialogue, { role: 'user', content: initialWork }]);
-        
-        const prompt = `---CONTEXTE EXERCICE---
-        ${exercise.statement}
-        ${exercise.fullCorrection ? `\n---CORRECTION---
-        ${exercise.fullCorrection}`: (exercise.correctionSnippet ? `\n---INDICE---
-        ${exercise.correctionSnippet}` : '')}
-        
-        ---DEMANDE ÉLÈVE---
-        ${initialWork.trim() || "J'ai besoin d'aide pour commencer cet exercice. Guide-moi pas à pas (mode socratique)."}`;
-        explain(prompt, chapter.id, 'socratic');
-    };
+        const newDialogue = [...dialogue, { role: 'user' as 'user', content: initialWork }];
+        onDialogueUpdate(newDialogue);
 
-    // Called for subsequent answers during the socratic dialogue
-    const validateAnswer = async (answer: string) => {
-        if (!socraticPath || isVerifying) return;
+        const prompt = `
+        # CONTEXTE DE L'EXERCICE
+        ## Énoncé:
+        ${exercise.statement}
+        ## Correction de référence (pour information):
+        ${exercise.fullCorrection || exercise.correctionSnippet}
         
-        const historyForApi = [...dialogue, { role: 'user' as const, content: answer }];
-        onDialogueUpdate(historyForApi);
+        # DEMANDE ÉLÈVE
+        Voici ce que l'élève a déjà fait ou sa question :
+        "${initialWork}"
+        
+        # MISSION
+        Analyse la demande de l'élève par rapport à l'exercice et démarre le tutorat socratique à l'étape appropriée.
+        `;
+        explain(prompt, chapter.id, 'socratic');
+    }, [dialogue, onDialogueUpdate, exercise, chapter, explain, resetAIExplain]);
+
+    const validateAnswer = useCallback(async (answer: string) => {
+        if (!socraticPath) return;
         
         setIsVerifying(true);
-        setVerificationResult(null);
-
+        setError(null);
+        
+        const newDialogue = [...dialogue, { role: 'user' as 'user', content: answer }];
+        onDialogueUpdate(newDialogue);
+        
         try {
             const supabase = getSupabase();
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
+            if (!session) throw new Error("Vous devez être connecté.");
 
             const response = await fetch('/api/validate-socratic-answer', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ 
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({
                     studentAnswer: answer,
                     currentIaQuestion: socraticPath[currentStep].ia_question,
                     expectedAnswerKeywords: socraticPath[currentStep].expected_answer_keywords,
                     exerciseStatement: exercise.statement,
                     exerciseCorrection: exercise.fullCorrection || exercise.correctionSnippet,
-                    dialogueHistory: historyForApi
-                }),
+                    dialogueHistory: newDialogue
+                })
             });
-            
-            const responseBody = await response.text();
 
+            const responseBody = await response.text();
             if (!response.ok) {
-                let errorMessage;
-                try {
-                    const errorData = JSON.parse(responseBody);
-                    errorMessage = errorData.error || `Une erreur est survenue (${response.status})`;
-                } catch (e) {
-                    errorMessage = responseBody || `Une erreur est survenue (${response.status})`;
-                }
-                throw new Error(errorMessage);
+                const errorData = JSON.parse(responseBody);
+                throw new Error(errorData.error || `Erreur serveur: ${response.status}`);
             }
-            
-            const result = await JSON.parse(responseBody);
-            
-            if(result.is_correct) {
-                const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.positive_feedback;
-                onDialogueUpdate([...historyForApi, { role: 'ai', content: feedbackMessage }]);
-                setVerificationResult('correct');
-                setTimeout(() => {
-                    setCurrentStep(prev => prev + 1);
-                }, 1000); 
-            } else {
-                const feedbackMessage = result.feedback_message || socraticPath[currentStep]?.hint_for_wrong_answer;
-                onDialogueUpdate([...historyForApi, { role: 'ai', content: feedbackMessage }]);
-                setVerificationResult('incorrect');
+
+            const result = JSON.parse(responseBody);
+            let finalDialogue = [...newDialogue, { role: 'ai' as 'ai', content: result.feedback_message }];
+
+            if (result.is_correct) {
+                setCurrentStep(prev => prev + 1);
             }
-            
+            onDialogueUpdate(finalDialogue);
+
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors de la vérification.');
+            const errorMessage = err instanceof Error ? err.message : "Une erreur est survenue.";
+            setError(errorMessage);
+            onDialogueUpdate([...newDialogue, { role: 'system', content: `Erreur: ${errorMessage}` }]);
         } finally {
             setIsVerifying(false);
         }
-    };
-
-    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            setUploadedFile(file);
-            setUploadedFileSrc(URL.createObjectURL(file));
-            setOcrVerificationText(null);
-            setStudentInput(''); // Clear text input when image is chosen
-        }
-    };
-    
-    const handleOcr = async () => {
-        if (!uploadedFile) return;
-        setIsLoadingOcr(true);
-        setError(null);
-        try {
-            const supabase = getSupabase();
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error("Vous devez être connecté pour utiliser cette fonctionnalité.");
-
-            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
-            const compressedFile = await imageCompression(uploadedFile, options);
-            const base64Image = await fileToBase64(compressedFile);
-
-            const response = await fetch('/api/ocr-with-gemini', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
-                body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type }),
-            });
-
-            const responseBody = await response.text();
-            if (!response.ok) {
-                 const errorData = JSON.parse(responseBody);
-                 throw new Error(errorData.error || `Une erreur est survenue (${response.status})`);
-            }
-            const result = JSON.parse(responseBody);
-            setOcrVerificationText(result.text);
-
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Une erreur est survenue lors du traitement de l\'image.');
-        } finally {
-            setIsLoadingOcr(false);
-        }
-    };
+    }, [dialogue, onDialogueUpdate, socraticPath, currentStep, exercise]);
 
     const handleSubmit = () => {
-        const textToSend = ocrVerificationText !== null
-            ? ocrVerificationText.trim()
-            : studentInput;
+        const textToSend = ocrVerificationText !== null ? ocrVerificationText.replace(/\\n/g, '\n').trim() : studentInput;
         
         if (!textToSend.trim()) return;
 
@@ -345,158 +289,173 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
         setUploadedFileSrc(null);
     };
 
-    const isLoading = isAIExplainLoading || isVerifying || isOcrLoading;
-    const isInputReadOnly = isLoading || isTutorFinished || ocrVerificationText !== null || !!uploadedFile;
-    const isSubmitDisabled = isLoading || isTutorFinished || isRateLimited || (!studentInput.trim() && (ocrVerificationText === null || !ocrVerificationText.trim()));
-    const currentPrompt = socraticPath?.[currentStep]?.student_response_prompt || 'Décris ton raisonnement...';
+    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            setUploadedFile(file);
+            setUploadedFileSrc(URL.createObjectURL(file));
+            setOcrVerificationText(null);
+        }
+    };
     
+    const handleExtractTextFromImage = async () => {
+        if (!uploadedFile || !user) return;
+        
+        setIsLoadingOcr(true);
+        setError(null);
+        
+        try {
+            const supabase = getSupabase();
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("Vous devez être connecté.");
+
+            const options = { maxSizeMB: 1, maxWidthOrHeight: 1920, useWebWorker: true };
+            const compressedFile = await imageCompression(uploadedFile, options);
+            const base64Image = await fileToBase64(compressedFile);
+            
+            const response = await fetch('/api/ocr-with-gemini', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify({ image: base64Image, mimeType: compressedFile.type }),
+            });
+
+            const responseBody = await response.text();
+            if (!response.ok) {
+                 const errorData = JSON.parse(responseBody);
+                 throw new Error(errorData.error || `Erreur OCR: ${response.status}`);
+            }
+            
+            const result = JSON.parse(responseBody);
+            setOcrVerificationText(result.text);
+
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Erreur lors du traitement de l\'image.');
+        } finally {
+            setIsLoadingOcr(false);
+        }
+    };
+
     if (isTutorFinished) {
         return <TutorSummary dialogue={dialogue} onBack={onBack} />;
     }
 
+    const currentPrompt = isTutorActive && socraticPath && currentStep < socraticPath.length
+        ? socraticPath[currentStep].student_response_prompt
+        : "Décris ton raisonnement...";
+
     return (
-        <div className="flex flex-col h-full max-h-[85vh] bg-slate-900 rounded-xl border border-slate-800 shadow-2xl">
-            {/* Header */}
-            <header className="p-3 border-b border-slate-800 flex items-center justify-between flex-shrink-0">
-                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700/50">
-                    <ArrowLeftIcon className="w-5 h-5 text-slate-400" />
+        <div className="flex flex-col h-[85vh] max-w-4xl mx-auto bg-slate-800/50 rounded-xl border border-slate-700/50 shadow-lg">
+            <header className="p-4 border-b border-slate-700 flex items-center gap-4 flex-shrink-0">
+                <button onClick={onBack} className="p-2 rounded-full hover:bg-slate-700">
+                    <ArrowLeftIcon className="w-5 h-5 text-slate-300" />
                 </button>
-                <div className="text-center">
-                    <h2 className="text-base font-bold text-slate-100 truncate max-w-xs sm:max-w-md md:max-w-lg">{exercise.statement}</h2>
-                    <p className="text-xs text-brand-blue-400">Tuteur IA</p>
+                <div>
+                    <h2 className="text-lg font-bold text-brand-blue-300">{exercise.statement.substring(0, 50)}...</h2>
+                    <p className="text-xs text-slate-400">{chapter.title}</p>
                 </div>
-                 <div className="w-9 h-9" />
             </header>
 
-            {/* Chat Area */}
             <main className="flex-grow p-4 overflow-y-auto space-y-4">
-                {dialogue.map((msg, index) => {
-                    if (msg.role === 'ai') {
-                        return (
-                            <AiMessage 
-                                key={index} 
-                                message={msg}
-                                response={aiResponse}
-                                onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk!.video_id, aiResponse?.videoChunk!.start_time_seconds)} 
-                            />
-                        );
-                    } else { // user role
-                        const mathContent = `$$ \\begin{array}{l} ${
-                            msg.content
-                                .replace(/\\\\/g, '\n') // Normalize breaks from MathQuill
-                                .split('\n')
-                                .map(processLineForMathJax)
-                                .join(' \\\\ ')
-                        } \\end{array} $$`;
-                        return (
-                            <div key={index} className="flex justify-end animate-fade-in">
-                                <div className="chat-bubble user-bubble">
-                                    <MathJaxRenderer content={mathContent} />
-                                </div>
+                {dialogue.map((msg, index) => (
+                    <div key={index} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                        {msg.role === 'ai' ? (
+                            <AiMessage message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk?.video_id || '', aiResponse?.videoChunk?.start_time_seconds || 0)} />
+                        ) : msg.role === 'user' ? (
+                             <div className="chat-bubble user-bubble self-end">
+                                <MathJaxRenderer content={`$$ \\begin{array}{l} ${
+                                    msg.content
+                                        .replace(/\\ /g, ' ')
+                                        .replace(/\\\\/g, '\n')
+                                        .split('\n')
+                                        .map(processLineForMathJax)
+                                        .join(' \\\\ ')
+                                } \\end{array} $$`} />
                             </div>
-                        );
-                    }
-                })}
-                
-                {isLoading && (
-                     <div className="flex justify-start">
-                         <div className="chat-bubble ai-bubble flex items-center gap-2">
-                            <SpinnerIcon className="w-5 h-5 animate-spin" />
-                            <span className="text-sm">Analyse en cours...</span>
-                         </div>
-                     </div>
+                        ) : (
+                            <div className="system-bubble self-center">{msg.content}</div>
+                        )}
+                    </div>
+                ))}
+                {(isAIExplainLoading || isVerifying || isOcrLoading) && (
+                    <div className="self-start flex items-center gap-2">
+                        <SpinnerIcon className="w-5 h-5 animate-spin text-slate-400" />
+                        <span className="text-sm text-slate-400">Le tuteur réfléchit...</span>
+                    </div>
                 )}
-                 <div ref={messagesEndRef} />
+                <div ref={messagesEndRef} />
             </main>
+            
+            {isKeyboardOpen && (
+                <MathKeyboard
+                    initialValue={studentInput}
+                    onConfirm={(latex) => {
+                        setStudentInput(latex);
+                        if (mathFieldRef.current) mathFieldRef.current.latex(latex);
+                        setIsKeyboardOpen(false);
+                    }}
+                    onClose={() => setIsKeyboardOpen(false)}
+                />
+            )}
 
-            {/* Input Area */}
-            <footer className="p-3 border-t border-slate-800 flex-shrink-0 bg-slate-950/50 rounded-b-xl">
-                 {error && (
-                    <div className="mb-2 p-2 bg-rose-900/30 border border-rose-500/50 rounded-lg text-center text-xs text-rose-300">
-                        {error}
-                    </div>
-                 )}
-
-                 {isKeyboardOpen && (
-                    <MathKeyboard
-                        initialValue={studentInput}
-                        onConfirm={(latex) => { setStudentInput(latex); setIsKeyboardOpen(false); }}
-                        onClose={() => setIsKeyboardOpen(false)}
-                    />
-                )}
+            <footer className="p-4 border-t border-slate-700 bg-slate-800/30 rounded-b-xl flex-shrink-0">
+                {isRateLimited && <p className="text-sm text-center text-red-400 mb-2">{error}</p>}
                 
-                {uploadedFileSrc && !ocrVerificationText && (
-                    <div className="text-center text-sm text-yellow-300 mb-2 p-2 bg-yellow-900/20 rounded-md border border-yellow-700/30">
-                        Image prête. Cliquez sur <strong>Extraire</strong> pour que l'IA lise votre écriture.
-                    </div>
-                )}
-
                 {ocrVerificationText !== null ? (
                     <div className="space-y-2 animate-fade-in">
-                         <p className="text-xs text-yellow-300 text-center">Veuillez vérifier et corriger le texte extrait de votre image :</p>
-                         <textarea
+                        <p className="text-sm text-yellow-300">Vérifiez le texte extrait de votre image :</p>
+                        <textarea
                             value={ocrVerificationText}
                             onChange={(e) => setOcrVerificationText(e.target.value)}
                             rows={4}
-                            className="w-full p-2 bg-slate-900 border border-slate-700 rounded-md text-sm font-mono"
-                         />
-                    </div>
-                ) : uploadedFileSrc ? (
-                    <div className="relative w-32 h-32 mx-auto mb-2 group">
-                        <img src={uploadedFileSrc} alt="Preview" className="w-full h-full object-cover rounded-lg" />
-                        <button onClick={() => { setUploadedFile(null); setUploadedFileSrc(null); }} className="absolute top-1 right-1 p-1 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100">
-                            <XCircleIcon className="w-5 h-5" />
+                            className="w-full p-2 bg-slate-900 border border-slate-600 rounded-md font-mono text-sm"
+                        />
+                        <button onClick={handleSubmit} className="w-full px-4 py-2 bg-brand-blue-600 text-white font-semibold rounded-lg">
+                            Confirmer et Envoyer
                         </button>
                     </div>
-                ) : null}
-                
-                <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
-
-                <div className="flex items-end gap-2">
-                    <div className="flex-grow space-y-1">
-                        <div className="flex items-stretch gap-2">
-                             <div className={`math-input-wrapper flex-grow ${isInputReadOnly ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                                <EditableMathField
-                                    latex={studentInput}
-                                    onChange={(field) => {
-                                        if (isInputReadOnly) return;
-                                        setStudentInput(field.latex());
-                                        setError(null);
-                                    }}
-                                    mathquillDidMount={(field) => (mathFieldRef.current = field)}
-                                    config={{ autoOperatorNames: 'sin cos tan log ln' }}
-                                    aria-placeholder={currentPrompt}
-                                    className={`h-full ${isInputReadOnly ? 'bg-slate-800 pointer-events-none' : ''}`}
-                                 />
+                ) : (
+                    <div className="space-y-2">
+                        {uploadedFileSrc && (
+                            <div className="relative w-32 h-32 mx-auto mb-2">
+                                <img src={uploadedFileSrc} alt="Aperçu" className="rounded-lg w-full h-full object-cover" />
+                                <button onClick={() => { setUploadedFile(null); setUploadedFileSrc(null); }} className="absolute -top-2 -right-2 p-1 bg-red-600 text-white rounded-full">
+                                    <XCircleIcon className="w-5 h-5"/>
+                                </button>
                             </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsKeyboardOpen(true)}
-                                className="px-3 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center shrink-0"
-                                aria-label="Ouvrir le clavier mathématique"
-                            >
+                        )}
+                        <div className="flex items-stretch gap-2">
+                            {uploadedFileSrc ? (
+                                <button onClick={handleExtractTextFromImage} className="w-full flex-grow px-4 py-3 bg-green-600 text-white font-semibold rounded-lg">
+                                    Extraire le texte de l'image
+                                </button>
+                            ) : (
+                                <div className="math-input-wrapper flex-grow">
+                                     <EditableMathField
+                                        latex={studentInput}
+                                        onChange={(field) => setStudentInput(field.latex())}
+                                        aria-placeholder={currentPrompt}
+                                        mathquillDidMount={(field) => (mathFieldRef.current = field)}
+                                        config={{
+                                            autoOperatorNames: 'sin cos tan log ln',
+                                            handlers: { enter: (mf) => mf.cmd('\\\\') }
+                                        }}
+                                        className="h-full"
+                                     />
+                                </div>
+                            )}
+                             <button type="button" onClick={() => setIsKeyboardOpen(true)} className="p-3 bg-slate-700 rounded-lg hover:bg-slate-600 flex items-center justify-center">
                                 <span className="font-serif text-xl italic text-brand-blue-300">ƒ(x)</span>
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isLoading || isRateLimited}
-                                className="p-3 bg-slate-800 rounded-lg hover:bg-slate-700 shrink-0 disabled:opacity-50"
-                                aria-label="Joindre une image"
-                            >
-                                <PaperClipIcon className="w-5 h-5" />
+                            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleFileSelected} className="hidden" />
+                            <button type="button" onClick={() => fileInputRef.current?.click()} className="p-3 bg-slate-700 rounded-lg hover:bg-slate-600">
+                                <PaperClipIcon className="w-6 h-6" />
+                            </button>
+                            <button onClick={handleSubmit} disabled={isAIExplainLoading || isVerifying || isOcrLoading || isRateLimited || (!studentInput.trim() && !uploadedFile)} className="px-4 py-3 bg-brand-blue-600 text-white font-semibold rounded-lg disabled:opacity-50">
+                                Envoyer
                             </button>
                         </div>
-                        {uploadedFile && !ocrVerificationText && (
-                            <button onClick={handleOcr} disabled={isLoading || isRateLimited} className="w-full px-4 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-50">
-                                {isLoading ? "Analyse..." : "Extraire le texte de l'image"}
-                            </button>
-                        )}
-                         <button onClick={handleSubmit} disabled={isSubmitDisabled} className="w-full px-4 py-2 text-sm font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700 disabled:opacity-50">
-                            Envoyer la réponse
-                        </button>
                     </div>
-                </div>
+                )}
             </footer>
         </div>
     );

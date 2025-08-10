@@ -82,23 +82,20 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
         <h3 className="text-2xl font-bold text-center text-slate-100">Résumé de la session</h3>
         <p className="text-sm text-center text-slate-400">Voici un récapitulatif de votre discussion avec le tuteur.</p>
         <div className="space-y-4 flex-grow overflow-y-auto p-4 bg-slate-950 rounded-lg border border-slate-800">
-            {dialogue.map((msg, index) => {
-                let contentToRender;
-                if (msg.role === 'ai') {
-                    contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
-                } else {
-                    const processedContent = msg.content.split('\n').map(processLineForMathJax).join(' \\\\ ');
-                    contentToRender = `$$ \\begin{array}{l} ${processedContent} \\end{array} $$`;
-                }
-
-                return (
-                    <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
-                            <MathJaxRenderer content={contentToRender} />
-                        </div>
+            {dialogue.map((msg, index) => (
+                <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
+                        {msg.role === 'ai' ? (
+                            <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
+                        ) : (
+                            msg.content.split('\n').map((line, lineIndex) => {
+                                const mathContent = `$$${processLineForMathJax(line)}$$`;
+                                return <MathJaxRenderer key={lineIndex} content={mathContent} />;
+                            })
+                        )}
                     </div>
-                );
-            })}
+                </div>
+            ))}
         </div>
         <div className="text-center mt-4 flex-shrink-0">
             <button onClick={onBack} className="px-6 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">
@@ -379,16 +376,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
-                        const mathContent = `$$ \\begin{array}{l} ${
-                            msg.content
-                                .split('\n')
-                                .map(processLineForMathJax)
-                                .join(' \\\\ ')
-                        } \\end{array} $$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">
                                 <div className="chat-bubble user-bubble">
-                                    <MathJaxRenderer content={mathContent} />
+                                    {msg.content.split('\n').map((line, lineIndex) => {
+                                        const mathContent = `$$${processLineForMathJax(line)}$$`;
+                                        return <MathJaxRenderer key={lineIndex} content={mathContent} />;
+                                    })}
                                 </div>
                             </div>
                         );

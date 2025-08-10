@@ -15,6 +15,18 @@ interface ChatRoomProps {
     onBack: () => void;
 }
 
+const processLineForMathJax = (line: string): string => {
+    if (!line) return '';
+    // Wrap words of 2+ letters in \text{} to ensure proper spacing and non-italic rendering in math mode.
+    // Single letters are assumed to be variables and are not wrapped.
+    return line.split(' ').map(part => {
+        if (/^[a-zA-Z\u00C0-\u017F]{2,}$/.test(part)) {
+            return `\\text{${part}}`;
+        }
+        return part;
+    }).join(' ');
+};
+
 export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
     const { user } = useAuth();
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -125,8 +137,12 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
                 {messages.map(msg => {
-                    const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                    const mathContent = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
+                    const mathContent = `$$ \\begin{array}{l} ${
+                        msg.content
+                            .split('\n')
+                            .map(processLineForMathJax)
+                            .join(' \\\\ ')
+                    } \\end{array} $$`;
                     
                     return (
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>

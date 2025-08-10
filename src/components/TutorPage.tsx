@@ -60,6 +60,18 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
     );
 };
 
+const processLineForMathJax = (line: string): string => {
+    if (!line) return '';
+    // Wrap words of 2+ letters in \text{} to ensure proper spacing and non-italic rendering in math mode.
+    // Single letters are assumed to be variables and are not wrapped.
+    return line.split(' ').map(part => {
+        if (/^[a-zA-Z\u00C0-\u017F]{2,}$/.test(part)) {
+            return `\\text{${part}}`;
+        }
+        return part;
+    }).join(' ');
+};
+
 const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }> = ({ dialogue, onBack }) => (
     <div className="p-4 space-y-4 animate-fade-in h-full flex flex-col">
         <h3 className="text-2xl font-bold text-center text-slate-100">Résumé de la session</h3>
@@ -70,8 +82,8 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
-                    const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                    contentToRender = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
+                    const processedContent = msg.content.split('\n').map(processLineForMathJax).join(' \\\\ ');
+                    contentToRender = `$$ \\begin{array}{l} ${processedContent} \\end{array} $$`;
                 }
 
                 return (
@@ -359,8 +371,12 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
-                        const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                        const mathContent = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
+                        const mathContent = `$$ \\begin{array}{l} ${
+                            msg.content
+                                .split('\n')
+                                .map(processLineForMathJax)
+                                .join(' \\\\ ')
+                        } \\end{array} $$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">
                                 <div className="chat-bubble user-bubble">

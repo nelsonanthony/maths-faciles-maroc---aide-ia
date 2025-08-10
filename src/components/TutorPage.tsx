@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -358,9 +359,12 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
-                        // The align* environment is better for top-level display math and handles alignment correctly.
-                        // The & ensures left-alignment for each line.
-                        const alignedContent = msg.content.replace(/\\\\/g, ' \\\\ & ');
+                        // IMPORTANT: Replace standard newlines (\n) from OCR/text with LaTeX newlines (\\).
+                        // Also handle existing LaTeX newlines for robustness.
+                        const alignedContent = msg.content
+                            .replace(/\n/g, ' \\\\ & ')
+                            .replace(/\\\\/g, ' \\\\ & ');
+                            
                         const mathContent = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">

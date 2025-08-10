@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ExerciseContext, ChatRoom as ChatRoomType } from '@/types';
 import { getSupabase } from '@/services/authService';
-import { ChatRoom } from '@/components/ChatRoom';
+import ChatRoom from '@/components/ChatRoom';
 import { ArrowLeftIcon, SpinnerIcon, PlusCircleIcon } from '@/components/icons';
 
 interface ChatPageProps {

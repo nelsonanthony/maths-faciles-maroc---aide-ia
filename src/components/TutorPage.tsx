@@ -70,8 +70,8 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
-                    const alignedContent = msg.content.replace(/\\\\/g, ' \\\\ & ');
-                    contentToRender = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
+                    const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
+                    contentToRender = `$$${mathJaxNewlines}$$`;
                 }
 
                 return (
@@ -359,16 +359,14 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
-                        // IMPORTANT: Replace standard newlines (\n) from OCR/text with LaTeX newlines (\\).
-                        // Also handle existing LaTeX newlines for robustness.
-                        const alignedContent = msg.content
-                            .replace(/\n/g, ' \\\\ & ')
-                            .replace(/\\\\/g, ' \\\\ & ');
-                            
-                        const mathContent = `$$\\begin{align*}& ${alignedContent}\\end{align*}$$`;
+                        // IMPORTANT: Replace standard newlines (\n) from OCR/text and LaTeX newlines (\\)
+                        // with a single type of LaTeX newline for consistent rendering.
+                        const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
+                        const mathContent = `$$${mathJaxNewlines}$$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">
                                 <div className="chat-bubble user-bubble">
+                                    {/* The MathJax config will handle left-alignment of this block. */}
                                     <MathJaxRenderer content={mathContent} />
                                 </div>
                             </div>

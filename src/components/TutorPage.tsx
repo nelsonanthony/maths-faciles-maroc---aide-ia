@@ -61,17 +61,13 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
 
 const processLineForMathJax = (line: string): string => {
     if (!line) return '';
-    // This regex is stateful, so we need a new instance for each call.
     const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/;
     const parts = line.split(textRegex);
     
     return parts.map((part, index) => {
-        // Words captured by the regex will be at odd indices.
         if (index % 2 === 1) {
             return `\\text{${part}}`;
         } else {
-            // Everything else (spaces, symbols, numbers, single letters) is at even indices.
-            // Replace spaces with non-breaking spaces for proper rendering in math mode.
             return part.replace(/ /g, '~');
         }
     }).join('');
@@ -82,20 +78,29 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
         <h3 className="text-2xl font-bold text-center text-slate-100">Résumé de la session</h3>
         <p className="text-sm text-center text-slate-400">Voici un récapitulatif de votre discussion avec le tuteur.</p>
         <div className="space-y-4 flex-grow overflow-y-auto p-4 bg-slate-950 rounded-lg border border-slate-800">
-            {dialogue.map((msg, index) => (
-                <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
-                        {msg.role === 'ai' ? (
-                            <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />
-                        ) : (
-                            msg.content.split('\n').map((line, lineIndex) => {
-                                const mathContent = `$$${processLineForMathJax(line)}$$`;
-                                return <MathJaxRenderer key={lineIndex} content={mathContent} />;
-                            })
-                        )}
+            {dialogue.map((msg, index) => {
+                let content;
+                if (msg.role === 'ai') {
+                    content = <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />;
+                } else {
+                    const mathContent = `$$ \\begin{array}{l} ${
+                        msg.content
+                            .replace(/\\\\/g, '\n') // Normalize breaks
+                            .split('\n')
+                            .map(processLineForMathJax)
+                            .join(' \\\\ ')
+                    } \\end{array} $$`;
+                    content = <MathJaxRenderer content={mathContent} />;
+                }
+                
+                return (
+                    <div key={index} className={`flex items-start gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`chat-bubble ${msg.role === 'user' ? 'user-bubble' : 'ai-bubble'} max-w-full`}>
+                           {content}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
         <div className="text-center mt-4 flex-shrink-0">
             <button onClick={onBack} className="px-6 py-2 font-semibold text-white bg-brand-blue-600 rounded-lg hover:bg-brand-blue-700">
@@ -324,7 +329,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
 
     const handleSubmit = () => {
         const textToSend = ocrVerificationText !== null
-            ? ocrVerificationText.replace(/\s+/g, ' ').trim()
+            ? ocrVerificationText.trim()
             : studentInput;
         
         if (!textToSend.trim()) return;
@@ -376,13 +381,17 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
+                        const mathContent = `$$ \\begin{array}{l} ${
+                            msg.content
+                                .replace(/\\\\/g, '\n') // Normalize breaks from MathQuill
+                                .split('\n')
+                                .map(processLineForMathJax)
+                                .join(' \\\\ ')
+                        } \\end{array} $$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">
                                 <div className="chat-bubble user-bubble">
-                                    {msg.content.split('\n').map((line, lineIndex) => {
-                                        const mathContent = `$$${processLineForMathJax(line)}$$`;
-                                        return <MathJaxRenderer key={lineIndex} content={mathContent} />;
-                                    })}
+                                    <MathJaxRenderer content={mathContent} />
                                 </div>
                             </div>
                         );

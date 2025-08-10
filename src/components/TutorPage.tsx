@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -62,9 +61,20 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
 
 const processLineForMathJax = (line: string): string => {
     if (!line) return '';
-    // This regex finds sequences of 2 or more letters (including accented ones)
-    // and wraps them in \text{...}. It preserves all spacing between elements.
-    return line.replace(/([a-zA-Z\u00C0-\u017F]{2,})/g, '\\text{$1}');
+    // This regex is stateful, so we need a new instance for each call.
+    const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/;
+    const parts = line.split(textRegex);
+    
+    return parts.map((part, index) => {
+        // Words captured by the regex will be at odd indices.
+        if (index % 2 === 1) {
+            return `\\text{${part}}`;
+        } else {
+            // Everything else (spaces, symbols, numbers, single letters) is at even indices.
+            // Replace spaces with non-breaking spaces for proper rendering in math mode.
+            return part.replace(/ /g, '~');
+        }
+    }).join('');
 };
 
 const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }> = ({ dialogue, onBack }) => (

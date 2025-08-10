@@ -125,16 +125,14 @@ export const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
                 {messages.map(msg => {
-                    // Replace both standard newlines (\n) and LaTeX newlines (\\) for consistent rendering.
                     const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                    const mathContent = `$$${mathJaxNewlines}$$`;
+                    const mathContent = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
                     
                     return (
                         <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
                             <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                                 {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
                                 <div className="text-sm">
-                                    {/* The global MathJax config will left-align this block. */}
                                     <MathJaxRenderer content={mathContent} className="overflow-x-auto py-1" />
                                 </div>
                             </div>

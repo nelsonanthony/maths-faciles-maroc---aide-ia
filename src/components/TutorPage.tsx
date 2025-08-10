@@ -71,7 +71,7 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                     contentToRender = DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string);
                 } else {
                     const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                    contentToRender = `$$${mathJaxNewlines}$$`;
+                    contentToRender = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
                 }
 
                 return (
@@ -359,14 +359,11 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             />
                         );
                     } else { // user role
-                        // IMPORTANT: Replace standard newlines (\n) from OCR/text and LaTeX newlines (\\)
-                        // with a single type of LaTeX newline for consistent rendering.
                         const mathJaxNewlines = msg.content.replace(/\n|\\\\/g, ' \\\\ ');
-                        const mathContent = `$$${mathJaxNewlines}$$`;
+                        const mathContent = `$$ \\begin{array}{l} ${mathJaxNewlines} \\end{array} $$`;
                         return (
                             <div key={index} className="flex justify-end animate-fade-in">
                                 <div className="chat-bubble user-bubble">
-                                    {/* The MathJax config will handle left-alignment of this block. */}
                                     <MathJaxRenderer content={mathContent} />
                                 </div>
                             </div>

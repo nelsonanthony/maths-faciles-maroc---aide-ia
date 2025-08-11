@@ -203,8 +203,8 @@ const formatSousQuestionsCorrection = (data: any): { statement: string; fullCorr
     // Build statement from all question "Énoncé" fields
     if (data.Correction && typeof data.Correction === 'object') {
         const sortedQuestionKeys = Object.keys(data.Correction).sort((a, b) => {
-            const numA = parseInt(a.match(/\d+/)?.[0] || '0');
-            const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+            const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+            const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
             return numA - numB;
         });
 
@@ -230,8 +230,8 @@ const formatSousQuestionsCorrection = (data: any): { statement: string; fullCorr
     if (data.Correction && typeof data.Correction === 'object') {
         fullCorrection += `## Correction Détaillée\n\n`;
         const sortedQuestionKeys = Object.keys(data.Correction).sort((a, b) => {
-            const numA = parseInt(a.match(/\d+/)?.[0] || '0');
-            const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+            const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+            const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
             return numA - numB;
         });
 
@@ -245,8 +245,8 @@ const formatSousQuestionsCorrection = (data: any): { statement: string; fullCorr
             const sortedEtapeKeys = Object.keys(qData)
                 .filter(k => k.startsWith('Étape'))
                 .sort((a, b) => {
-                    const numA = parseInt(a.match(/\d+/)?.[0] || '0');
-                    const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+                    const numA = parseInt(a.match(/\d+/)?.[0] || '0', 10);
+                    const numB = parseInt(b.match(/\d+/)?.[0] || '0', 10);
                     return numA - numB;
                 });
             
@@ -270,6 +270,7 @@ const formatSousQuestionsCorrection = (data: any): { statement: string; fullCorr
             if (qData.Conclusion) {
                 fullCorrection += `**Conclusion :** ${qData.Conclusion}\n\n`;
             }
+             fullCorrection += `\n`;
         }
     }
 
@@ -386,6 +387,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         const fixLatexAndDelimiters = (text: string) => {
             if (!text) return '';
             // First, handle double-escaped backslashes for commands like \\frac -> \frac
+            // and escaped parentheses \\( -> \(
             let fixedText = text.replace(/\\\\/g, '\\');
             
             // Then, convert MathJax delimiters like \(...\) to $...$ and \[...\] to $$...$$

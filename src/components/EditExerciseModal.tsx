@@ -195,6 +195,92 @@ const formatPropositionsCorrection = (correction: any): string => {
     return markdown.trim();
 };
 
+// Helper function for the "sous-questions" format
+const formatSousQuestionsCorrection = (data: any): { statement: string; fullCorrection: string } => {
+    let statement = '';
+    let fullCorrection = '';
+
+    // Build statement from all question "Énoncé" fields
+    if (data.Correction && typeof data.Correction === 'object') {
+        const sortedQuestionKeys = Object.keys(data.Correction).sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)?.[0] || '0');
+            const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+            return numA - numB;
+        });
+
+        statement = sortedQuestionKeys.map(qKey => {
+            const qData = data.Correction[qKey];
+            if (qData && qData['Énoncé']) {
+                return `**${qKey} :** ${qData['Énoncé']}`;
+            }
+            return '';
+        }).filter(Boolean).join('\n\n');
+    }
+
+    // Build full correction
+    
+    // Part 1: Sous-questions
+    if (data['Sous-questions préalables'] && Array.isArray(data['Sous-questions préalables'])) {
+        fullCorrection += `## Pistes de réflexion\n\n`;
+        fullCorrection += data['Sous-questions préalables'].map((q: string) => `*   ${q}`).join('\n');
+        fullCorrection += `\n\n---\n\n`;
+    }
+
+    // Part 2: Detailed Correction
+    if (data.Correction && typeof data.Correction === 'object') {
+        fullCorrection += `## Correction Détaillée\n\n`;
+        const sortedQuestionKeys = Object.keys(data.Correction).sort((a, b) => {
+            const numA = parseInt(a.match(/\d+/)?.[0] || '0');
+            const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+            return numA - numB;
+        });
+
+        for (const qKey of sortedQuestionKeys) {
+            const qData = data.Correction[qKey];
+            fullCorrection += `### ${qKey}\n\n`;
+            if (qData['Énoncé']) {
+                 fullCorrection += `**Énoncé :** ${qData['Énoncé']}\n\n`;
+            }
+            
+            const sortedEtapeKeys = Object.keys(qData)
+                .filter(k => k.startsWith('Étape'))
+                .sort((a, b) => {
+                    const numA = parseInt(a.match(/\d+/)?.[0] || '0');
+                    const numB = parseInt(b.match(/\d+/)?.[0] || '0');
+                    return numA - numB;
+                });
+            
+            for (const etapeKey of sortedEtapeKeys) {
+                const etapeData = qData[etapeKey];
+                fullCorrection += `#### ${etapeKey}\n`;
+                if (typeof etapeData === 'object' && etapeData !== null) {
+                    for (const detailKey in etapeData) {
+                        const detailValue = etapeData[detailKey];
+                        const formattedKey = detailKey.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+                        if (detailKey.toLowerCase() === 'calcul') {
+                            fullCorrection += `> **${formattedKey}:**\n> $$${detailValue}$$\n\n`;
+                        } else {
+                            fullCorrection += `*   **${formattedKey}:** ${detailValue}\n`;
+                        }
+                    }
+                }
+                fullCorrection += '\n';
+            }
+
+            if (qData.Conclusion) {
+                fullCorrection += `**Conclusion :** ${qData.Conclusion}\n\n`;
+            }
+        }
+    }
+
+    // Part 3: Global Astuce
+    if (data.Astuce) {
+        fullCorrection += `\n---\n\n## Astuce\n\n${data.Astuce}\n`;
+    }
+
+    return { statement: statement.trim(), fullCorrection: fullCorrection.trim() };
+};
+
 
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, seriesId, onSave, onClose }) => {
   const [formData, setFormData] = useState<Omit<Exercise, 'id'> & { id?: string }>(exercise || emptyExercise);
@@ -223,8 +309,14 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
         let fullCorrection = '';
         let latexFormula = '';
 
+        // --- Handle the new "sous-questions" format ---
+        if (parsedJson['Sous-questions préalables'] && parsedJson.Correction) {
+            const { statement: newStatement, fullCorrection: newCorrection } = formatSousQuestionsCorrection(parsedJson);
+            statement = newStatement;
+            fullCorrection = newCorrection;
+        }
         // --- Handle structured analysis format (most complex) ---
-        if (parsedJson.énoncé?.texte && parsedJson.correction && parsedJson.conclusion) {
+        else if (parsedJson.énoncé?.texte && parsedJson.correction && parsedJson.conclusion) {
              statement = parsedJson.énoncé.texte;
              fullCorrection = formatStructuredAnalysisCorrection(parsedJson);
 

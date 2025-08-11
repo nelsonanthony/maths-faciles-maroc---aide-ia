@@ -21,70 +21,78 @@ const emptyExercise: Omit<Exercise, 'id'> = {
   latexFormula: ''
 };
 
-const cleanForStudentView = (text: string): string => {
+const formatFormulasForDisplay = (text: string): string => {
   if (!text) return '';
-  
+
   return text
-    // Gestion spécifique des fonctions réciproques
-    .replace(/\\\(f\^\{-1\\\}\)/g, 'f⁻¹')
-    .replace(/\$f\^\{-1\}\$/g, 'f⁻¹')
+    // Conversion des formules en ligne vers format bloc
+    .replace(/\\\(([^]+?)\\\)/g, '$$$$$1$$$$')  // \(...\) → $$...$$
+    .replace(/\$([^$]+?)\$/g, '$$$$$1$$$$')     // $...$ → $$...$$
+    
+    // Protection des caractères spéciaux
+    .replace(/\\\$/g, '$')  // Échappement des $
+    .replace(/\\\\/g, '\\') // Correction des backslashes
+};
+
+const transformForStudentView = (text: string): string => {
+  if (!text) return '';
+
+  return text
+    // Transformation des indices
+    .replace(/([a-zA-Zα-ω])_(\d+)/g, '$1-$2')  // x_1 → x-1
+    .replace(/(\\[a-zA-Z]+)_(\d+)/g, '$1-$2')  // \alpha_2 → \alpha-2
+    
+    // Gestion des fonctions réciproques
     .replace(/f\^\{-1\}/g, 'f⁻¹')
     
-    // Nettoyage général LaTeX
+    // Nettoyage des délimiteurs LaTeX
     .replace(/\\\(/g, '')
     .replace(/\\\)/g, '')
     .replace(/\$/g, '')
     
-    // Formatage des indices/exposants
-    .replace(/_(\d+)/g, '₋$1')
-    .replace(/\^(\d+)/g, '⁺$1')
-    
-    // Symboles spéciaux
-    .replace(/\\cdot/g, '·')
-    .replace(/\\times/g, '×')
-    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g, '$1/$2')
-    .replace(/\\sqrt\{([^}]+)\}/g, '√$1')
-    .replace(/\\pi/g, 'π')
-    .replace(/\\alpha/g, 'α')
-    .replace(/\\beta/g, 'β');
+    // Formules spéciales
+    .replace(/\\pm/g, '±')
+    .replace(/\\sqrt\{([^}]+)\}/g, '√$1');
 };
 
-const generateTeacherCorrection = (data: any): string => {
-  let correction = '';
+
+const generateCorrectionContent = (data: any): string => {
+  let content = '';
 
   if (data['Sous-questions préalables']) {
-    correction += `## Pistes pédagogiques\n${data['Sous-questions préalables'].join('\n')}\n\n`;
+    content += `## Pistes pédagogiques\n${data['Sous-questions préalables'].join('\n')}\n\n`;
   }
 
   if (data.Correction) {
     Object.entries(data.Correction)
-      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-      .forEach(([qName, qData]) => {
-        const q = qData as any;
-        correction += `### ${qName}\n**Énoncé:** ${q['Énoncé']}\n\n`;
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .forEach(([qName, qData]) => {
+      const q = qData as any;
+      content += `### ${qName}\n**Énoncé:** ${formatFormulasForDisplay(q['Énoncé'] || '')}\n\n`;
 
-        Object.entries(q)
-          .filter(([key]) => key.startsWith('Étape'))
-          .forEach(([stepName, stepData]) => {
-            const step = stepData as any;
-            correction += `#### ${stepName}\n`;
-            if (step.Action) correction += `**Méthode:** ${step.Action}\n`;
-            if (step.Calcul) correction += `> **Formule:**\n> $${step.Calcul}$\n`;
-            if (step.Explication) correction += `${step.Explication}\n\n`;
-          });
-
-        if (q.Conclusion) {
-          correction += `**Conclusion:** ${q.Conclusion}\n\n`;
-        }
-      });
+      Object.entries(q)
+        .filter(([key]) => key.startsWith('Étape'))
+        .forEach(([stepName, stepData]) => {
+          const step = stepData as any;
+          content += `#### ${stepName}\n`;
+          if (step.Action) content += `**Méthode:** ${step.Action}\n`;
+          if (step.Calcul) content += `> **Formule:**\n> ${formatFormulasForDisplay(step.Calcul)}\n`;
+          if (step.Explication) content += `${formatFormulasForDisplay(step.Explication)}\n\n`;
+        });
+        
+      if (q.Conclusion) {
+        content += `**Conclusion:** ${formatFormulasForDisplay(q.Conclusion)}\n\n`;
+      }
+    });
   }
-
+  
   if (data.Astuce) {
-    correction += `## Astuce\n${data.Astuce}\n`;
+    content += `## Astuce\n${formatFormulasForDisplay(data.Astuce)}\n`;
   }
 
-  return correction;
+  return content;
 };
+
 
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ 
   exercise, 
@@ -118,10 +126,10 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
         statement: parsed.Correction ? 
           Object.entries(parsed.Correction)
             .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-            .map(([q, data]) => `**${q}:** ${cleanForStudentView((data as any)['Énoncé'])}`)
+            .map(([q, data]) => `**${q}:** ${transformForStudentView((data as any)['Énoncé'])}`)
             .join('\n\n')
           : '',
-        fullCorrection: generateTeacherCorrection(parsed),
+        fullCorrection: generateCorrectionContent(parsed),
         latexFormula: '',
         imageUrl: ''
       });

@@ -289,10 +289,20 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ exercise, 
              throw new Error("Format JSON non reconnu. Assurez-vous que la structure est correcte.");
         }
 
+        // This corrects a common issue where backslashes in LaTeX are double-escaped in the JSON source.
+        // For example, it converts a string like "\\frac" into the correct "\frac" for MathJax to process.
+        const fixLatexEscaping = (text: string) => {
+            if (!text) return '';
+            return text.replace(/\\\\/g, '\\');
+        };
+        
+        const finalStatement = fixLatexEscaping(statement.trim());
+        const finalFullCorrection = fixLatexEscaping(fullCorrection.trim());
+
         setFormData(prev => ({
             ...prev,
-            statement: statement.trim(),
-            fullCorrection: fullCorrection.trim(),
+            statement: finalStatement,
+            fullCorrection: finalFullCorrection,
             latexFormula: latexFormula.trim(),
         }));
 

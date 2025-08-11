@@ -157,7 +157,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
   const getPreviewContent = (text: string | undefined, fallback: string) => {
     const content = text || fallback;
     const parsed = marked.parse(content, { breaks: true });
-    return DOMPurify.sanitize(parsed as string);
+    return DOMPurify.sanitize(parsed);
   };
 
   return (

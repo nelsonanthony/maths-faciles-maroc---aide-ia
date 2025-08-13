@@ -24,37 +24,43 @@ const emptyExercise: Omit<Exercise, 'id'> = {
 const generateCorrectionContent = (data: any): string => {
   let content = '';
 
-  if (data['Sous-questions préalables']) {
-    content += `## Pistes pédagogiques\n${data['Sous-questions préalables'].join('\n')}\n\n`;
-  }
-
-  if (data.Correction) {
-    Object.entries(data.Correction)
-    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-    .forEach(([qName, qData]) => {
-      const q = qData as any;
-      // Use the text directly from JSON, keeping delimiters
-      content += `### ${qName}\n**Énoncé:** ${q['Énoncé'] || ''}\n\n`;
-
-      Object.entries(q)
-        .filter(([key]) => key.startsWith('Étape'))
-        .forEach(([stepName, stepData]) => {
-          const step = stepData as any;
-          content += `#### ${stepName}\n`;
-          if (step.Action) content += `**Méthode:** ${step.Action}\n\n`;
-          // Use newlines for block rendering
-          if (step.Calcul) content += `**Formule:**\n\n${step.Calcul}\n\n`;
-          if (step.Explication) content += `${step.Explication}\n\n`;
-        });
-        
-      if (q.Conclusion) {
-        content += `**Conclusion:**\n\n${q.Conclusion}\n\n`;
-      }
+  if (data['Sous-questions préalables'] && Array.isArray(data['Sous-questions préalables'])) {
+    content += `## Pistes pédagogiques\n`;
+    data['Sous-questions préalables'].forEach((piste: string) => {
+      content += `- ${piste}\n`;
     });
+    content += '\n';
   }
-  
+
+  if (data.Correction && typeof data.Correction === 'object') {
+    Object.entries(data.Correction)
+      .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+      .forEach(([qName, qData]) => {
+        const q = qData as any;
+        content += `### ${qName}\n`;
+        if (q['Énoncé']) {
+          content += `**Énoncé:** ${q['Énoncé']}\n\n`;
+        }
+
+        Object.entries(q)
+          .filter(([key]) => key.startsWith('Étape'))
+          .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+          .forEach(([stepName, stepData]) => {
+            const step = stepData as any;
+            content += `#### ${stepName}\n`;
+            if (step.Action) content += `**Méthode:** ${step.Action}\n\n`;
+            if (step.Calcul) content += `**Formule:**\n\n${step.Calcul}\n\n`;
+            if (step.Explication) content += `${step.Explication}\n\n`;
+          });
+
+        if (q.Conclusion) {
+          content += `**Conclusion:** ${q.Conclusion}\n\n`;
+        }
+      });
+  }
+
   if (data.Astuce) {
-    content += `## Astuce\n${data.Astuce}\n`;
+    content += `## Astuce\n${data.Astuce}\n\n`;
   }
 
   return content;
@@ -89,14 +95,23 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     try {
       const parsed = JSON.parse(jsonInput);
       
-      setFormData({
-        statement: parsed.Correction ? 
+      const statementContent = (parsed.Correction && typeof parsed.Correction === 'object') ? 
           Object.entries(parsed.Correction)
             .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-            .map(([q, data]) => `**${q}:** ${(data as any)['Énoncé']}`)
+            .map(([qName, qData]) => {
+                const q = qData as any;
+                const questionNumber = qName.replace(/[^0-9]/g, '');
+                const questionPrefix = questionNumber ? `**${questionNumber})**` : `**${qName}:**`;
+                return `${questionPrefix} ${q['Énoncé'] || ''}`;
+            })
             .join('\n\n')
-          : '',
+          : '';
+
+      setFormData({
+        ...formData, // Preserve ID if it exists
+        statement: statementContent,
         fullCorrection: generateCorrectionContent(parsed),
+        correctionSnippet: '', // will be generated on save
         latexFormula: '',
         imageUrl: ''
       });
@@ -105,9 +120,11 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
       setIsJsonImporterOpen(false);
       setError(null);
     } catch (err) {
-      setError("Format JSON invalide");
+      console.error("JSON parsing error:", err);
+      setError(err instanceof Error ? `Format JSON invalide: ${err.message}` : "Format JSON invalide");
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

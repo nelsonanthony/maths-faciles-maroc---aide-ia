@@ -21,9 +21,16 @@ const getPreviewContent = (text: string | undefined, fallback: string): string =
         mathExpressions.push(match);
         return placeholder(index);
     });
-
-    // Process inline math
+    
+    // Process inline math $...$
     processedContent = processedContent.replace(/\$((?:\\.|[^$])*?)\$/g, (match) => {
+        const index = mathExpressions.length;
+        mathExpressions.push(match);
+        return placeholder(index);
+    });
+
+    // Process inline math \(...\)
+    processedContent = processedContent.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
         const index = mathExpressions.length;
         mathExpressions.push(match);
         return placeholder(index);
@@ -88,7 +95,7 @@ const generateCorrectionContent = (data: any): string => {
             const step = stepData as any;
             content += `#### ${stepName}\n`;
             if (step.Action) content += `**Méthode:** ${step.Action}\n\n`;
-            if (step.Calcul) content += `**Formule:**\n\n${step.Calcul}\n\n`;
+            if (step.Calcul) content += `**Formule:**\n${step.Calcul}\n\n`;
             if (step.Explication) content += `${step.Explication}\n\n`;
           });
 

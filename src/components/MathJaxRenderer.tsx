@@ -2,25 +2,22 @@ import React, { useEffect, useRef, useState } from 'react';
 
 declare global {
   interface Window {
-    MathJax: any; // Use `any` for simplicity with the dynamic config
+    MathJax: any;
   }
 }
 
-// Singleton promise to ensure configuration and loading happens only once.
 let mathjaxPromise: Promise<void> | null = null;
 
 const initializeMathJax = (): Promise<void> => {
-  if (mathjaxPromise) {
-    return mathjaxPromise;
-  }
+  if (mathjaxPromise) return mathjaxPromise;
 
   mathjaxPromise = new Promise((resolve, reject) => {
     const checkMathJax = () => {
       if (window.MathJax) {
         window.MathJax.config = {
           tex: {
-            inlineMath: [['$', '$'], ['\\(', '\\)']], // Handles $...$ and \(...\)
-            displayMath: [['$$', '$$'], ['\\[', '\\]']], // Handles $$...$$ and \[...\]
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
             processEscapes: true,
             processEnvironments: true,
             macros: {
@@ -34,21 +31,21 @@ const initializeMathJax = (): Promise<void> => {
           svg: {
             fontCache: 'global',
             displayAlign: 'left',
+            displayIndent: '0', // Pas d'indentation des blocs
             linebreaks: {
               automatic: true,
-              width: '90% container' // Allow automatic line breaking
+              width: '90% container'
             }
-          },
+          }
         };
-        // This promise resolves when MathJax is ready.
         window.MathJax.startup.promise.then(resolve).catch(reject);
       } else {
-        // If not ready, wait and check again.
         setTimeout(checkMathJax, 50);
       }
     };
     checkMathJax();
   });
+
   return mathjaxPromise;
 };
 
@@ -56,31 +53,26 @@ export const MathJaxRenderer: React.FC<{ content: string; className?: string }> 
   const ref = useRef<HTMLDivElement>(null);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Effect to initialize MathJax. Runs only once for the lifetime of the app
-  // because of the singleton `mathjaxPromise`.
   useEffect(() => {
     initializeMathJax()
-      .then(() => {
-        setIsInitialized(true);
-      })
+      .then(() => setIsInitialized(true))
       .catch((err) => console.error("Failed to initialize MathJax", err));
   }, []);
 
-  // A single effect to handle content changes and typesetting.
   useEffect(() => {
     if (ref.current) {
-      // Always set the content. This ensures the element is populated before typesetting.
-      ref.current.innerHTML = content;
-      
-      // If MathJax has been initialized, then proceed to typeset.
+      // Évite que Markdown compresse les espaces autour des formules inline
+      const safeContent = content.replace(/\$(.+?)\$/g, ' $' + '$1' + '$ ');
+      ref.current.innerHTML = safeContent;
+
       if (isInitialized) {
+        window.MathJax.typesetClear?.();
         window.MathJax.typesetPromise([ref.current]).catch((err: any) =>
           console.error('MathJax typeset error:', err)
         );
       }
     }
-  }, [content, isInitialized]); // Reruns when content changes or when MathJax becomes ready.
+  }, [content, isInitialized]);
 
-  // We render the div, and the effect populates it. This is a sound pattern.
   return <div ref={ref} className={className || ''} />;
 };

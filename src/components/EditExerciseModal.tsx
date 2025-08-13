@@ -131,23 +131,34 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
 
   const getPreviewContent = (text: string | undefined, fallback: string): string => {
     const content = text || fallback;
+    if (!content.trim()) {
+      return `<p>${fallback}</p>`;
+    }
     const mathExpressions: string[] = [];
     
     // Regex to find all common LaTeX delimiters. The `s` flag allows `.` to match newlines for block math.
     const mathRegex = /(\$\$.*?\$\$|\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\])/gs;
-    
-    // Step 1: Find and replace math expressions with unique, safe placeholders.
+    const placeholder = 'MATHJAX_PLACEHOLDER';
+
+    // Step 1: Replace math expressions with a placeholder wrapped in backticks.
+    // This tells `marked` to treat them as inline code, preventing it from processing their content.
     const placeholderContent = content.replace(mathRegex, (match) => {
       mathExpressions.push(match);
-      return `__MATHJAX_PLACEHOLDER_${mathExpressions.length - 1}__`;
+      return `\`${placeholder}\``;
     });
     
-    // Step 2: Process the non-math content with the Markdown parser.
+    // Step 2: Process the mixed content with the Markdown parser.
+    // This will convert `\`MATHJAX_PLACEHOLDER\`` into `<code>MATHJAX_PLACEHOLDER</code>`.
     let htmlContent = marked.parse(placeholderContent, { breaks: true }) as string;
     
-    // Step 3: Replace placeholders back with the original, untouched math expressions.
-    htmlContent = htmlContent.replace(/__MATHJAX_PLACEHOLDER_(\d+)__/g, (_, index) => {
-      return mathExpressions[parseInt(index, 10)];
+    // Step 3: Replace the generated code tags back with the original, untouched math expressions.
+    // We do this in a loop to ensure we're replacing them in the correct order.
+    let expressionIndex = 0;
+    htmlContent = htmlContent.replace(/<code>MATHJAX_PLACEHOLDER<\/code>/g, () => {
+        if (expressionIndex < mathExpressions.length) {
+            return mathExpressions[expressionIndex++];
+        }
+        return ''; // Should not happen if counts match
     });
 
     // Step 4: Sanitize the final HTML to prevent XSS attacks.

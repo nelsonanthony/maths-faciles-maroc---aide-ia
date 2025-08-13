@@ -129,10 +129,29 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     }
   };
 
-  const getPreviewContent = (text: string | undefined, fallback: string) => {
+  const getPreviewContent = (text: string | undefined, fallback: string): string => {
     const content = text || fallback;
-    const parsed = marked.parse(content, { breaks: true });
-    return DOMPurify.sanitize(parsed as string);
+    const mathExpressions: string[] = [];
+    
+    // Regex to find all common LaTeX delimiters. The `s` flag allows `.` to match newlines for block math.
+    const mathRegex = /(\$\$.*?\$\$|\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\])/gs;
+    
+    // Step 1: Find and replace math expressions with unique, safe placeholders.
+    const placeholderContent = content.replace(mathRegex, (match) => {
+      mathExpressions.push(match);
+      return `__MATHJAX_PLACEHOLDER_${mathExpressions.length - 1}__`;
+    });
+    
+    // Step 2: Process the non-math content with the Markdown parser.
+    let htmlContent = marked.parse(placeholderContent, { breaks: true }) as string;
+    
+    // Step 3: Replace placeholders back with the original, untouched math expressions.
+    htmlContent = htmlContent.replace(/__MATHJAX_PLACEHOLDER_(\d+)__/g, (_, index) => {
+      return mathExpressions[parseInt(index, 10)];
+    });
+
+    // Step 4: Sanitize the final HTML to prevent XSS attacks.
+    return DOMPurify.sanitize(htmlContent);
   };
 
   return (

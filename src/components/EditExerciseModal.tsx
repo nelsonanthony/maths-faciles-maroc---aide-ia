@@ -6,66 +6,44 @@ import { DesmosGraph } from '@/components/DesmosGraph';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
-// This flag ensures the marked extension is loaded only once.
-let markedMathExtensionLoaded = false;
-
-const setupMarkedWithMath = () => {
-  if (markedMathExtensionLoaded) return;
-
-  const mathExtension = {
-    name: 'math',
-    level: 'inline' as const,
-    start(src: string) {
-      return src.indexOf('$');
-    },
-    tokenizer(src: string) {
-      const blockRule = /^\$\$([\s\S]+?)\$\$/;
-      const inlineRule = /^\$((?:\\.|[^$])+?)\$/; // Handles escaped chars and non-dollar chars
-
-      let match;
-      if ((match = blockRule.exec(src))) {
-        return {
-          type: 'math',
-          raw: match[0],
-          text: match[1].trim(),
-          displayMode: true,
-        };
-      }
-      
-      if ((match = inlineRule.exec(src))) {
-        return {
-          type: 'math',
-          raw: match[0],
-          text: match[1].trim(),
-          displayMode: false,
-        };
-      }
-      return undefined;
-    },
-    renderer(token: any) {
-      // Return the raw LaTeX string. MathJax will process it.
-      return token.raw;
-    },
-  };
-
-  marked.use({
-    gfm: true,
-    breaks: true,
-    extensions: [mathExtension],
-  });
-
-  markedMathExtensionLoaded = true;
-};
-
 const getPreviewContent = (text: string | undefined, fallback: string): string => {
-    setupMarkedWithMath();
     const content = text || fallback;
     if (!content.trim()) {
       return `<p>${fallback}</p>`;
     }
-    const htmlContent = marked.parse(content) as string;
-    return DOMPurify.sanitize(htmlContent);
+
+    const mathExpressions: string[] = [];
+    const placeholder = (index: number) => `<!-- MATHJAX_PLACEHOLDER_${index} -->`;
+
+    // Process display math first to avoid capturing single `$` inside `$$`
+    let processedContent = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+        const index = mathExpressions.length;
+        mathExpressions.push(match);
+        return placeholder(index);
+    });
+
+    // Process inline math
+    processedContent = processedContent.replace(/\$((?:\\.|[^$])*?)\$/g, (match) => {
+        const index = mathExpressions.length;
+        mathExpressions.push(match);
+        return placeholder(index);
+    });
+
+    // Process with Marked
+    const htmlContent = marked.parse(processedContent, {
+        gfm: true,
+        breaks: true,
+    }) as string;
+
+    // Restore math expressions
+    const finalHtml = htmlContent.replace(/<!-- MATHJAX_PLACEHOLDER_(\d+) -->/g, (_, indexStr) => {
+        const index = parseInt(indexStr, 10);
+        return mathExpressions[index] || '';
+    });
+    
+    return DOMPurify.sanitize(finalHtml);
 };
+
 
 interface EditExerciseModalProps {
   exercise: Exercise | null;

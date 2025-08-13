@@ -6,6 +6,67 @@ import { DesmosGraph } from '@/components/DesmosGraph';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
+// This flag ensures the marked extension is loaded only once.
+let markedMathExtensionLoaded = false;
+
+const setupMarkedWithMath = () => {
+  if (markedMathExtensionLoaded) return;
+
+  const mathExtension = {
+    name: 'math',
+    level: 'inline' as const,
+    start(src: string) {
+      return src.indexOf('$');
+    },
+    tokenizer(src: string) {
+      const blockRule = /^\$\$([\s\S]+?)\$\$/;
+      const inlineRule = /^\$((?:\\.|[^$])+?)\$/; // Handles escaped chars and non-dollar chars
+
+      let match;
+      if ((match = blockRule.exec(src))) {
+        return {
+          type: 'math',
+          raw: match[0],
+          text: match[1].trim(),
+          displayMode: true,
+        };
+      }
+      
+      if ((match = inlineRule.exec(src))) {
+        return {
+          type: 'math',
+          raw: match[0],
+          text: match[1].trim(),
+          displayMode: false,
+        };
+      }
+      return undefined;
+    },
+    renderer(token: any) {
+      // Return the raw LaTeX string. MathJax will process it.
+      return token.raw;
+    },
+  };
+
+  marked.use({
+    gfm: true,
+    breaks: true,
+    extensions: [mathExtension],
+  });
+
+  markedMathExtensionLoaded = true;
+};
+
+const getPreviewContent = (text: string | undefined, fallback: string): string => {
+    setupMarkedWithMath();
+    const content = text || fallback;
+    if (!content.trim()) {
+      return `<p>${fallback}</p>`;
+    }
+    const htmlContent = marked.parse(content) as string;
+    return DOMPurify.sanitize(htmlContent);
+};
+
 interface EditExerciseModalProps {
   exercise: Exercise | null;
   seriesId: string;
@@ -144,47 +205,6 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const getPreviewContent = (text: string | undefined, fallback: string): string => {
-    const content = text || fallback;
-    if (!content.trim()) {
-      return `<p>${fallback}</p>`;
-    }
-    const mathExpressions: { expr: string, isDisplay: boolean }[] = [];
-    
-    // Regex to find all common LaTeX delimiters. `[\s\S]` is used to match newlines inside display math.
-    const mathRegex = /(\$\$[\s\S]*?\$\$|\$[^$]*?\$|\\\(.*?\\\)|\\\[[\s\S]*?\\\])/g;
-    
-    // Step 1: Replace math expressions with unique HTML comment placeholders.
-    const placeholderContent = content.replace(mathRegex, (match) => {
-      const isDisplayMath = match.startsWith('$$') || match.startsWith('\\[');
-      const placeholder = `<!-- MATHJAX_PLACEHOLDER_${mathExpressions.length} -->`;
-      mathExpressions.push({ expr: match, isDisplay: isDisplayMath });
-      // Add newlines around display math to help marked treat it as a separate block.
-      return isDisplayMath ? `\n\n${placeholder}\n\n` : placeholder;
-    });
-    
-    // Step 2: Process with Markdown parser.
-    let htmlContent = marked.parse(placeholderContent, { breaks: true }) as string;
-    
-    // Step 3: Replace placeholders back with their original math content.
-    mathExpressions.forEach((math, index) => {
-        const placeholder = `<!-- MATHJAX_PLACEHOLDER_${index} -->`;
-        const placeholderInP = `<p>${placeholder}</p>`;
-        
-        // If it's display math and it got wrapped in a <p> tag by itself,
-        // we replace the whole <p> tag to make it a true block element.
-        if (math.isDisplay && htmlContent.includes(placeholderInP)) {
-             htmlContent = htmlContent.replace(placeholderInP, math.expr);
-        } else {
-             // Otherwise (for inline math or mixed content), just replace the comment.
-             htmlContent = htmlContent.replace(placeholder, math.expr);
-        }
-    });
-
-    // Step 4: Sanitize the final HTML.
-    return DOMPurify.sanitize(htmlContent);
   };
 
   return (

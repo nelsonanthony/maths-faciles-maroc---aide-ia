@@ -134,34 +134,39 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
     if (!content.trim()) {
       return `<p>${fallback}</p>`;
     }
-    const mathExpressions: string[] = [];
+    const mathExpressions: { expr: string, isDisplay: boolean }[] = [];
     
-    // Regex to find all common LaTeX delimiters. The `s` flag allows `.` to match newlines for block math.
-    const mathRegex = /(\$\$.*?\$\$|\$.*?\$|\\\(.*?\\\)|\\\[.*?\\\])/gs;
-    const placeholder = 'MATHJAX_PLACEHOLDER';
-
-    // Step 1: Replace math expressions with a placeholder wrapped in backticks.
-    // This tells `marked` to treat them as inline code, preventing it from processing their content.
+    // Regex to find all common LaTeX delimiters. `[\s\S]` is used to match newlines inside display math.
+    const mathRegex = /(\$\$[\s\S]*?\$\$|\$[^$]*?\$|\\\(.*?\\\)|\\\[[\s\S]*?\\\])/g;
+    
+    // Step 1: Replace math expressions with unique HTML comment placeholders.
     const placeholderContent = content.replace(mathRegex, (match) => {
-      mathExpressions.push(match);
-      return `\`${placeholder}\``;
+      const isDisplayMath = match.startsWith('$$') || match.startsWith('\\[');
+      const placeholder = `<!-- MATHJAX_PLACEHOLDER_${mathExpressions.length} -->`;
+      mathExpressions.push({ expr: match, isDisplay: isDisplayMath });
+      // Add newlines around display math to help marked treat it as a separate block.
+      return isDisplayMath ? `\n\n${placeholder}\n\n` : placeholder;
     });
     
-    // Step 2: Process the mixed content with the Markdown parser.
-    // This will convert `\`MATHJAX_PLACEHOLDER\`` into `<code>MATHJAX_PLACEHOLDER</code>`.
+    // Step 2: Process with Markdown parser.
     let htmlContent = marked.parse(placeholderContent, { breaks: true }) as string;
     
-    // Step 3: Replace the generated code tags back with the original, untouched math expressions.
-    // We do this in a loop to ensure we're replacing them in the correct order.
-    let expressionIndex = 0;
-    htmlContent = htmlContent.replace(/<code>MATHJAX_PLACEHOLDER<\/code>/g, () => {
-        if (expressionIndex < mathExpressions.length) {
-            return mathExpressions[expressionIndex++];
+    // Step 3: Replace placeholders back with their original math content.
+    mathExpressions.forEach((math, index) => {
+        const placeholder = `<!-- MATHJAX_PLACEHOLDER_${index} -->`;
+        const placeholderInP = `<p>${placeholder}</p>`;
+        
+        // If it's display math and it got wrapped in a <p> tag by itself,
+        // we replace the whole <p> tag to make it a true block element.
+        if (math.isDisplay && htmlContent.includes(placeholderInP)) {
+             htmlContent = htmlContent.replace(placeholderInP, math.expr);
+        } else {
+             // Otherwise (for inline math or mixed content), just replace the comment.
+             htmlContent = htmlContent.replace(placeholder, math.expr);
         }
-        return ''; // Should not happen if counts match
     });
 
-    // Step 4: Sanitize the final HTML to prevent XSS attacks.
+    // Step 4: Sanitize the final HTML.
     return DOMPurify.sanitize(htmlContent);
   };
 

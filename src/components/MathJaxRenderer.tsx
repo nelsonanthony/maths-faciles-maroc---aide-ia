@@ -19,9 +19,9 @@ const initializeMathJax = (): Promise<void> => {
       if (window.MathJax) {
         window.MathJax.config = {
           tex: {
-            inlineMath: [['$', '$']],
-            displayMath: [['$$', '$$']],
-            processEscapes: false, // Important! Disables \(...\) and \[...\]
+            inlineMath: [['$', '$'], ['\\(', '\\)']], // Handles $...$ and \(...\)
+            displayMath: [['$$', '$$'], ['\\[', '\\]']], // Handles $$...$$ and \[...\]
+            processEscapes: true,
             processEnvironments: true,
             macros: {
               'R': '\\mathbb{R}',

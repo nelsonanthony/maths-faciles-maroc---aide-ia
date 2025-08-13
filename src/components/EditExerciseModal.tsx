@@ -21,28 +21,6 @@ const emptyExercise: Omit<Exercise, 'id'> = {
   latexFormula: ''
 };
 
-// This function remains the same, it's for the simplified student-facing statement.
-const transformForStudentView = (text: string): string => {
-  if (!text) return '';
-
-  return text
-    // Transformation des indices
-    .replace(/([a-zA-Zα-ω])_(\d+)/g, '$1-$2')  // x_1 → x-1
-    .replace(/(\\[a-zA-Z]+)_(\d+)/g, '$1-$2')  // \alpha_2 → \alpha-2
-    
-    // Gestion des fonctions réciproques
-    .replace(/f\^\{-1\}/g, 'f⁻¹')
-    
-    // Nettoyage des délimiteurs LaTeX
-    .replace(/\\\(/g, '')
-    .replace(/\\\)/g, '')
-    .replace(/\$/g, '')
-    
-    // Formules spéciales
-    .replace(/\\pm/g, '±')
-    .replace(/\\sqrt\{([^}]+)\}/g, '√$1');
-};
-
 const generateCorrectionContent = (data: any): string => {
   let content = '';
 
@@ -55,7 +33,7 @@ const generateCorrectionContent = (data: any): string => {
     .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
     .forEach(([qName, qData]) => {
       const q = qData as any;
-      // Use the text directly from JSON
+      // Use the text directly from JSON, keeping delimiters
       content += `### ${qName}\n**Énoncé:** ${q['Énoncé'] || ''}\n\n`;
 
       Object.entries(q)
@@ -63,21 +41,18 @@ const generateCorrectionContent = (data: any): string => {
         .forEach(([stepName, stepData]) => {
           const step = stepData as any;
           content += `#### ${stepName}\n`;
-          if (step.Action) content += `**Méthode:** ${step.Action}\n`;
-          // Use the text directly from JSON
-          if (step.Calcul) content += `> **Formule:**\n> ${step.Calcul}\n`;
-          // Use the text directly from JSON
+          if (step.Action) content += `**Méthode:** ${step.Action}\n\n`;
+          // Use newlines for block rendering
+          if (step.Calcul) content += `**Formule:**\n\n${step.Calcul}\n\n`;
           if (step.Explication) content += `${step.Explication}\n\n`;
         });
         
-      // Use the text directly from JSON
       if (q.Conclusion) {
-        content += `**Conclusion:** ${q.Conclusion}\n\n`;
+        content += `**Conclusion:**\n\n${q.Conclusion}\n\n`;
       }
     });
   }
   
-  // Use the text directly from JSON
   if (data.Astuce) {
     content += `## Astuce\n${data.Astuce}\n`;
   }
@@ -118,7 +93,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
         statement: parsed.Correction ? 
           Object.entries(parsed.Correction)
             .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-            .map(([q, data]) => `**${q}:** ${transformForStudentView((data as any)['Énoncé'])}`)
+            .map(([q, data]) => `**${q}:** ${(data as any)['Énoncé']}`)
             .join('\n\n')
           : '',
         fullCorrection: generateCorrectionContent(parsed),

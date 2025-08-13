@@ -21,27 +21,6 @@ const emptyExercise: Omit<Exercise, 'id'> = {
   latexFormula: ''
 };
 
-// This function normalizes inline math to use single-dollar delimiters ($...$),
-// which MathJax will render inline with the text. This prevents unwanted line breaks.
-const formatInlineMath = (text: string): string => {
-  if (!text) return '';
-  // Normalize \(...\) to $...$
-  // We assume single $...$ are already correct and don't touch them to avoid complex regex.
-  return text.replace(/\\\(([\s\S]+?)\\\)/g, '$$$1$$');
-};
-
-// This function formats a string that is assumed to be a single math formula
-// into a block-level formula using double-dollar delimiters ($$...$$).
-const formatBlockMath = (text: string): string => {
-    if (!text) return '';
-    // First, strip any existing delimiters to get the raw formula.
-    const rawFormula = text
-      .replace(/^\\\(([\s\S]+?)\\\)$/, '$1')
-      .replace(/^\$([\s\S]+?)\$$/, '$1');
-    // Then, wrap it in block-level delimiters.
-    return `$$${rawFormula}$$`;
-};
-
 // This function remains the same, it's for the simplified student-facing statement.
 const transformForStudentView = (text: string): string => {
   if (!text) return '';
@@ -64,7 +43,6 @@ const transformForStudentView = (text: string): string => {
     .replace(/\\sqrt\{([^}]+)\}/g, '√$1');
 };
 
-// This function is updated to use the new formatting logic.
 const generateCorrectionContent = (data: any): string => {
   let content = '';
 
@@ -77,8 +55,8 @@ const generateCorrectionContent = (data: any): string => {
     .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
     .forEach(([qName, qData]) => {
       const q = qData as any;
-      // Énoncé is mixed content, use inline formatting.
-      content += `### ${qName}\n**Énoncé:** ${formatInlineMath(q['Énoncé'] || '')}\n\n`;
+      // Use the text directly from JSON
+      content += `### ${qName}\n**Énoncé:** ${q['Énoncé'] || ''}\n\n`;
 
       Object.entries(q)
         .filter(([key]) => key.startsWith('Étape'))
@@ -86,22 +64,22 @@ const generateCorrectionContent = (data: any): string => {
           const step = stepData as any;
           content += `#### ${stepName}\n`;
           if (step.Action) content += `**Méthode:** ${step.Action}\n`;
-          // Calcul is a block formula.
-          if (step.Calcul) content += `> **Formule:**\n> ${formatBlockMath(step.Calcul)}\n`;
-          // Explication is mixed content, use inline formatting.
-          if (step.Explication) content += `${formatInlineMath(step.Explication)}\n\n`;
+          // Use the text directly from JSON
+          if (step.Calcul) content += `> **Formule:**\n> ${step.Calcul}\n`;
+          // Use the text directly from JSON
+          if (step.Explication) content += `${step.Explication}\n\n`;
         });
         
-      // Conclusion is mixed content, use inline formatting.
+      // Use the text directly from JSON
       if (q.Conclusion) {
-        content += `**Conclusion:** ${formatInlineMath(q.Conclusion)}\n\n`;
+        content += `**Conclusion:** ${q.Conclusion}\n\n`;
       }
     });
   }
   
-  // Astuce is mixed content, use inline formatting.
+  // Use the text directly from JSON
   if (data.Astuce) {
-    content += `## Astuce\n${formatInlineMath(data.Astuce)}\n`;
+    content += `## Astuce\n${data.Astuce}\n`;
   }
 
   return content;

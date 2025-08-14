@@ -60,11 +60,11 @@ const customRenderer = new marked.Renderer();
 // The `heading` method in recent versions of `marked`'s renderer receives a single
 // token object, not separate `text` and `level` arguments. This fixes the type error.
 customRenderer.heading = (token: any): string => {
-  // `token.text` is the raw markdown content of the heading. We must parse it
-  // for inline markdown elements like bold, italics, etc.
-  const text = marked.parseInline(token.text);
-  // `token.depth` is the heading level (1-6).
-  return `<h${token.depth}>${text}</h${token.depth}>\n`;
+  // Added a guard to prevent crash on empty headings (e.g., "### \n").
+  const textContent = token?.text || '';
+  const text = marked.parseInline(textContent);
+  const level = token?.depth || 1;
+  return `<h${level}>${text}</h${level}>\n`;
 };
 
 

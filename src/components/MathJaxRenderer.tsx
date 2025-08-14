@@ -67,8 +67,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         })
-        // Use a non-greedy regex for single dollar signs.
-        .replace(/\$([\s\S]+?)\$/g, (match) => {
+        // Use a more robust regex for single dollar signs that doesn't match across newlines.
+        .replace(/\$([^$\n]*?)\$/g, (match) => {
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         });

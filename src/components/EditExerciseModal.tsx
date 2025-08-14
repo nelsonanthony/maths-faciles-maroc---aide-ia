@@ -56,12 +56,10 @@ const generateCorrectionContent = (data: any): string => {
   }
 
   // Proactively add spacing to help the Markdown parser be robust.
-  // Display math gets newlines, inline math gets spaces.
+  // Display math gets newlines.
   return content
     .replace(/\$\$([\s\S]*?)\$\$/g, '\n\n$$$1$$\n\n')
-    .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n')
-    .replace(/([^\s])(\$[^$]+\$|\\\([\s\S]*?\\\))/g, '$1 $2') // leading space
-    .replace(/(\$[^$]+\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2'); // trailing space
+    .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n');
 };
 
 

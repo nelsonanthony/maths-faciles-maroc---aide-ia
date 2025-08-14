@@ -62,63 +62,37 @@ customRenderer.heading = (text: string, level: number): string => {
 };
 
 /**
- * Robustly processes a Markdown string that contains LaTeX, ensuring math is not corrupted by the parser.
- * @param content The Markdown string to process.
- * @returns Sanitized HTML string ready for rendering.
+ * Robustly processes a Markdown string that contains LaTeX
  */
 export const processMarkdownWithMath = (content: string | undefined): string => {
     let source = content || '';
     if (!source.trim()) return '';
 
-    // Étape 1: Protéger les formules mathématiques
-    source = source
-        // Protéger les formules display
-        .replace(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g, '\n\n$1\n\n')
-        // Protéger les formules en ligne en ajoutant un espace si elles sont collées à du texte
-        .replace(/([^\s])(\$[^$]+?\$|\\\([\s\S]*?\\\))/g, '$1 $2')
-        .replace(/(\$[^$]+?\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2');
+    // Nouvelle approche simplifiée
+    // Étape 1: Protéger les formules mathématiques avec des balises temporaires
+    const protectedSource = source
+        .replace(/\$\$([\s\S]*?)\$\$/g, '<math-display>$$$1$$</math-display>')
+        .replace(/\\\[([\s\S]*?)\\\]/g, '<math-display>\\[$1\\]</math-display>')
+        .replace(/\\\(([\s\S]*?)\\\)/g, '<math-inline>\\($1\\)</math-inline>')
+        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, '$1<math-inline>$ $2 $</math-inline>');
 
-    const placeholders: string[] = [];
-    const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
-
-    // Étape 2: Remplacer séquentiellement les expressions mathématiques par des placeholders
-    let processedText = source;
-    
-    const mathPatterns = [
-        { regex: /\$\$[\s\S]*?\$\$/g, type: 'display' },
-        { regex: /\\\[[\s\S]*?\\\]/g, type: 'display' },
-        { regex: /\\\([\s\S]*?\\\)/g, type: 'inline' },
-        { regex: /(^|[^\\])\$([^$\n]+?)\$/g, type: 'inline' }
-    ];
-
-    mathPatterns.forEach(({ regex }) => {
-        processedText = processedText.replace(regex, (match) => {
-            placeholders.push(match);
-            return placeholder(placeholders.length - 1);
-        });
-    });
-
-    // Étape 3: Parser le Markdown
-    let html = marked.parse(processedText, { 
-        breaks: true, 
+    // Étape 2: Parser le Markdown
+    let html = marked.parse(protectedSource, {
+        breaks: true,
         gfm: true,
         renderer: customRenderer,
     }) as string;
 
-    // Étape 4: Restaurer les expressions mathématiques
-    html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
-        return placeholders[parseInt(index, 10)];
-    });
+    // Étape 3: Remplacer les balises temporaires par les formules originales
+    html = html
+        .replace(/<math-display>([\s\S]*?)<\/math-display>/g, '$1')
+        .replace(/<math-inline>([\s\S]*?)<\/math-inline>/g, '$1');
 
-    // Étape 5: Nettoyer les paragraphes qui contiennent UNIQUEMENT des formules display
+    // Étape 4: Nettoyer les paragraphes autour des formules display
     html = html.replace(
-        /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g, 
+        /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g,
         '$1'
     );
-    
-    // Étape 6: S'assurer qu'il y a un espace autour des formules inline pour éviter qu'elles ne soient collées au texte
-    html = html.replace(/\s*(\$[^$]+?\$|\\\([\s\S]*?\\\))\s*/g, ' $1 ');
-
 
     return DOMPurify.sanitize(html);
 };

@@ -56,58 +56,69 @@ const initializeMathJax = (): Promise<void> => {
 };
 
 /**
- * Robustly processes a Markdown string that contains LaTeX, ensuring math is not corrupted.
+ * Robustly processes a Markdown string that contains LaTeX, ensuring math is not corrupted by the parser.
  * @param content The Markdown string to process.
  * @returns Sanitized HTML string ready for rendering.
  */
 export const processMarkdownWithMath = (content: string | undefined): string => {
-  let source = content || '';
-  if (!source.trim()) return '';
+    let source = content || '';
+    if (!source.trim()) return '';
 
-  const placeholders: string[] = [];
-  const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
+    // Step 1: Add spacing around math expressions to prevent Marked.js from merging them with text.
+    // Display math gets newlines for block separation.
+    source = source
+        .replace(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g, '\n\n$1\n\n')
+        // Inline math gets a leading space if it follows a non-space character.
+        .replace(/([^\s])(\$[^\n$]+?\$|\\\([\s\S]*?\\\))/g, '$1 $2')
+        // Inline math gets a trailing space if it's followed by a non-space character.
+        .replace(/(\$[^\n$]+?\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2');
 
-  // Use more robust regexes to handle edge cases better
-  let processedText = source
-    // Display math $$...$$
-    .replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
-      placeholders.push(match);
-      return placeholder(placeholders.length - 1);
-    })
-    // Display math \[...\]
-    .replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
-      placeholders.push(match);
-      return placeholder(placeholders.length - 1);
-    })
-    // Inline math $...$ - Improved regex to avoid escaped dollars and newlines
-    .replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
-      // Reconstruct the original match part that needs to be replaced
-      const originalMatch = `$${math}$`;
-      placeholders.push(originalMatch);
-      // The prefix is preserved, and only the math part is replaced.
-      return `${prefix}${placeholder(placeholders.length - 1)}`;
-    })
-    // Inline math \(...\)
-    .replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
-      placeholders.push(match);
-      return placeholder(placeholders.length - 1);
+    const placeholders: string[] = [];
+    const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
+
+    // Step 2: Replace math expressions with placeholders before parsing.
+    let processedText = source
+        // Display math $$...$$
+        .replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+        placeholders.push(match);
+        return placeholder(placeholders.length - 1);
+        })
+        // Display math \[...\]
+        .replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
+        placeholders.push(match);
+        return placeholder(placeholders.length - 1);
+        })
+        // Inline math $...$ - Improved regex to avoid escaped dollars and newlines
+        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
+            const originalMatch = `$${math}$`;
+            placeholders.push(originalMatch);
+            return `${prefix}${placeholder(placeholders.length - 1)}`;
+        })
+        // Inline math \(...\)
+        .replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
+        placeholders.push(match);
+        return placeholder(placeholders.length - 1);
+        });
+
+    // Step 3: Parse the Markdown with safer options.
+    let html = marked.parse(processedText, {
+        breaks: true,
+        gfm: true,
+        headerIds: false // Prevents generating IDs that might conflict
+    }) as string;
+
+    // Step 4: Restore math expressions from placeholders.
+    html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
+        return placeholders[parseInt(index, 10)];
     });
 
-  let html = marked.parse(processedText, { breaks: true, gfm: true }) as string;
+    // Step 5: Clean up paragraphs that only contain display math.
+    html = html.replace(
+        /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g,
+        '$1'
+    );
 
-  // Restore placeholders
-  html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
-    return placeholders[parseInt(index, 10)];
-  });
-  
-  // Important Correction: Only remove <p> tags for display math formulas
-  // to avoid breaking inline math flow.
-  html = html.replace(
-    /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g, 
-    '$1'
-  );
-
-  return DOMPurify.sanitize(html);
+    return DOMPurify.sanitize(html);
 };
 
 

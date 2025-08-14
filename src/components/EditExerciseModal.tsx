@@ -55,10 +55,13 @@ const generateCorrectionContent = (data: any): string => {
     content += `## Astuce\n${data.Astuce}\n\n`;
   }
 
-  // Proactively add spacing to help the Markdown parser
+  // Proactively add spacing to help the Markdown parser be robust.
+  // Display math gets newlines, inline math gets spaces.
   return content
     .replace(/\$\$([\s\S]*?)\$\$/g, '\n\n$$$1$$\n\n')
-    .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n');
+    .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n')
+    .replace(/([^\s])(\$[^\n$]+?\$|\\\([\s\S]*?\\\))/g, '$1 $2') // leading space
+    .replace(/(\$[^\n$]+?\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2'); // trailing space
 };
 
 

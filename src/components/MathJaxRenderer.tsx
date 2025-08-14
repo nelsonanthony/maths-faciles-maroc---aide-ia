@@ -82,7 +82,7 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
       placeholders.push(match);
       return placeholder(placeholders.length - 1);
     })
-    .replace(/\$([^\n\r$]+?)\$/g, (match) => {   // Inline math $...$ (non-greedy, no newlines)
+    .replace(/\$([\s\S]*?)\$/g, (match) => {   // Inline math $...$
       placeholders.push(match);
       return placeholder(placeholders.length - 1);
     })
@@ -101,8 +101,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   
   // Step 5: Clean up cases where math is wrapped in a <p> tag by `marked`,
   // which can cause unwanted margins and layout issues. This now handles
-  // both display and inline math formats.
-  html = html.replace(/<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$[^\n\r$]+?\$|\\\([\s\S]*?\\\))\s*<\/p>/g, '$1');
+  // all formats correctly.
+  html = html.replace(/<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|\$([\s\S]*?)\$|\\\([\s\S]*?\\\))\s*<\/p>/g, '$1');
 
   // Step 6: Sanitize the final HTML to prevent XSS attacks.
   return DOMPurify.sanitize(html);

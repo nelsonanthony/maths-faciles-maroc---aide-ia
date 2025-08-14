@@ -248,9 +248,10 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
     }, [dialogue, onDialogueUpdate, socraticPath, currentStep, exercise]);
 
     const handleSubmit = () => {
-        const textToSend = ocrVerificationText !== null ? ocrVerificationText.replace(/\\n/g, '\n').trim() : studentInput;
+        const rawText = ocrVerificationText !== null ? ocrVerificationText.replace(/\\n/g, '\n') : studentInput;
+        const textToSend = rawText.replace(/\\ /g, ' ').trim();
         
-        if (!textToSend.trim()) return;
+        if (!textToSend) return;
 
         if (isTutorActive) {
             validateAnswer(textToSend);

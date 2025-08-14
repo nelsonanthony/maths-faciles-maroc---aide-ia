@@ -75,7 +75,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
 
     const handleSendMessage = async (e: React.MouseEvent<HTMLButtonElement>) => {
         e.preventDefault();
-        const messageToSend = newMessage.trim();
+        const messageToSend = newMessage.replace(/\\ /g, ' ').trim();
         if (!messageToSend || !user) return;
     
         setNewMessage(''); // Optimistically clear the input via state

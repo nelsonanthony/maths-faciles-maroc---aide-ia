@@ -19,34 +19,9 @@ const initializeMathJax = (): Promise<void> => {
 
   mathjaxPromise = new Promise((resolve, reject) => {
     const checkMathJax = () => {
-      if (window.MathJax) {
-        window.MathJax.config = {
-          tex: {
-            inlineMath: [['$', '$'], ['\\(', '\\)']], // Handles $...$ and \(...\)
-            displayMath: [['$$', '$$'], ['\\[', '\\]']], // Handles $$...$$ and \[...\]
-            processEscapes: true,
-            processEnvironments: true,
-            macros: {
-              'R': '\\mathbb{R}',
-              'N': '\\mathbb{N}',
-              'Z': '\\mathbb{Z}',
-              'Q': '\\mathbb{Q}',
-              'C': '\\mathbb{C}'
-            }
-          },
-          svg: {
-            fontCache: 'global',
-            displayAlign: 'left',
-            linebreaks: {
-              automatic: true,
-              width: '90% container' // Allow automatic line breaking
-            }
-          },
-        };
-        // This promise resolves when MathJax is ready.
+      if (window.MathJax?.startup?.promise) {
         window.MathJax.startup.promise.then(resolve).catch(reject);
       } else {
-        // If not ready, wait and check again.
         setTimeout(checkMathJax, 50);
       }
     };
@@ -57,10 +32,7 @@ const initializeMathJax = (): Promise<void> => {
 
 // Create a custom renderer that does not add IDs to headings
 const customRenderer = new marked.Renderer();
-// The `heading` method in recent versions of `marked`'s renderer receives a single
-// token object, not separate `text` and `level` arguments. This fixes the type error.
 customRenderer.heading = (token: any): string => {
-  // Added a guard to prevent crash on empty headings (e.g., "### \n").
   const textContent = token?.text || '';
   const text = marked.parseInline(textContent);
   const level = token?.depth || 1;
@@ -95,8 +67,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         })
-        // Use a robust regex that matches a single dollar, then any character except a dollar, then a closing dollar.
-        .replace(/\$([^$]+?)\$/g, (match) => {
+        // Use a non-greedy regex for single dollar signs.
+        .replace(/\$([\s\S]+?)\$/g, (match) => {
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         });
@@ -113,7 +85,7 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
         return placeholders[parseInt(index, 10)];
     });
 
-    // 5. Clean up <p> tags only around display math
+    // 5. Clean up <p> tags only around display math to fix spacing issues
     html = html.replace(
         /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g,
         '$1'

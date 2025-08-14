@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
   <head>
@@ -5,10 +6,46 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Maths Faciles Maroc - Aide IA</title>
+    <script>
+      // Configuration pour MathJax
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']], // Activer les délimiteurs $...$
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true
+        },
+        svg: {
+          fontCache: 'global'
+        }
+      };
+    </script>
     <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+<script type="importmap">
+{
+  "imports": {
+    "vite": "https://esm.sh/vite@^7.0.6",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.7.0",
+    "tailwindcss/": "https://esm.sh/tailwindcss@^4.1.11/",
+    "react/": "https://esm.sh/react@^18.2.0/",
+    "react": "https://esm.sh/react@^18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^18.2.0/",
+    "marked": "https://esm.sh/marked@^16.1.1",
+    "dompurify": "https://esm.sh/dompurify@^3.2.6",
+    "@google/genai": "https://esm.sh/@google/genai@^1.11.0",
+    "browser-image-compression": "https://esm.sh/browser-image-compression@^2.0.2",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.53.0",
+    "dotenv/": "https://esm.sh/dotenv@^17.2.1/",
+    "@vercel/node": "https://esm.sh/@vercel/node@^5.3.7",
+    "youtube-transcript": "https://esm.sh/youtube-transcript@^1.2.1",
+    "desmos": "https://esm.sh/desmos@^1.5.4",
+    "react-mathquill": "https://esm.sh/react-mathquill@^1.0.3"
+  }
+}
+</script>
 </head>
   <body class="bg-slate-950 text-slate-300">
     <div id="root"></div>

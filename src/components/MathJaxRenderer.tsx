@@ -68,33 +68,51 @@ customRenderer.heading = (token: any): string => {
 
 
 /**
- * Robustly processes a Markdown string that contains LaTeX
+ * Robustly processes a Markdown string that contains LaTeX using a placeholder strategy.
  */
 export const processMarkdownWithMath = (content: string | undefined): string => {
     let source = content || '';
     if (!source.trim()) return '';
 
-    // Nouvelle approche simplifiée
-    // Étape 1: Protéger les formules mathématiques avec des balises temporaires
-    const protectedSource = source
-        .replace(/\$\$([\s\S]*?)\$\$/g, '<math-display>$$$1$$</math-display>')
-        .replace(/\\\[([\s\S]*?)\\\]/g, '<math-display>\\[$1\\]</math-display>')
-        .replace(/\\\(([\s\S]*?)\\\)/g, '<math-inline>\\($1\\)</math-inline>')
-        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, '$1<math-inline>$ $2 $</math-inline>');
+    const placeholders: string[] = [];
+    const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
 
-    // Étape 2: Parser le Markdown
-    let html = marked.parse(protectedSource, {
+    // 1. Protect display math first
+    source = source
+        .replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+            placeholders.push(match);
+            return placeholder(placeholders.length - 1);
+        })
+        .replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
+            placeholders.push(match);
+            return placeholder(placeholders.length - 1);
+        });
+
+    // 2. Protect inline math
+    source = source
+        .replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
+            placeholders.push(match);
+            return placeholder(placeholders.length - 1);
+        })
+        // Use negative lookbehind to avoid matching escaped dollars like \$
+        .replace(/(?<!\\)\$([^\n\$]+?)\$/g, (match) => {
+            placeholders.push(match);
+            return placeholder(placeholders.length - 1);
+        });
+
+    // 3. Parse markdown on text-only content
+    let html = marked.parse(source, {
         breaks: true,
         gfm: true,
         renderer: customRenderer,
     }) as string;
 
-    // Étape 3: Remplacer les balises temporaires par les formules originales
-    html = html
-        .replace(/<math-display>([\s\S]*?)<\/math-display>/g, '$1')
-        .replace(/<math-inline>([\s\S]*?)<\/math-inline>/g, '$1');
+    // 4. Restore math content
+    html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
+        return placeholders[parseInt(index, 10)];
+    });
 
-    // Étape 4: Nettoyer les paragraphes autour des formules display
+    // 5. Clean up <p> tags only around display math
     html = html.replace(
         /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g,
         '$1'

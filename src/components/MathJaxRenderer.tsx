@@ -78,8 +78,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })
-    // Updated regex for inline math: matches single $, not preceded by another $ or a backslash.
-    .replace(/(?<![\$\\])\$([^$]+?)\$/g, (match) => {
+    // Now process inline math.
+    .replace(/\$([^$]+?)\$/g, (match) => {
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })

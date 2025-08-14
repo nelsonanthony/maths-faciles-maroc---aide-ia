@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Exercise } from '@/types';
@@ -15,34 +15,34 @@ const getPreviewContent = (text: string | undefined, fallback: string): string =
     const mathExpressions: string[] = [];
     const placeholder = (index: number) => `<!-- MATHJAX_PLACEHOLDER_${index} -->`;
 
-    // Bloc $$...$$
+    // Process display math first to avoid capturing single `$` inside `$$`
     let processedContent = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
         const index = mathExpressions.length;
         mathExpressions.push(match);
         return placeholder(index);
     });
     
-    // Inline $...$ (éviter $$...$$ grâce aux lookarounds)
-    processedContent = processedContent.replace(/(?<!\$)\$([^\$]+?)\$(?!\$)/g, (match) => {
+    // Process inline math $...$
+    processedContent = processedContent.replace(/\$((?:\\.|[^$])*?)\$/g, (match) => {
         const index = mathExpressions.length;
         mathExpressions.push(match);
         return placeholder(index);
     });
 
-    // Inline \(...\)
+    // Process inline math \(...\)
     processedContent = processedContent.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
         const index = mathExpressions.length;
         mathExpressions.push(match);
         return placeholder(index);
     });
 
-    // Markdown
+    // Process with Marked
     const htmlContent = marked.parse(processedContent, {
         gfm: true,
         breaks: true,
     }) as string;
 
-    // Restaurer les formules
+    // Restore math expressions
     const finalHtml = htmlContent.replace(/<!-- MATHJAX_PLACEHOLDER_(\d+) -->/g, (_, indexStr) => {
         const index = parseInt(indexStr, 10);
         return mathExpressions[index] || '';
@@ -50,6 +50,7 @@ const getPreviewContent = (text: string | undefined, fallback: string): string =
     
     return DOMPurify.sanitize(finalHtml);
 };
+
 
 interface EditExerciseModalProps {
   exercise: Exercise | null;
@@ -111,6 +112,7 @@ const generateCorrectionContent = (data: any): string => {
   return content;
 };
 
+
 export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ 
   exercise, 
   seriesId, 
@@ -138,6 +140,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
 
     try {
       const parsed = JSON.parse(jsonInput);
+      
       const statementContent = (parsed.Correction && typeof parsed.Correction === 'object') ? 
           Object.entries(parsed.Correction)
             .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
@@ -151,10 +154,10 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
           : '';
 
       setFormData({
-        ...formData,
+        ...formData, // Preserve ID if it exists
         statement: statementContent,
         fullCorrection: generateCorrectionContent(parsed),
-        correctionSnippet: '',
+        correctionSnippet: '', // will be generated on save
         latexFormula: '',
         imageUrl: ''
       });
@@ -167,6 +170,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
       setError(err instanceof Error ? `Format JSON invalide: ${err.message}` : "Format JSON invalide");
     }
   };
+
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,7 +185,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
         imageUrl: formData.imageUrl?.trim() || undefined,
         latexFormula: formData.latexFormula?.trim() || undefined
       }, seriesId);
-    } catch {
+    } catch (err) {
       setError("Erreur lors de la sauvegarde");
     } finally {
       setIsSaving(false);

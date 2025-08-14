@@ -60,8 +60,8 @@ const generateCorrectionContent = (data: any): string => {
   return content
     .replace(/\$\$([\s\S]*?)\$\$/g, '\n\n$$$1$$\n\n')
     .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n')
-    .replace(/([^\s])(\$[^$]+\$|\\\([\s\S]*?\\))/g, '$1 $2') // leading space
-    .replace(/(\$[^$]+\$|\\\([\s\S]*?\\))([^\s])/g, '$1 $2'); // trailing space
+    .replace(/([^\s])(\$[^$]+\$|\\\([\s\S]*?\\\)\))/g, '$1 $2') // leading space
+    .replace(/(\$[^$]+\$|\\\([\s\S]*?\\\)\))([^\s])/g, '$1 $2'); // trailing space
 };
 
 

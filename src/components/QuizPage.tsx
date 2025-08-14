@@ -1,10 +1,8 @@
 
 import React, { useState } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { Quiz } from '@/types';
 import { ArrowLeftIcon } from '@/components/icons';
-import { MathJaxRenderer } from '@/components/MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from '@/components/MathJaxRenderer';
 import { useAuth } from '@/contexts/AuthContext';
 import { CircularProgressBar } from '@/components/CircularProgressBar';
 import * as userService from '@/services/userService';
@@ -115,7 +113,7 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterId, chapterTitl
                         <div key={q.id} className={`p-4 rounded-lg border-2 ${q.correctAnswerIndex !== undefined ? (selectedAnswers[index] === q.correctAnswerIndex ? 'border-green-500/50 bg-green-900/20' : 'border-red-500/50 bg-red-900/20') : 'border-gray-600'}`}>
                             <div className="font-semibold text-gray-200 flex items-start gap-2">
                                <span>{index + 1}.</span>
-                               <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(q.question) as string)} />
+                               <MathJaxRenderer content={processMarkdownWithMath(q.question)} />
                             </div>
                             {q.options && typeof q.correctAnswerIndex !== 'undefined' && (
                                 <p className="text-sm text-green-400 mt-2">Bonne réponse : <span className="font-medium">{q.options[q.correctAnswerIndex]}</span></p>
@@ -143,7 +141,7 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterId, chapterTitl
 
             <div className="bg-gray-800/50 p-8 rounded-xl border border-gray-700">
                 <div className="text-xl font-semibold text-gray-200 mb-6">
-                   {currentQuestion && <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(currentQuestion.question) as string)} />}
+                   {currentQuestion && <MathJaxRenderer content={processMarkdownWithMath(currentQuestion.question)} />}
                 </div>
                 {currentQuestion && currentQuestion.options && (
                     <div className="space-y-4">
@@ -157,7 +155,7 @@ export const QuizPage: React.FC<QuizPageProps> = ({ quiz, chapterId, chapterTitl
                                         : 'bg-gray-700/50 border-gray-600 hover:bg-gray-700'
                                 }`}
                             >
-                                <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(option) as string)} />
+                                <MathJaxRenderer content={processMarkdownWithMath(option)} />
                             </button>
                         ))}
                     </div>

@@ -1,11 +1,9 @@
 
 import React from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { Series, Exercise } from '@/types';
 import { ArrowLeftIcon, PencilIcon, TrashIcon, PlusCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
-import { MathJaxRenderer } from '@/components/MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from '@/components/MathJaxRenderer';
 
 interface ExerciseListPageProps {
     series: Series;
@@ -67,7 +65,7 @@ export const ExerciseListPage: React.FC<ExerciseListPageProps> = ({
                                 <div className="flex-grow overflow-hidden">
                                     <h3 className="text-xl font-semibold text-gray-200">Exercice {index + 1}</h3>
                                     <div className="text-gray-400 mt-2 line-clamp-2">
-                                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement, { breaks: true }) as string)} />
+                                        <MathJaxRenderer content={processMarkdownWithMath(exercise.statement)} />
                                     </div>
                                 </div>
                                 {isAdmin && (

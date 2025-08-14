@@ -1,12 +1,9 @@
 
 
-
 import React, { useRef, useState } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { ArrowLeftIcon, PencilIcon, BookOpenIcon, QuestionMarkCircleIcon } from '@/components/icons';
 import { Exercise, Chapter, ExerciseContext, User } from '@/types';
-import { MathJaxRenderer } from '@/components/MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from '@/components/MathJaxRenderer';
 import { DesmosGraph } from '@/components/DesmosGraph';
 import { useAuth } from '@/contexts/AuthContext';
 import { RelatedExercises } from '@/components/RelatedExercises';
@@ -121,7 +118,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                 <div className="text-gray-300">
                     <h3 className="font-semibold text-gray-400 uppercase tracking-wider text-sm mb-2">Énoncé de l'exercice</h3>
                      <div className="prose prose-invert max-w-none">
-                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.statement) as string)} />
+                        <MathJaxRenderer content={processMarkdownWithMath(exercise.statement)} />
                     </div>
                 </div>
 
@@ -145,7 +142,7 @@ export const ExercisePage: React.FC<ExercisePageProps> = ({ exercise, chapter, s
                     {showOfficialCorrection ? (
                         <div className="mt-4 pt-4 border-t border-gray-700/50">
                              <div className="prose prose-invert max-w-none">
-                                <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(exercise.fullCorrection) as string)} />
+                                <MathJaxRenderer content={processMarkdownWithMath(exercise.fullCorrection)} />
                             </div>
                         </div>
                     ) : (

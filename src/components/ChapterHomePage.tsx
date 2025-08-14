@@ -1,10 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { Chapter, Quiz, VideoLink } from '@/types';
 import { ArrowLeftIcon, BookOpenIcon, QuestionMarkCircleIcon, DocumentTextIcon, PlayCircleIcon, PencilIcon, PlusCircleIcon, TrashIcon } from '@/components/icons';
-import { MathJaxRenderer } from '@/components/MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from '@/components/MathJaxRenderer';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ChapterHomePageProps {
@@ -145,7 +143,7 @@ export const ChapterHomePage: React.FC<ChapterHomePageProps> = ({
                         </h3>
                     </div>
                     <div className="prose prose-invert max-w-none text-gray-300">
-                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(chapter.summary) as string)} />
+                        <MathJaxRenderer content={processMarkdownWithMath(chapter.summary)} />
                     </div>
                 </div>
 

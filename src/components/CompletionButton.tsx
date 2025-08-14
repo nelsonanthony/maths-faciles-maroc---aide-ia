@@ -1,7 +1,5 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { useAuth } from '../contexts/AuthContext';
 import * as userService from '../services/userService';
 import { SpinnerIcon, CheckCircleIcon, XCircleIcon, CameraIcon, TrashIcon, PlusCircleIcon, PencilIcon } from './icons';
@@ -9,7 +7,7 @@ import { Exercise } from '../types';
 import { getSupabase } from '../services/authService';
 import imageCompression from 'browser-image-compression';
 import { MathKeyboard } from './MathKeyboard';
-import { MathJaxRenderer } from './MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from './MathJaxRenderer';
 
 
 interface FeedbackPart {
@@ -377,7 +375,7 @@ export const CompletionButton: React.FC<CompletionButtonProps> = ({ exercise }) 
                                 <div className="flex-grow">
                                     <h5 className="font-semibold text-slate-200">{part.part_title}</h5>
                                     <div className="text-sm text-slate-400 prose prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ul:pl-4 prose-li:my-0.5">
-                                        <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(part.explanation) as string)} />
+                                        <MathJaxRenderer content={processMarkdownWithMath(part.explanation)} />
                                     </div>
                                 </div>
                             </div>

@@ -1,62 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
-import { MathJaxRenderer } from '@/components/MathJaxRenderer';
-
-const getPreviewContent = (text: string | undefined, fallback: string): string => {
-  const content = text?.trim() ?? fallback;
-  if (!content) return `<p>${fallback}</p>`;
-
-  const math: string[] = [];
-  const placeholder = (i: number) => `<!--MATHJAX_${i}-->`;
-
-  /* ----------- 1️⃣  Remplacement par des placeholders ----------- */
-  let processed = content
-    // $$…$$  (display)
-    .replace(/\$\$([\s\S]*?)\$\$/g, (_, m) => {
-      const i = math.length;
-      math.push(`$$${m}$$`);
-      return placeholder(i);
-    })
-    // $…$  (inline)
-    .replace(/\$((?:\\.|[^$])*)\$/g, (_, m) => {
-      const i = math.length;
-      math.push(`$${m}$`);
-      return placeholder(i);
-    })
-    // \(...\)  (alternative inline)
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_, m) => {
-      const i = math.length;
-      math.push(`\\(${m}\\)`);
-      return placeholder(i);
-    });
-
-  /* ------------------- 2️⃣  Markdown → HTML ------------------- */
-  const html = marked.parse(processed, {
-    gfm: true,
-    breaks: false, // ← éviter les <br> superflus
-  }) as string;
-
-  /* ------------------- 3️⃣  Ré‑injection des maths ----------- */
-  const finalHtml = html.replace(/<!--MATHJAX_(\d+)-->/g, (_, idx) => {
-    const i = Number(idx);
-    return math[i] ?? '';
-  });
-
-  // Nettoyage final (DOMPurify)
-  return DOMPurify.sanitize(finalHtml);
-};
-
-
-interface EditExerciseModalProps {
-  exercise: Exercise | null;
-  seriesId: string;
-  onSave: (exerciseData: Exercise, seriesId: string) => Promise<void>;
-  onClose: () => void;
-}
+import { MathJaxRenderer, processMarkdownWithMath } from '@/components/MathJaxRenderer';
 
 const emptyExercise: Omit<Exercise, 'id'> = {
   statement: '',
@@ -112,7 +58,12 @@ const generateCorrectionContent = (data: any): string => {
 };
 
 
-export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({ 
+export const EditExerciseModal: React.FC<{ 
+  exercise: Exercise | null;
+  seriesId: string;
+  onSave: (exerciseData: Exercise, seriesId: string) => Promise<void>;
+  onClose: () => void;
+}> = ({ 
   exercise, 
   seriesId, 
   onSave, 
@@ -278,7 +229,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
                     Prévisualisation élève
                   </h4>
                   <div className="prose prose-invert max-w-none p-4 min-h-[10rem] bg-slate-900/50 rounded-lg border border-slate-700">
-                    <MathJaxRenderer content={getPreviewContent(formData.statement, "Aucun énoncé")} />
+                    <MathJaxRenderer content={processMarkdownWithMath(formData.statement)} />
                   </div>
                 </div>
                 <div>
@@ -286,7 +237,7 @@ export const EditExerciseModal: React.FC<EditExerciseModalProps> = ({
                     Prévisualisation correction
                   </h4>
                   <div className="prose prose-invert max-w-none p-4 min-h-[12rem] bg-slate-900/50 rounded-lg border border-slate-700">
-                    <MathJaxRenderer content={getPreviewContent(formData.fullCorrection, "Aucune correction")} />
+                    <MathJaxRenderer content={processMarkdownWithMath(formData.fullCorrection)} />
                   </div>
                 </div>
               </div>

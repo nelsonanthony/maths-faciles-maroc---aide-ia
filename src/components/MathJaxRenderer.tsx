@@ -94,8 +94,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         })
-        // Use negative lookbehind to avoid matching escaped dollars like \$
-        .replace(/(?<!\\)\$([^\n\$]+?)\$/g, (match) => {
+        // Use a robust regex that matches a single dollar, then any character except a dollar, then a closing dollar.
+        .replace(/\$([^$]+?)\$/g, (match) => {
             placeholders.push(match);
             return placeholder(placeholders.length - 1);
         });

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
@@ -54,7 +55,10 @@ const generateCorrectionContent = (data: any): string => {
     content += `## Astuce\n${data.Astuce}\n\n`;
   }
 
-  return content;
+  // Proactively add spacing to help the Markdown parser
+  return content
+    .replace(/\$\$([\s\S]*?)\$\$/g, '\n\n$$$1$$\n\n')
+    .replace(/\\\[([\s\S]*?)\\\]/g, '\n\n\\[$1\\]\n\n');
 };
 
 

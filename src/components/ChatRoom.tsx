@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -6,30 +7,13 @@ import { ChatRoom as ChatRoomType, ChatMessage } from '@/types';
 import { getSupabase } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { ArrowLeftIcon, SpinnerIcon } from '@/components/icons';
-import { MathJaxRenderer } from './MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from './MathJaxRenderer';
 import { MathKeyboard } from './MathKeyboard';
 
 interface ChatRoomProps {
     room: ChatRoomType;
     onBack: () => void;
 }
-
-const processLineForMathJax = (line: string): string => {
-    if (!line) return '';
-    // This regex is stateful, so we need a new instance for each call.
-    const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/;
-    const parts = line.split(textRegex);
-    
-    return parts.map((part, index) => {
-        if (index % 2 === 1) {
-            return `\\text{${part}}`;
-        } else {
-            // Everything else (spaces, symbols, numbers, single letters) is at even indices.
-            // Replace spaces with non-breaking spaces for proper rendering in math mode.
-            return part.replace(/ /g, '~');
-        }
-    }).join('');
-};
 
 const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
     const { user } = useAuth();
@@ -140,27 +124,16 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             <main className="flex-grow p-4 overflow-y-auto space-y-4">
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
-                {messages.map(msg => {
-                    const mathContent = `$$ \\begin{array}{l} ${
-                        msg.content
-                            .replace(/\\ /g, ' ')      // Normalize MathQuill space to a regular space
-                            .replace(/\\\\/g, '\n') // Normalize MathQuill breaks to newlines
-                            .split('\n')
-                            .map(processLineForMathJax)
-                            .join(' \\\\ ')
-                    } \\end{array} $$`;
-
-                    return (
-                        <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
-                            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                                {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
-                                <div className="text-sm">
-                                    <MathJaxRenderer content={mathContent} />
-                                </div>
+                {messages.map(msg => (
+                    <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
+                        <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                            {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
+                            <div className="text-sm prose prose-invert max-w-none">
+                                <MathJaxRenderer content={processMarkdownWithMath(msg.content)} />
                             </div>
                         </div>
-                    );
-                })}
+                    </div>
+                ))}
                 <div ref={messagesEndRef} />
             </main>
 

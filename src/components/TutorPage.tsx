@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -6,7 +7,7 @@ import { useAIExplain } from '@/hooks/useAIExplain';
 import { SpinnerIcon, PlayCircleIcon, PaperClipIcon, ArrowLeftIcon, XCircleIcon } from '@/components/icons';
 import { useAuth } from '@/contexts/AuthContext';
 import { DialogueMessage, SocraticPath, AIResponse, Exercise, Chapter } from '@/types';
-import { MathJaxRenderer } from './MathJaxRenderer';
+import { MathJaxRenderer, processMarkdownWithMath } from './MathJaxRenderer';
 import { getSupabase } from '../services/authService';
 import { EditableMathField, MathField } from 'react-mathquill';
 import { MathKeyboard } from './MathKeyboard';
@@ -59,25 +60,6 @@ const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | nu
     );
 };
 
-const processLineForMathJax = (line: string): string => {
-    // This regex identifies consecutive sequences of 2 or more letters (including accented ones).
-    const textRegex = /([a-zA-Z\u00C0-\u017F]{2,})/g;
-    
-    // Split the line by these text blocks. The text blocks will be at odd indices in the resulting array.
-    const parts = line.split(textRegex);
-
-    return parts.map((part, index) => {
-        // If it's a text block (odd index), wrap it in \text{}.
-        if (index % 2 === 1) {
-            return `\\text{${part}}`;
-        } else {
-            // Otherwise, it's a mix of symbols, numbers, single letters, and spaces.
-            // Replace spaces with non-breaking spaces `~` for correct rendering in math mode.
-            return part.replace(/ /g, '~');
-        }
-    }).join('');
-};
-
 const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }> = ({ dialogue, onBack }) => (
     <div className="p-4 space-y-4 animate-fade-in h-full flex flex-col">
         <h3 className="text-2xl font-bold text-center text-slate-100">Résumé de la session</h3>
@@ -88,15 +70,7 @@ const TutorSummary: React.FC<{ dialogue: DialogueMessage[], onBack: () => void }
                 if (msg.role === 'ai') {
                     content = <MathJaxRenderer content={DOMPurify.sanitize(marked.parse(msg.content, { breaks: true }) as string)} />;
                 } else {
-                     const mathContent = `$$ \\begin{array}{l} ${
-                        msg.content
-                            .replace(/\\ /g, ' ') // Normalize MathQuill space
-                            .replace(/\\\\/g, '\n') // Normalize MathQuill breaks
-                            .split('\n')
-                            .map(processLineForMathJax)
-                            .join(' \\\\ ')
-                    } \\end{array} $$`;
-                    content = <MathJaxRenderer content={mathContent} />;
+                    content = <MathJaxRenderer content={processMarkdownWithMath(msg.content)} />;
                 }
                 
                 return (
@@ -361,15 +335,8 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                         {msg.role === 'ai' ? (
                             <AiMessage message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk?.video_id || '', aiResponse?.videoChunk?.start_time_seconds || 0)} />
                         ) : msg.role === 'user' ? (
-                             <div className="chat-bubble user-bubble self-end">
-                                <MathJaxRenderer content={`$$ \\begin{array}{l} ${
-                                    msg.content
-                                        .replace(/\\ /g, ' ')
-                                        .replace(/\\\\/g, '\n')
-                                        .split('\n')
-                                        .map(processLineForMathJax)
-                                        .join(' \\\\ ')
-                                } \\end{array} $$`} />
+                             <div className="chat-bubble user-bubble self-end prose prose-invert max-w-none">
+                                <MathJaxRenderer content={processMarkdownWithMath(msg.content)} />
                             </div>
                         ) : (
                             <div className="system-bubble self-center">{msg.content}</div>

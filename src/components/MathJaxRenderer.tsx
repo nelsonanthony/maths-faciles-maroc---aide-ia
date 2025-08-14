@@ -68,7 +68,7 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   const placeholder = (i: number) => `<!--MATHJAX_PLACEHOLDER_${i}-->`;
 
   // 1. Isolate all math expressions to protect them from the Markdown parser.
-  // Display math is processed first to correctly handle nested expressions.
+  // The order of replacement is crucial: process display math first, then inline math.
   let processedText = source
     .replace(/\$\$([\s\S]*?)\$\$/g, (match) => { // display math $$...$$
       mathExpressions.push(match);
@@ -78,13 +78,12 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })
-    // Updated regex for inline math: using `+` instead of `*` to ensure content is not empty.
-    // This prevents issues with expressions like `$ $` being processed incorrectly.
-    .replace(/\$((?:\\.|[^$])+?)\$/g, (match) => { // inline math $...$
+    // Updated regex for inline math: matches single $, not preceded by another $ or a backslash.
+    .replace(/(?<![\$\\])\$([^$]+?)\$/g, (match) => {
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })
-    .replace(/\\\(([\s\S]+?)\\\)/g, (match) => { // inline math \(...\), also updated to `+`
+    .replace(/\\\(([\s\S]+?)\\\)/g, (match) => { // inline math \(...\)
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     });

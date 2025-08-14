@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Level, Chapter, Series, Exercise, Quiz, QuizQuestion, DeletionInfo } from "../src/types.js";
+import dataAccess from "./_lib/data-access.js";
 
 // This function runs on Vercel's servers (Node.js environment)
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -53,66 +54,77 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const { action, payload } = req.body;
         if (!action || !payload) return res.status(400).json({ error: "L'action et le payload sont requis." });
 
-        let rpcError;
-        
+        let curriculum = await dataAccess.getCurriculumFromSupabase();
+
         switch (action) {
             case 'ADD_OR_UPDATE_LEVEL': {
                 const levelData = payload.level as Level;
-                ({ error: rpcError } = await supabase.rpc('upsert_level', { p_level_data: levelData as any }));
+                const index = curriculum.findIndex(l => l.id === levelData.id);
+                if (index > -1) {
+                    curriculum[index] = { ...curriculum[index], ...levelData };
+                } else {
+                    curriculum.push(levelData);
+                }
                 break;
             }
             case 'ADD_OR_UPDATE_CHAPTER': {
-                const { levelId, chapter } = payload as { levelId: string, chapter: Chapter };
-                // Using the specific 'upsert_chapter' function as defined in the provided SQL v3 script.
-                ({ error: rpcError } = await supabase.rpc('upsert_chapter', { p_level_id: levelId, p_chapter_data: chapter as any }));
+                const { levelId, chapter: chapterData } = payload as { levelId: string, chapter: Chapter };
+                const level = curriculum.find(l => l.id === levelId);
+                if (!level) throw new Error(`Niveau ${levelId} non trouvé.`);
+                const index = level.chapters.findIndex(c => c.id === chapterData.id);
+                if (index > -1) {
+                    level.chapters[index] = { ...level.chapters[index], ...chapterData };
+                } else {
+                    level.chapters.push(chapterData);
+                }
                 break;
             }
              case 'ADD_OR_UPDATE_SERIES': {
-                const { levelId, chapterId, series } = payload as { levelId: string, chapterId: string, series: Series };
-                const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
-                const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                if (chapterIdx === null) throw new Error(`Chapitre ${chapterId} non trouvé.`);
-                
-                const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: series as any }));
+                const { levelId, chapterId, series: seriesData } = payload as { levelId: string, chapterId: string, series: Series };
+                const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                if (!chapter) throw new Error(`Chapitre ${chapterId} non trouvé.`);
+                const index = chapter.series.findIndex(s => s.id === seriesData.id);
+                if (index > -1) {
+                    chapter.series[index] = { ...chapter.series[index], ...seriesData };
+                } else {
+                    chapter.series.push(seriesData);
+                }
                 break;
             }
              case 'ADD_OR_UPDATE_EXERCISE': {
                 const { levelId, chapterId, seriesId, exercise } = payload as { levelId: string, chapterId: string, seriesId: string, exercise: Exercise };
-                const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
-                const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                if (chapterIdx === null) throw new Error(`Chapitre ${chapterId} non trouvé.`);
-                const { data: seriesIdx } = await supabase.rpc('find_series_idx', { p_level_id: levelId, p_chapter_id: chapterId, p_series_id: seriesId });
-                if (seriesIdx === null) throw new Error(`Série ${seriesId} non trouvée.`);
-                
-                const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series', seriesIdx.toString(), 'exercises'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: exercise as any }));
+                const series = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.series.find(s => s.id === seriesId);
+                if (!series) throw new Error(`Série ${seriesId} non trouvée.`);
+                const index = series.exercises.findIndex(e => e.id === exercise.id);
+                if (index > -1) {
+                    series.exercises[index] = exercise;
+                } else {
+                    series.exercises.push(exercise);
+                }
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ': {
-                const { levelId, chapterId, quiz } = payload as { levelId: string, chapterId: string, quiz: Quiz };
-                const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
-                const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                if (chapterIdx === null) throw new Error(`Chapitre ${chapterId} non trouvé.`);
-
-                const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: quiz as any }));
+                const { levelId, chapterId, quiz: quizData } = payload as { levelId: string, chapterId: string, quiz: Quiz };
+                const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                if (!chapter) throw new Error(`Chapitre ${chapterId} non trouvé.`);
+                const index = chapter.quizzes.findIndex(q => q.id === quizData.id);
+                if (index > -1) {
+                    chapter.quizzes[index] = { ...chapter.quizzes[index], ...quizData };
+                } else {
+                    chapter.quizzes.push(quizData);
+                }
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ_QUESTION': {
                 const { levelId, chapterId, quizId, question } = payload as { levelId: string, chapterId: string, quizId: string, question: QuizQuestion };
-                const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                if (levelIdx === null) throw new Error(`Niveau ${levelId} non trouvé.`);
-                const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                if (chapterIdx === null) throw new Error(`Chapitre ${chapterId} non trouvé.`);
-                const { data: quizIdx } = await supabase.rpc('find_quiz_idx', { p_level_id: levelId, p_chapter_id: chapterId, p_quiz_id: quizId });
-                if (quizIdx === null) throw new Error(`Quiz ${quizId} non trouvé.`);
-
-                const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes', quizIdx.toString(), 'questions'];
-                ({ error: rpcError } = await supabase.rpc('upsert_item', { p_path: path, p_item_data: question as any }));
+                const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
+                if (!quiz) throw new Error(`Quiz ${quizId} non trouvé.`);
+                const index = quiz.questions.findIndex(q => q.id === question.id);
+                if (index > -1) {
+                    quiz.questions[index] = question;
+                } else {
+                    quiz.questions.push(question);
+                }
                 break;
             }
             case 'DELETE_ITEM': {
@@ -121,51 +133,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 switch(type) {
                     case 'level':
-                        ({ error: rpcError } = await supabase.rpc('delete_level', { p_level_id: levelId }));
+                        curriculum = curriculum.filter(l => l.id !== levelId);
                         break;
                     case 'chapter':
-                        ({ error: rpcError } = await supabase.rpc('delete_chapter', { p_level_id: levelId, p_chapter_id: chapterId }));
+                        curriculum.find(l => l.id === levelId)!.chapters = curriculum.find(l => l.id === levelId)!.chapters.filter(c => c.id !== chapterId);
                         break;
-                    case 'series': {
-                        const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                        if (levelIdx === null) break;
-                        const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                        if (chapterIdx === null) break;
-                        const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series'];
-                        ({ error: rpcError } = await supabase.rpc('delete_item', { p_path_to_parent_array: path, p_item_id: seriesId }));
+                    case 'series': 
+                        const chapterForSeries = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                        if(chapterForSeries) chapterForSeries.series = chapterForSeries.series.filter(s => s.id !== seriesId);
                         break;
-                    }
-                    case 'exercise': {
-                        const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                        if (levelIdx === null) break;
-                        const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                        if (chapterIdx === null) break;
-                        const { data: seriesIdx } = await supabase.rpc('find_series_idx', { p_level_id: levelId, p_chapter_id: chapterId, p_series_id: seriesId });
-                        if (seriesIdx === null) break;
-                        const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'series', seriesIdx.toString(), 'exercises'];
-                        ({ error: rpcError } = await supabase.rpc('delete_item', { p_path_to_parent_array: path, p_item_id: exerciseId }));
+                    case 'exercise':
+                        const seriesForEx = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.series.find(s => s.id === seriesId);
+                        if(seriesForEx) seriesForEx.exercises = seriesForEx.exercises.filter(e => e.id !== exerciseId);
                         break;
-                    }
-                     case 'quiz': {
-                        const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                        if (levelIdx === null) break;
-                        const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                        if (chapterIdx === null) break;
-                        const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes'];
-                        ({ error: rpcError } = await supabase.rpc('delete_item', { p_path_to_parent_array: path, p_item_id: quizId }));
+                    case 'quiz':
+                         const chapterForQuiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
+                         if(chapterForQuiz) chapterForQuiz.quizzes = chapterForQuiz.quizzes.filter(q => q.id !== quizId);
                         break;
-                    }
-                    case 'quizQuestion': {
-                        const { data: levelIdx } = await supabase.rpc('find_level_idx', { p_level_id: levelId });
-                        if (levelIdx === null) break;
-                        const { data: chapterIdx } = await supabase.rpc('find_chapter_idx', { p_level_id: levelId, p_chapter_id: chapterId });
-                        if (chapterIdx === null) break;
-                        const { data: quizIdx } = await supabase.rpc('find_quiz_idx', { p_level_id: levelId, p_chapter_id: chapterId, p_quiz_id: quizId });
-                        if (quizIdx === null) break;
-                        const path = [levelIdx.toString(), 'chapters', chapterIdx.toString(), 'quizzes', quizIdx.toString(), 'questions'];
-                        ({ error: rpcError } = await supabase.rpc('delete_item', { p_path_to_parent_array: path, p_item_id: questionId }));
+                    case 'quizQuestion':
+                        const quizForQuestion = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
+                        if(quizForQuestion) quizForQuestion.questions = quizForQuestion.questions.filter(qu => qu.id !== questionId);
                         break;
-                    }
                 }
                 break;
             }
@@ -173,12 +161,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.status(400).json({ error: `Action inconnue: ${action}` });
         }
         
-        if (rpcError) {
-            console.error(`Erreur RPC pour l'action '${action}':`, rpcError);
-            throw new Error(`Échec de l'opération: ${rpcError.message}`);
+        // Save the entire updated curriculum back to the database
+        const { error: updateError } = await (supabase
+            .from('curriculum') as any)
+            .update({ data: curriculum })
+            .eq('id', 1);
+
+        if (updateError) {
+            throw new Error(`Échec de la sauvegarde dans la base de données : ${updateError.message}`);
         }
         
-        return res.status(200).json({ success: true });
+        dataAccess.invalidateCache();
+
+        return res.status(200).json({ success: true, message: "Curriculum mis à jour avec succès." });
 
     } catch (e: any) {
         console.error(`Erreur critique dans 'update-curriculum' pour l'action '${req.body.action}':`, e);

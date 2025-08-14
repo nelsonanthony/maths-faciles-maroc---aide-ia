@@ -55,6 +55,12 @@ const initializeMathJax = (): Promise<void> => {
   return mathjaxPromise;
 };
 
+// Create a custom renderer that does not add IDs to headings
+const customRenderer = new marked.Renderer();
+customRenderer.heading = (text: string, level: number): string => {
+  return `<h${level}>${text}</h${level}>\n`;
+};
+
 /**
  * Robustly processes a Markdown string that contains LaTeX, ensuring math is not corrupted by the parser.
  * @param content The Markdown string to process.
@@ -64,59 +70,55 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
     let source = content || '';
     if (!source.trim()) return '';
 
-    // Step 1: Add spacing around math expressions to prevent Marked.js from merging them with text.
-    // Display math gets newlines for block separation.
+    // Étape 1: Protéger les formules mathématiques
     source = source
+        // Protéger les formules display
         .replace(/(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g, '\n\n$1\n\n')
-        // Inline math gets a leading space if it follows a non-space character.
-        .replace(/([^\s])(\$[^\n$]+?\$|\\\([\s\S]*?\\\))/g, '$1 $2')
-        // Inline math gets a trailing space if it's followed by a non-space character.
-        .replace(/(\$[^\n$]+?\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2');
+        // Protéger les formules en ligne en ajoutant un espace si elles sont collées à du texte
+        .replace(/([^\s])(\$[^$]+?\$|\\\([\s\S]*?\\\))/g, '$1 $2')
+        .replace(/(\$[^$]+?\$|\\\([\s\S]*?\\\))([^\s])/g, '$1 $2');
 
     const placeholders: string[] = [];
     const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
 
-    // Step 2: Replace math expressions with placeholders before parsing.
-    let processedText = source
-        // Display math $$...$$
-        .replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
-        placeholders.push(match);
-        return placeholder(placeholders.length - 1);
-        })
-        // Display math \[...\]
-        .replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
-        placeholders.push(match);
-        return placeholder(placeholders.length - 1);
-        })
-        // Inline math $...$ - Improved regex to avoid escaped dollars and newlines
-        .replace(/(^|[^\\])\$([^$\n]+?)\$/g, (_, prefix, math) => {
-            const originalMatch = `$${math}$`;
-            placeholders.push(originalMatch);
-            return `${prefix}${placeholder(placeholders.length - 1)}`;
-        })
-        // Inline math \(...\)
-        .replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
-        placeholders.push(match);
-        return placeholder(placeholders.length - 1);
-        });
+    // Étape 2: Remplacer séquentiellement les expressions mathématiques par des placeholders
+    let processedText = source;
+    
+    const mathPatterns = [
+        { regex: /\$\$[\s\S]*?\$\$/g, type: 'display' },
+        { regex: /\\\[[\s\S]*?\\\]/g, type: 'display' },
+        { regex: /\\\([\s\S]*?\\\)/g, type: 'inline' },
+        { regex: /(^|[^\\])\$([^$\n]+?)\$/g, type: 'inline' }
+    ];
 
-    // Step 3: Parse the Markdown with safer options.
-    let html = marked.parse(processedText, {
-        breaks: true,
+    mathPatterns.forEach(({ regex }) => {
+        processedText = processedText.replace(regex, (match) => {
+            placeholders.push(match);
+            return placeholder(placeholders.length - 1);
+        });
+    });
+
+    // Étape 3: Parser le Markdown
+    let html = marked.parse(processedText, { 
+        breaks: true, 
         gfm: true,
-        headerIds: false // Prevents generating IDs that might conflict
+        renderer: customRenderer,
     }) as string;
 
-    // Step 4: Restore math expressions from placeholders.
+    // Étape 4: Restaurer les expressions mathématiques
     html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
         return placeholders[parseInt(index, 10)];
     });
 
-    // Step 5: Clean up paragraphs that only contain display math.
+    // Étape 5: Nettoyer les paragraphes qui contiennent UNIQUEMENT des formules display
     html = html.replace(
-        /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g,
+        /<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g, 
         '$1'
     );
+    
+    // Étape 6: S'assurer qu'il y a un espace autour des formules inline pour éviter qu'elles ne soient collées au texte
+    html = html.replace(/\s*(\$[^$]+?\$|\\\([\s\S]*?\\\))\s*/g, ' $1 ');
+
 
     return DOMPurify.sanitize(html);
 };

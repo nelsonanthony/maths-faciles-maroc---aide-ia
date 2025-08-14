@@ -68,7 +68,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   source = source.replace(/\\ /g, ' ');
 
   const placeholders: string[] = [];
-  const placeholder = (i: number) => `__MATHJAX_PLACEHOLDER_${i}__`;
+  // Use a placeholder format that Markdown won't interpret. '@@' is safe, unlike '__'.
+  const placeholder = (i: number) => `@@MATHJAX_PLACEHOLDER_${i}@@`;
 
   // Step 2: Sequentially replace math expressions with placeholders.
   // Order is crucial: display math must be replaced before inline math to avoid conflicts.
@@ -94,7 +95,7 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   let html = marked.parse(processedText, { breaks: true, gfm: true }) as string;
 
   // Step 4: Restore the math expressions from placeholders.
-  html = html.replace(/__MATHJAX_PLACEHOLDER_(\d+)__/g, (_, index) => {
+  html = html.replace(/@@MATHJAX_PLACEHOLDER_(\d+)@@/g, (_, index) => {
     return placeholders[parseInt(index, 10)];
   });
   

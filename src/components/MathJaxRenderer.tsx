@@ -61,46 +61,49 @@ const initializeMathJax = (): Promise<void> => {
  * @returns Sanitized HTML string ready for rendering.
  */
 export const processMarkdownWithMath = (content: string | undefined): string => {
-  const source = content || '';
+  let source = content || '';
   if (!source.trim()) return '';
 
-  const mathExpressions: string[] = [];
-  const placeholder = (i: number) => `<!--MATHJAX_PLACEHOLDER_${i}-->`;
+  // Step 1: Fix MathQuill's escaped spaces, which is a key cause of "glued text".
+  source = source.replace(/\\ /g, ' ');
 
-  // 1. Isolate all math expressions to protect them from the Markdown parser.
-  // The order of replacement is crucial: process display math first, then inline math.
+  const placeholders: string[] = [];
+  const placeholder = (i: number) => `__MATHJAX_PLACEHOLDER_${i}__`;
+
+  // Step 2: Sequentially replace math expressions with placeholders.
+  // Order is crucial: display math must be replaced before inline math to avoid conflicts.
   let processedText = source
-    .replace(/\$\$([\s\S]*?)\$\$/g, (match) => { // display math $$...$$
-      mathExpressions.push(match);
-      return placeholder(mathExpressions.length - 1);
+    .replace(/\$\$([\s\S]*?)\$\$/g, (match) => { // Display math $$...$$
+      placeholders.push(match);
+      return placeholder(placeholders.length - 1);
     })
-    .replace(/\\\[([\s\S]*?)\\\]/g, (match) => { // display math \[...\]
-      mathExpressions.push(match);
-      return placeholder(mathExpressions.length - 1);
+    .replace(/\\\[([\s\S]*?)\\\]/g, (match) => { // Display math \[...\]
+      placeholders.push(match);
+      return placeholder(placeholders.length - 1);
     })
-    // Now process inline math.
-    .replace(/\$([^$]+?)\$/g, (match) => {
-      mathExpressions.push(match);
-      return placeholder(mathExpressions.length - 1);
+    .replace(/\$([^\n\r$]+?)\$/g, (match) => {   // Inline math $...$ (non-greedy, no newlines)
+      placeholders.push(match);
+      return placeholder(placeholders.length - 1);
     })
-    .replace(/\\\(([\s\S]+?)\\\)/g, (match) => { // inline math \(...\)
-      mathExpressions.push(match);
-      return placeholder(mathExpressions.length - 1);
+    .replace(/\\\(([\s\S]*?)\\\)/g, (match) => { // Inline math \(...\)
+      placeholders.push(match);
+      return placeholder(placeholders.length - 1);
     });
 
-  // 2. Parse the remaining text with Markdown
-  const html = marked.parse(processedText, { breaks: true, gfm: true }) as string;
-  
-  // 3. Restore math expressions.
-  // This also "unwraps" display math from <p> tags if they are on their own line, which is cleaner for rendering.
-  let finalHtml = html.replace(/<p>\s*<!--MATHJAX_PLACEHOLDER_(\d+)-->\s*<\/p>/g, (_, index) => {
-    return mathExpressions[parseInt(index, 10)];
-  }).replace(/<!--MATHJAX_PLACEHOLDER_(\d+)-->/g, (_, index) => {
-    return mathExpressions[parseInt(index, 10)];
+  // Step 3: Parse the remaining text with Markdown.
+  let html = marked.parse(processedText, { breaks: true, gfm: true }) as string;
+
+  // Step 4: Restore the math expressions from placeholders.
+  html = html.replace(/__MATHJAX_PLACEHOLDER_(\d+)__/g, (_, index) => {
+    return placeholders[parseInt(index, 10)];
   });
   
-  // 4. Sanitize the final HTML for security
-  return DOMPurify.sanitize(finalHtml);
+  // Step 5: Clean up cases where display math is wrapped in a <p> tag by `marked`,
+  // which can cause unwanted margins and layout issues.
+  html = html.replace(/<p>\s*(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])\s*<\/p>/g, '$1');
+
+  // Step 6: Sanitize the final HTML to prevent XSS attacks.
+  return DOMPurify.sanitize(html);
 };
 
 

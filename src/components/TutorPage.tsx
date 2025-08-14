@@ -35,7 +35,7 @@ const fileToBase64 = (file: File): Promise<string> =>
     });
 
 const AiMessage: React.FC<{ message: DialogueMessage; response?: AIResponse | null; onNavigate: () => void; }> = ({ message, response, onNavigate }) => {
-    const safeContent = DOMPurify.sanitize(marked.parse(message.content, { breaks: true }) as string);
+    const safeContent = processMarkdownWithMath(message.content);
     const videoChunk = response?.videoChunk;
     return (
         <div className="chat-bubble ai-bubble self-start animate-fade-in">

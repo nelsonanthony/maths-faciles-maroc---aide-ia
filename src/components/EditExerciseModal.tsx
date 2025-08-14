@@ -7,48 +7,23 @@ import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 const getPreviewContent = (text: string | undefined, fallback: string): string => {
-    const content = text || fallback;
-    if (!content.trim()) {
-      return `<p>${fallback}</p>`;
-    }
+  const content = text || fallback;
+  if (!content.trim()) {
+    return `<p>${fallback}</p>`;
+  }
 
-    const mathExpressions: string[] = [];
-    const placeholder = (index: number) => `<!-- MATHJAX_PLACEHOLDER_${index} -->`;
+  // Remplacer les délimiteurs LaTeX pour éviter les conflits avec Marked.js.
+  // C'est une approche robuste qui convertit les délimiteurs courants ($ et $$)
+  // en délimiteurs plus explicites (\( \) et \[ \]) avant que Marked n'analyse le texte.
+  const processedContent = content
+    // D'abord, traiter les délimiteurs de bloc ($$) pour éviter qu'ils ne soient traités comme des délimiteurs en ligne.
+    // Le 's' flag permet au '.' de matcher les nouvelles lignes, pour les formules sur plusieurs lignes.
+    .replace(/\$\$(.*?)\$\$/gs, (_match, formula) => `\\[${formula.trim()}\\]`)
+    // Ensuite, traiter les délimiteurs en ligne ($).
+    .replace(/\$(.*?)\$/g, (_match, formula) => `\\(${formula.trim()}\\)`);
 
-    // Process display math first to avoid capturing single `$` inside `$$`
-    let processedContent = content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
-        const index = mathExpressions.length;
-        mathExpressions.push(match);
-        return placeholder(index);
-    });
-    
-    // Process inline math $...$
-    processedContent = processedContent.replace(/\$((?:\\.|[^$])*?)\$/g, (match) => {
-        const index = mathExpressions.length;
-        mathExpressions.push(match);
-        return placeholder(index);
-    });
-
-    // Process inline math \(...\)
-    processedContent = processedContent.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
-        const index = mathExpressions.length;
-        mathExpressions.push(match);
-        return placeholder(index);
-    });
-
-    // Process with Marked
-    const htmlContent = marked.parse(processedContent, {
-        gfm: true,
-        breaks: true,
-    }) as string;
-
-    // Restore math expressions
-    const finalHtml = htmlContent.replace(/<!-- MATHJAX_PLACEHOLDER_(\d+) -->/g, (_, indexStr) => {
-        const index = parseInt(indexStr, 10);
-        return mathExpressions[index] || '';
-    });
-    
-    return DOMPurify.sanitize(finalHtml);
+  const html = marked.parse(processedContent, { gfm: true, breaks: true }) as string;
+  return DOMPurify.sanitize(html);
 };
 
 

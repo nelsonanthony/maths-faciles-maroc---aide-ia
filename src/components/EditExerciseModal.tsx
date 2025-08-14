@@ -12,17 +12,26 @@ const getPreviewContent = (text: string | undefined, fallback: string): string =
     return `<p>${fallback}</p>`;
   }
 
-  // Remplacer les délimiteurs LaTeX pour éviter les conflits avec Marked.js.
-  // C'est une approche robuste qui convertit les délimiteurs courants ($ et $$)
-  // en délimiteurs plus explicites (\( \) et \[ \]) avant que Marked n'analyse le texte.
-  const processedContent = content
-    // D'abord, traiter les délimiteurs de bloc ($$) pour éviter qu'ils ne soient traités comme des délimiteurs en ligne.
-    // Le 's' flag permet au '.' de matcher les nouvelles lignes, pour les formules sur plusieurs lignes.
-    .replace(/\$\$(.*?)\$\$/gs, (_match, formula) => `\\[${formula.trim()}\\]`)
-    // Ensuite, traiter les délimiteurs en ligne ($).
-    .replace(/\$(.*?)\$/g, (_match, formula) => `\\(${formula.trim()}\\)`);
+  const mathStore: string[] = [];
+  
+  // 1. Isolate LaTeX expressions by replacing them with HTML comment placeholders.
+  // The regex prioritizes block math ($$ ... $$) over inline math ($ ... $).
+  // The inline math regex `\$[^$]+\$` ensures it doesn't greedily match across multiple expressions.
+  const demathContent = content.replace(/(\$\$[\s\S]*?\$\$|\$[^$]+\$)/g, (match) => {
+    mathStore.push(match);
+    return `<!--MATHJAX_PLACEHOLDER_${mathStore.length - 1}-->`;
+  });
 
-  const html = marked.parse(processedContent, { gfm: true, breaks: true }) as string;
+  // 2. Process the remaining content (which is now safe) with marked.
+  let html = marked.parse(demathContent, { gfm: true, breaks: true }) as string;
+
+  // 3. Restore the original, untouched LaTeX expressions.
+  html = html.replace(/<!--MATHJAX_PLACEHOLDER_(\d+)-->/g, (_, indexStr) => {
+    const index = parseInt(indexStr, 10);
+    return mathStore[index] || '';
+  });
+
+  // 4. Sanitize the final HTML.
   return DOMPurify.sanitize(html);
 };
 

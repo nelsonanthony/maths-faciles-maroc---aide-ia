@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -66,7 +67,8 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   const mathExpressions: string[] = [];
   const placeholder = (i: number) => `<!--MATHJAX_PLACEHOLDER_${i}-->`;
 
-  // 1. Isolate all math expressions to protect them from the Markdown parser
+  // 1. Isolate all math expressions to protect them from the Markdown parser.
+  // Display math is processed first to correctly handle nested expressions.
   let processedText = source
     .replace(/\$\$([\s\S]*?)\$\$/g, (match) => { // display math $$...$$
       mathExpressions.push(match);
@@ -76,11 +78,13 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })
-    .replace(/\$((?:\\.|[^$])*?)\$/g, (match) => { // inline math $...$
+    // Updated regex for inline math: using `+` instead of `*` to ensure content is not empty.
+    // This prevents issues with expressions like `$ $` being processed incorrectly.
+    .replace(/\$((?:\\.|[^$])+?)\$/g, (match) => { // inline math $...$
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     })
-    .replace(/\\\(([\s\S]*?)\\\)/g, (match) => { // inline math \(...)\
+    .replace(/\\\(([\s\S]+?)\\\)/g, (match) => { // inline math \(...\), also updated to `+`
       mathExpressions.push(match);
       return placeholder(mathExpressions.length - 1);
     });
@@ -89,7 +93,7 @@ export const processMarkdownWithMath = (content: string | undefined): string => 
   const html = marked.parse(processedText, { breaks: true, gfm: true }) as string;
   
   // 3. Restore math expressions.
-  // This also "unwraps" display math from <p> tags if they are on their own line.
+  // This also "unwraps" display math from <p> tags if they are on their own line, which is cleaner for rendering.
   let finalHtml = html.replace(/<p>\s*<!--MATHJAX_PLACEHOLDER_(\d+)-->\s*<\/p>/g, (_, index) => {
     return mathExpressions[parseInt(index, 10)];
   }).replace(/<!--MATHJAX_PLACEHOLDER_(\d+)-->/g, (_, index) => {

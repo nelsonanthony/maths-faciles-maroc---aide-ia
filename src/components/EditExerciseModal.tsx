@@ -7,32 +7,47 @@ import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
 
 const getPreviewContent = (text: string | undefined, fallback: string): string => {
-  const content = text || fallback;
-  if (!content.trim()) {
-    return `<p>${fallback}</p>`;
-  }
+  const content = text?.trim() ?? fallback;
+  if (!content) return `<p>${fallback}</p>`;
 
-  const mathStore: string[] = [];
-  
-  // 1. Isolate LaTeX expressions by replacing them with HTML comment placeholders.
-  // The regex prioritizes block math ($$ ... $$) over inline math ($ ... $).
-  // The inline math regex `\$[^$]+\$` ensures it doesn't greedily match across multiple expressions.
-  const demathContent = content.replace(/(\$\$[\s\S]*?\$\$|\$[^$]+\$)/g, (match) => {
-    mathStore.push(match);
-    return `<!--MATHJAX_PLACEHOLDER_${mathStore.length - 1}-->`;
+  const math: string[] = [];
+  const placeholder = (i: number) => `<!--MATHJAX_${i}-->`;
+
+  /* ----------- 1️⃣  Remplacement par des placeholders ----------- */
+  let processed = content
+    // $$…$$  (display)
+    .replace(/\$\$([\s\S]*?)\$\$/g, (_, m) => {
+      const i = math.length;
+      math.push(`$$${m}$$`);
+      return placeholder(i);
+    })
+    // $…$  (inline)
+    .replace(/\$((?:\\.|[^$])*)\$/g, (_, m) => {
+      const i = math.length;
+      math.push(`$${m}$`);
+      return placeholder(i);
+    })
+    // \(...\)  (alternative inline)
+    .replace(/\\\(([\s\S]*?)\\\)/g, (_, m) => {
+      const i = math.length;
+      math.push(`\\(${m}\\)`);
+      return placeholder(i);
+    });
+
+  /* ------------------- 2️⃣  Markdown → HTML ------------------- */
+  const html = marked.parse(processed, {
+    gfm: true,
+    breaks: false, // ← éviter les <br> superflus
+  }) as string;
+
+  /* ------------------- 3️⃣  Ré‑injection des maths ----------- */
+  const finalHtml = html.replace(/<!--MATHJAX_(\d+)-->/g, (_, idx) => {
+    const i = Number(idx);
+    return math[i] ?? '';
   });
 
-  // 2. Process the remaining content (which is now safe) with marked.
-  let html = marked.parse(demathContent, { gfm: true, breaks: true }) as string;
-
-  // 3. Restore the original, untouched LaTeX expressions.
-  html = html.replace(/<!--MATHJAX_PLACEHOLDER_(\d+)-->/g, (_, indexStr) => {
-    const index = parseInt(indexStr, 10);
-    return mathStore[index] || '';
-  });
-
-  // 4. Sanitize the final HTML.
-  return DOMPurify.sanitize(html);
+  // Nettoyage final (DOMPurify)
+  return DOMPurify.sanitize(finalHtml);
 };
 
 

@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Quiz, QuizQuestion } from '@/types';
 import { XMarkIcon, PencilIcon, TrashIcon, PlusCircleIcon, SpinnerIcon } from '@/components/icons';
@@ -56,9 +57,11 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, o
           questions: localQuestions,
         };
         await onSave(finalQuiz, chapterId);
+        onClose(); // Close modal only on successful save
     } catch (err) {
         console.error("Save failed:", err);
-        setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');
+        // The main error is shown via an alert in handleCRUDError. This is a fallback message.
+        setError('La sauvegarde a échoué. Veuillez vérifier l\'alerte pour plus de détails et réessayer.');
     } finally {
         setIsSaving(false);
     }

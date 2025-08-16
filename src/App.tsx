@@ -329,7 +329,7 @@ export const App: React.FC = () => {
         }) || null;
         
         setCurriculum(optimisticCurriculum);
-        closeModal();
+        // The modal will close itself upon success.
 
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
@@ -337,7 +337,7 @@ export const App: React.FC = () => {
         } catch (error) {
             handleCRUDError(error, 'quiz');
             setCurriculum(originalCurriculum);
-            closeModal();
+            throw error; // Re-throw to let the modal know about the failure
         }
     };
 

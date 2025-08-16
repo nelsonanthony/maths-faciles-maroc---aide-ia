@@ -107,6 +107,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapterId, quiz: quizData } = payload as { levelId: string, chapterId: string, quiz: Quiz };
                 const chapter = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId);
                 if (!chapter) throw new Error(`Chapitre ${chapterId} non trouvé.`);
+                if (!chapter.quizzes) { // Defensive check
+                    chapter.quizzes = [];
+                }
                 const index = chapter.quizzes.findIndex(q => q.id === quizData.id);
                 if (index > -1) {
                     chapter.quizzes[index] = { ...chapter.quizzes[index], ...quizData };

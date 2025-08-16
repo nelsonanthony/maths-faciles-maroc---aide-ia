@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -337,12 +336,13 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             <AiMessage message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk?.video_id || '', aiResponse?.videoChunk?.start_time_seconds || 0)} />
                         ) : msg.role === 'user' ? (
                             (() => {
-                                // Explicitly replace spaces and newlines with their LaTeX equivalents
-                                // to ensure they are preserved inside the math environment.
-                                const formattedContent = msg.content.replace(/ /g, '\\ ').replace(/\n/g, '\\\\ ');
+                                const contentToRender = msg.content
+                                    .split('\n')
+                                    .map(line => line.trim() ? `$${line.replace(/ /g, '\\ ')}$` : '')
+                                    .join('<br/>');
                                 return (
                                     <div className="chat-bubble user-bubble self-end prose prose-invert max-w-none">
-                                        <MathJaxRenderer content={processMarkdownWithMath(`$${formattedContent}$`)} />
+                                        <MathJaxRenderer content={processMarkdownWithMath(contentToRender)} />
                                     </div>
                                 );
                             })()

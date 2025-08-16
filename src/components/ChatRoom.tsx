@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -125,18 +124,18 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
                 {messages.map(msg => {
-                    const formattedContent = msg.user_id === user?.id 
-                        ? msg.content.replace(/ /g, '\\ ').replace(/\n/g, '\\\\ ')
+                    const isUserMessage = msg.user_id === user?.id;
+                    const contentToRender = isUserMessage
+                        ? msg.content
+                            .split('\n')
+                            .map(line => line.trim() ? `$${line.replace(/ /g, '\\ ')}$` : '')
+                            .join('<br/>')
                         : msg.content;
-                    
-                    const contentToRender = msg.user_id === user?.id 
-                        ? `$${formattedContent}$` 
-                        : formattedContent;
 
                     return (
-                        <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
-                            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                                {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
+                        <div key={msg.id} className={`flex items-end gap-2 ${isUserMessage ? 'justify-end' : ''}`}>
+                            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${isUserMessage ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                                {!isUserMessage && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
                                 <div className="text-sm prose prose-invert max-w-none">
                                     <MathJaxRenderer content={processMarkdownWithMath(contentToRender)} />
                                 </div>

@@ -309,7 +309,7 @@ export const App: React.FC = () => {
 
     const handleAddOrUpdateQuiz = async (quizData: Quiz, chapterId: string) => {
         if (!selectedLevelId) return;
-
+    
         const originalCurriculum = curriculum;
         const optimisticCurriculum = originalCurriculum?.map(level => {
             if (level.id !== selectedLevelId) return level;
@@ -329,56 +329,44 @@ export const App: React.FC = () => {
         }) || null;
         
         setCurriculum(optimisticCurriculum);
-        // The modal will close itself upon success.
-
+    
         try {
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ', payload: { levelId: selectedLevelId, chapterId, quiz: quizData } });
-            await fetchInitialData(); // Re-sync with database
+            await fetchInitialData(); 
         } catch (error) {
             handleCRUDError(error, 'quiz');
             setCurriculum(originalCurriculum);
-            throw error; // Re-throw to let the modal know about the failure
+            throw error;
         }
     };
-
+    
     const handleAddOrUpdateQuizQuestion = async (questionData: QuizQuestion, quizId: string, chapterId: string) => {
         if (!selectedLevelId) return;
-
+    
         const originalCurriculum = curriculum;
-        let optimisticQuiz: Quiz | undefined;
-        const optimisticCurriculum = originalCurriculum?.map(l => {
-            if (l.id !== selectedLevelId) return l;
-            const newChaps = l.chapters.map(c => {
-                if (c.id !== chapterId) return c;
-                const newQuizzesArr = c.quizzes.map(q => {
-                    if (q.id !== quizId) return q;
-                    const questions = q.questions || [];
-                    const qIndex = questions.findIndex(qu => qu.id === questionData.id);
-                    const newQArr = [...questions];
-                    if (qIndex > -1) newQArr[qIndex] = questionData;
-                    else newQArr.push(questionData);
-                    const newQuizData = { ...q, questions: newQArr };
-                    optimisticQuiz = newQuizData;
-                    return newQuizData;
-                });
-                return { ...c, quizzes: newQuizzesArr };
-            });
-            return { ...l, chapters: newChaps };
-        }) || null;
-
-        setCurriculum(optimisticCurriculum);
-        closeModal();
-        if (optimisticQuiz) {
-            openModal({ type: 'editQuiz', payload: { quiz: optimisticQuiz, chapterId } });
-        }
-
+    
         try {
+            // API call is now first for robustness. No more optimistic update here.
             await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
-            await fetchInitialData(); // Re-sync with database
+            
+            // On success, re-fetch all data to ensure UI consistency.
+            const freshData = await getCurriculum();
+            setCurriculum(freshData);
+    
+            // Then, update the parent modal state so it re-renders with fresh data.
+            const freshQuiz = freshData.find(l => l.id === selectedLevelId)
+                                ?.chapters.find(c => c.id === chapterId)
+                                ?.quizzes.find(q => q.id === quizId);
+            
+            if (freshQuiz) {
+                // This happens just before EditQuizQuestionModal closes, so when it closes,
+                // the parent EditQuizModal will have the new data.
+                openModal({ type: 'editQuiz', payload: { quiz: freshQuiz, chapterId } });
+            }
         } catch (error) {
             handleCRUDError(error, 'question de quiz');
             setCurriculum(originalCurriculum);
-            closeModal();
+            throw error; // Re-throw to let the modal know about the failure.
         }
     };
 

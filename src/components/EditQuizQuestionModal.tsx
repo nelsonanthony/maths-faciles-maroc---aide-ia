@@ -79,6 +79,7 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
         };
 
         await onSave(finalQuestion, quizId, chapterId);
+        onClose(); // Close only on successful save
     } catch (err) {
         console.error("Save failed:", err);
         setError(err instanceof Error ? err.message : 'Erreur lors de la sauvegarde');

@@ -122,6 +122,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const { levelId, chapterId, quizId, question } = payload as { levelId: string, chapterId: string, quizId: string, question: QuizQuestion };
                 const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
                 if (!quiz) throw new Error(`Quiz ${quizId} non trouvé.`);
+                if (!quiz.questions) { // Defensive check to prevent crash
+                    quiz.questions = [];
+                }
                 const index = quiz.questions.findIndex(q => q.id === question.id);
                 if (index > -1) {
                     quiz.questions[index] = question;

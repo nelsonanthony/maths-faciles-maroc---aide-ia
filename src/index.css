@@ -62,6 +62,7 @@
   mjx-container[jax="SVG"] {
     display: inline-block;
     margin: 0.2em 0;
+    vertical-align: -0.1em; /* Ajout pour un meilleur alignement vertical */
   }
   .animate-gradient {
     background-size: 200% 200%;

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Series } from '@/types';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 
@@ -17,6 +17,10 @@ export const EditSeriesModal: React.FC<EditSeriesModalProps> = ({ series, onSave
   const [formData, setFormData] = useState(series || emptySeries);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData(series || emptySeries);
+  }, [series]);
 
   const isCreating = !series;
   const modalTitle = isCreating ? "Ajouter une nouvelle série" : "Modifier la série";

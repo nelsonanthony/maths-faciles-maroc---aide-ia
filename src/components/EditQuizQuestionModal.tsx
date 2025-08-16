@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QuizQuestion } from '@/types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
 
@@ -21,6 +21,10 @@ export const EditQuizQuestionModal: React.FC<EditQuizQuestionModalProps> = ({ qu
   const [formData, setFormData] = useState(question || emptyQuestion);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData(question || emptyQuestion);
+  }, [question]);
 
   const isCreating = !question;
   const modalTitle = isCreating ? "Ajouter une question" : "Modifier la question";

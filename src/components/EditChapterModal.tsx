@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Chapter, VideoLink } from '@/types';
 import { XMarkIcon, PlusCircleIcon, TrashIcon, SpinnerIcon } from '@/components/icons';
 
@@ -33,6 +34,12 @@ export const EditChapterModal: React.FC<EditChapterModalProps> = ({ chapter, onS
   const [videoLinks, setVideoLinks] = useState<VideoLink[]>(chapter?.videoLinks || []);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTitle(chapter?.title || '');
+    setSummary(chapter?.summary || '');
+    setVideoLinks(chapter?.videoLinks || []);
+  }, [chapter]);
   
   const isCreating = !chapter;
   const modalTitle = isCreating ? "Ajouter un nouveau chapitre" : "Modifier le chapitre";

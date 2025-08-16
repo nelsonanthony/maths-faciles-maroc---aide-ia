@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Level } from '@/types';
 import { XMarkIcon, SpinnerIcon } from '@/components/icons';
 
@@ -18,6 +18,10 @@ export const EditLevelModal: React.FC<EditLevelModalProps> = ({ level, onSave, o
   const [formData, setFormData] = useState(level || emptyLevel);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData(level || emptyLevel);
+  }, [level]);
 
   const isCreating = !level;
   const modalTitle = isCreating ? "Ajouter un nouveau niveau" : "Modifier le niveau";

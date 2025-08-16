@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Exercise } from '@/types';
 import { DesmosGraph } from '@/components/DesmosGraph';
@@ -79,6 +80,10 @@ export const EditExerciseModal: React.FC<{
   const [isJsonImporterOpen, setIsJsonImporterOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFormData(exercise || emptyExercise);
+  }, [exercise]);
 
   const isCreating = !exercise;
 

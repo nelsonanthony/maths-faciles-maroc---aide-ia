@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Quiz, QuizQuestion } from '@/types';
 import { XMarkIcon, PencilIcon, TrashIcon, PlusCircleIcon, SpinnerIcon } from '@/components/icons';
 import { MathJaxRenderer } from '@/components/MathJaxRenderer';
@@ -27,6 +27,14 @@ export const EditQuizModal: React.FC<EditQuizModalProps> = ({ quiz, chapterId, o
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // This effect ensures that if the parent component passes a new 'quiz' prop
+    // (e.g., after a child modal has updated it), the internal state of this
+    // modal is updated to reflect those changes.
+    setFormData({ title: quiz?.title || '' });
+    setLocalQuestions(quiz?.questions || []);
+  }, [quiz]);
 
   const isCreating = !quiz;
   const modalTitle = isCreating ? "Ajouter un nouveau quiz" : "Modifier le quiz";

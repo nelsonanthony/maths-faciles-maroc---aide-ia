@@ -119,12 +119,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 break;
             }
             case 'ADD_OR_UPDATE_QUIZ_QUESTION': {
-                const { levelId, chapterId, quizId, question } = payload as { levelId: string, chapterId: string, quizId: string, question: QuizQuestion };
+                const { levelId, chapterId, quizId, question: encodedQuestion } = payload as { levelId: string, chapterId: string, quizId: string, question: QuizQuestion };
                 const quiz = curriculum.find(l => l.id === levelId)?.chapters.find(c => c.id === chapterId)?.quizzes.find(q => q.id === quizId);
                 if (!quiz) throw new Error(`Quiz ${quizId} non trouvé.`);
-                if (!quiz.questions) { // Defensive check to prevent crash
+                if (!quiz.questions) {
                     quiz.questions = [];
                 }
+
+                // Decode the question and options text upon receiving it
+                const question: QuizQuestion = {
+                    ...encodedQuestion,
+                    question: decodeURIComponent(encodedQuestion.question),
+                    options: encodedQuestion.options?.map(opt => decodeURIComponent(opt))
+                };
+
                 const index = quiz.questions.findIndex(q => q.id === question.id);
                 if (index > -1) {
                     quiz.questions[index] = question;

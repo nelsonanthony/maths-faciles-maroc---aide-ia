@@ -346,27 +346,29 @@ export const App: React.FC = () => {
         const originalCurriculum = curriculum;
     
         try {
-            // API call is now first for robustness. No more optimistic update here.
-            await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: questionData } });
+            // Encode question and options text to safely transmit special characters like '?'
+            const encodedQuestionData = {
+                ...questionData,
+                question: encodeURIComponent(questionData.question),
+                options: questionData.options?.map(opt => encodeURIComponent(opt))
+            };
+
+            await callUpdateApi({ action: 'ADD_OR_UPDATE_QUIZ_QUESTION', payload: { levelId: selectedLevelId, chapterId, quizId, question: encodedQuestionData } });
             
-            // On success, re-fetch all data to ensure UI consistency.
             const freshData = await getCurriculum();
             setCurriculum(freshData);
     
-            // Then, update the parent modal state so it re-renders with fresh data.
             const freshQuiz = freshData.find(l => l.id === selectedLevelId)
                                 ?.chapters.find(c => c.id === chapterId)
                                 ?.quizzes.find(q => q.id === quizId);
             
             if (freshQuiz) {
-                // This happens just before EditQuizQuestionModal closes, so when it closes,
-                // the parent EditQuizModal will have the new data.
                 openModal({ type: 'editQuiz', payload: { quiz: freshQuiz, chapterId } });
             }
         } catch (error) {
             handleCRUDError(error, 'question de quiz');
             setCurriculum(originalCurriculum);
-            throw error; // Re-throw to let the modal know about the failure.
+            throw error;
         }
     };
 

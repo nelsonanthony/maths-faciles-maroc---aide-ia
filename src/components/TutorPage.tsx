@@ -336,9 +336,16 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                         {msg.role === 'ai' ? (
                             <AiMessage message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk?.video_id || '', aiResponse?.videoChunk?.start_time_seconds || 0)} />
                         ) : msg.role === 'user' ? (
-                             <div className="chat-bubble user-bubble self-end prose prose-invert max-w-none">
-                                <MathJaxRenderer content={processMarkdownWithMath(`$${msg.content}$`)} />
-                            </div>
+                            (() => {
+                                // Explicitly replace spaces and newlines with their LaTeX equivalents
+                                // to ensure they are preserved inside the math environment.
+                                const formattedContent = msg.content.replace(/ /g, '\\ ').replace(/\n/g, '\\\\ ');
+                                return (
+                                    <div className="chat-bubble user-bubble self-end prose prose-invert max-w-none">
+                                        <MathJaxRenderer content={processMarkdownWithMath(`$${formattedContent}$`)} />
+                                    </div>
+                                );
+                            })()
                         ) : (
                             <div className="system-bubble self-center">{msg.content}</div>
                         )}

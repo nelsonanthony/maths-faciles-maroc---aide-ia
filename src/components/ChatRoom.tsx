@@ -124,16 +124,26 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
             <main className="flex-grow p-4 overflow-y-auto space-y-4">
                 {isLoading && <div className="text-center"><SpinnerIcon className="w-6 h-6 animate-spin mx-auto" /></div>}
                 
-                {messages.map(msg => (
-                    <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
-                        <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
-                            {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
-                            <div className="text-sm prose prose-invert max-w-none">
-                                <MathJaxRenderer content={processMarkdownWithMath(`$${msg.content}$`)} />
+                {messages.map(msg => {
+                    const formattedContent = msg.user_id === user?.id 
+                        ? msg.content.replace(/ /g, '\\ ').replace(/\n/g, '\\\\ ')
+                        : msg.content;
+                    
+                    const contentToRender = msg.user_id === user?.id 
+                        ? `$${formattedContent}$` 
+                        : formattedContent;
+
+                    return (
+                        <div key={msg.id} className={`flex items-end gap-2 ${msg.user_id === user?.id ? 'justify-end' : ''}`}>
+                            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
+                                {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
+                                <div className="text-sm prose prose-invert max-w-none">
+                                    <MathJaxRenderer content={processMarkdownWithMath(contentToRender)} />
+                                </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                 <div ref={messagesEndRef} />
             </main>
 

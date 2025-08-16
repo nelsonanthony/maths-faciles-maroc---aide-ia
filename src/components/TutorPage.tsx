@@ -337,7 +337,7 @@ export const TutorPage: React.FC<TutorPageProps> = ({ exercise, chapter, levelId
                             <AiMessage message={msg} response={aiResponse} onNavigate={() => onNavigateToTimestamp(levelId, chapter.id, aiResponse?.videoChunk?.video_id || '', aiResponse?.videoChunk?.start_time_seconds || 0)} />
                         ) : msg.role === 'user' ? (
                              <div className="chat-bubble user-bubble self-end prose prose-invert max-w-none">
-                                <MathJaxRenderer content={processMarkdownWithMath(msg.content)} />
+                                <MathJaxRenderer content={processMarkdownWithMath(`$${msg.content}$`)} />
                             </div>
                         ) : (
                             <div className="system-bubble self-center">{msg.content}</div>

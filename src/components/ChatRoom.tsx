@@ -129,7 +129,7 @@ const ChatRoom: React.FC<ChatRoomProps> = ({ room, onBack }) => {
                         <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.user_id === user?.id ? 'bg-brand-blue-600 text-white' : 'bg-gray-700 text-gray-200'}`}>
                             {msg.user_id !== user?.id && <p className="text-xs font-bold text-brand-blue-300 mb-1">{msg.user_email}</p>}
                             <div className="text-sm prose prose-invert max-w-none">
-                                <MathJaxRenderer content={processMarkdownWithMath(msg.content)} />
+                                <MathJaxRenderer content={processMarkdownWithMath(`$${msg.content}$`)} />
                             </div>
                         </div>
                     </div>
